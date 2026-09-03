@@ -5,7 +5,6 @@ import StoplightCore
 /// US-008 + US-010/011 lists.
 struct SettingsView: View {
     @Bindable var model: AppModel
-    @AppStorage(Prefs.showCount) private var showCount = false
     @AppStorage(Prefs.notifications) private var notifications = "all"
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
@@ -30,7 +29,8 @@ struct SettingsView: View {
                 .pickerStyle(.radioGroup)
             }
             Section {
-                Toggle("Show count in menu bar", isOn: $showCount)
+                Toggle("Dark housing behind the dots", isOn: $model.prefs.housing)
+                Toggle("Show count in menu bar", isOn: $model.prefs.showCount)
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, on in
                         do {

@@ -165,6 +165,27 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - [ ] No drag-and-drop. Right-click and the hover glyph are the only affordances (drag in a menu bar popover is fiddly and dismisses easily)
 - [ ] Section headers only appear when the section is non-empty; with nothing pinned or watched the list looks exactly like v1
 
+### US-013: Watch people
+**Description:** As a user, I want to follow a teammate so all of their open PRs show up, grouped under their name.
+
+**Acceptance Criteria:**
+- [ ] The ⌘N field accepts `@login` (or a github.com/login profile URL) in addition to PR URLs
+- [ ] Each watched person adds one aliased `search(query: "is:pr is:open author:LOGIN archived:false")` to the existing poll request; still one HTTP call per poll
+- [ ] Their PRs render in a section headed `@login`, below Mine and Watching, worst-first within the section
+- [ ] Their PRs count toward the dots and fire notifications like watched PRs
+- [ ] Right-click a row in a person section → "Stop following @login"; Settings lists followed people with a remove button
+- [ ] Followed logins persist in UserDefaults as `[String]`
+- [ ] Hidden repos and pins apply to their PRs too
+- [ ] v1.1: "Add teammate" picker listing members of orgs you belong to (`viewer.organizations` → `membersWithRole`), requires `read:org`
+
+### US-014: Menu bar housing
+**Description:** As a user, I want an optional dark pill behind the dots so they read on any wallpaper.
+
+**Acceptance Criteria:**
+- [ ] Settings toggle "Dark housing behind the dots", off by default
+- [ ] Housing is a 14pt-tall pill, dark gray, 4pt padding around the dots; unlit dots become white at 28% so they show on the pill
+- [ ] Toggle takes effect immediately without restart
+
 ## Functional Requirements
 
 - FR-1: The app runs as a menu bar accessory only (`LSUIElement = true`), no Dock icon, no main window

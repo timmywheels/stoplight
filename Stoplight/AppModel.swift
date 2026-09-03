@@ -56,7 +56,7 @@ final class AppModel {
     var aggregate: CIState { Rollup.aggregate(all) }
     var presence: StatusPresence { StatusPresence(all) }
     var badgeCount: Int? {
-        guard UserDefaults.standard.bool(forKey: Prefs.showCount) else { return nil }
+        guard prefs.showCount else { return nil }
         let n = all.filter { !$0.isDraft && $0.state != .success && $0.state != .none }.count
         return n > 0 ? n : nil
     }
@@ -247,5 +247,6 @@ final class AppModel {
 
 enum Prefs {
     static let showCount = "showCountInMenuBar"
+    static let housing = "menuBarHousing"
     static let notifications = "notificationMode"  // all | failOnly | off
 }

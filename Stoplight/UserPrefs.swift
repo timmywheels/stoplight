@@ -15,11 +15,17 @@ final class UserPrefs {
         static let watched = "watchedRefs"
         static let pinned = "pinnedIDs"
         static let all = [hidden, watched, pinned]
+        static let showCount = Prefs.showCount
+        static let housing = Prefs.housing
     }
 
     var hiddenRepos: Set<String> { didSet { persist(Key.hidden, Array(hiddenRepos).sorted()) } }
     var watched: [PRRef] { didSet { persist(Key.watched, watched.map(\.key)) } }
     var pinned: Set<String> { didSet { persist(Key.pinned, Array(pinned).sorted()) } }
+
+    // Menu bar look. Local only, not synced.
+    var showCount: Bool { didSet { defaults.set(showCount, forKey: Key.showCount) } }
+    var housing: Bool { didSet { defaults.set(housing, forKey: Key.housing) } }
 
     private let defaults: UserDefaults
     private let cloud: NSUbiquitousKeyValueStore?
@@ -37,6 +43,8 @@ final class UserPrefs {
         hiddenRepos = Set(load(Key.hidden))
         watched = load(Key.watched).compactMap(PRRef.init(key:))
         pinned = Set(load(Key.pinned))
+        showCount = defaults.bool(forKey: Key.showCount)
+        housing = defaults.bool(forKey: Key.housing)
 
         if let cloud {
             observer = NotificationCenter.default.addObserver(

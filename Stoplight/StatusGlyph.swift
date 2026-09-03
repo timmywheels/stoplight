@@ -8,9 +8,20 @@ enum StatusGlyph {
     static let gap: CGFloat = 3
     static let height: CGFloat = 18
 
-    static func image(for presence: StatusPresence, count: Int?, pop: CGFloat = 0) -> NSImage {
-        let width = dot * 3 + gap * 2
+    static let housingPad: CGFloat = 4
+
+    /// - housing: draw a dark rounded pill behind the dots (🚥 style) for contrast on busy wallpapers.
+    static func image(for presence: StatusPresence, count: Int?, pop: CGFloat = 0, housing: Bool = false) -> NSImage {
+        let dotsWidth = dot * 3 + gap * 2
+        let pad: CGFloat = housing ? housingPad : 0
+        let width = dotsWidth + pad * 2
         let img = NSImage(size: NSSize(width: width, height: height), flipped: false) { _ in
+            if housing {
+                let pill = NSRect(x: 0, y: (height - (dot + pad * 2)) / 2, width: width, height: dot + pad * 2)
+                NSColor(white: 0.22, alpha: 1).setFill()
+                NSBezierPath(roundedRect: pill, xRadius: pill.height / 2, yRadius: pill.height / 2).fill()
+            }
+            let dim = housing ? NSColor(white: 1, alpha: 0.28) : NSColor.secondaryLabelColor.withAlphaComponent(0.35)
             let lights: [(on: Bool, color: NSColor, pop: CGFloat)] = [
                 (presence.failure, .systemRed, 0),
                 (presence.pending, .systemYellow, 0),

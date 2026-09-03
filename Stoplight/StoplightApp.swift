@@ -11,7 +11,7 @@ struct StoplightApp: App {
                 .task { model.start() }
         } label: {
             // US-004: three stoplight dots. The green one pops once when everything turns green.
-            Image(nsImage: StatusGlyph.image(for: model.presence, count: model.badgeCount, pop: model.bob))
+            Image(nsImage: StatusGlyph.image(for: model.presence, count: model.badgeCount, pop: model.bob, housing: model.prefs.housing))
         }
         .menuBarExtraStyle(.window)
 
