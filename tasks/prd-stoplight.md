@@ -129,16 +129,17 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - [ ] `PullRequest` and `CheckResult` models are provider-neutral (no GitHub-specific field names leak into the UI layer)
 - [ ] `PRQuery` enum with a single case `.authored` in v1; the GitHub search string is derived from it, so adding `.reviewRequested` is a one-line change plus a UI section
 
-### US-010: Hide repos
-**Description:** As a user, I want to hide noisy repos so they never show up anywhere in Stoplight.
+### US-010: Ignore users, repos, orgs
+**Description:** As a user, I want to silence noisy sources (bots, archived-ish repos, a whole org) so they never show up anywhere in Stoplight.
 
 **Acceptance Criteria:**
-- [ ] Right-click any PR row shows a context menu with "Hide owner/repo"
-- [ ] Hidden repos are excluded from the list, the menu bar aggregate, the widget, and notifications
-- [ ] Settings gains a "Hidden repos" section listing each hidden repo with a remove (−) button
-- [ ] Hidden set persists in UserDefaults as a string array; empty by default
-- [ ] Filtering happens in one place (`Filters.apply`) so all four surfaces agree
-- [ ] Unit test: a hidden repo's failing PR does not turn the aggregate red
+- [ ] Settings → Sources has an Ignore list for each of Users, Repos, Orgs, each with an add field and per-row remove
+- [ ] Right-click any PR row → Ignore submenu: `@author`, `owner/repo`, `org`
+- [ ] Ignored PRs are excluded from the list, the dots, the widget, and notifications
+- [ ] Matching is case-insensitive; org matches the `owner` half of `owner/repo`
+- [ ] Persisted in UserDefaults inside the `sources` JSON blob; the old `hiddenRepos` list migrates into Ignore → Repos once
+- [ ] Filtering happens in one place (`Filters.visible(_:ignore:)`) so all four surfaces agree
+- [ ] Unit tests: an ignored repo's failing PR does not light the red dot; ignored user and org filters work
 
 ### US-011: Watch someone else's PR
 **Description:** As a user, I want to watch a teammate's PR (or any PR by URL) so I know when its CI settles.
@@ -165,17 +166,17 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - [ ] No drag-and-drop. Right-click and the hover glyph are the only affordances (drag in a menu bar popover is fiddly and dismisses easily)
 - [ ] Section headers only appear when the section is non-empty; with nothing pinned or watched the list looks exactly like v1
 
-### US-013: Watch people
-**Description:** As a user, I want to follow a teammate so all of their open PRs show up, grouped under their name.
+### US-013: Follow users, repos, orgs
+**Description:** As a user, I want to follow teammates, key repos, or a whole org from Settings, so their open PRs show up grouped, without typing commands.
 
 **Acceptance Criteria:**
-- [ ] The ⌘N field accepts `@username` (or a github.com/username profile URL) in addition to PR URLs
-- [ ] Each watched person adds one aliased `search(query: "is:pr is:open author:LOGIN archived:false")` to the existing poll request; still one HTTP call per poll
-- [ ] Their PRs render in a section headed `@username`, below Mine and Watching, worst-first within the section
-- [ ] Their PRs count toward the dots and fire notifications like watched PRs
-- [ ] Right-click a row in a person section → "Stop following @username"; Settings lists followed people with a remove button
-- [ ] Followed logins persist in UserDefaults as `[String]`
-- [ ] Hidden repos and pins apply to their PRs too
+- [ ] Settings → Sources has a Follow list for each of Users, Repos, Orgs, next to the Ignore list, same editor
+- [ ] Each followed item adds one aliased `search` to the single poll request: `author:USER`, `repo:OWNER/NAME`, or `org:ORG` (50 PRs cap each)
+- [ ] Popover sections, in order: Pinned, Mine, Watching, then one section per followed item titled `@username`, `owner/repo`, or `org`. A PR appears once, in the first section that claims it
+- [ ] Followed PRs count toward the dots and fire notifications like your own
+- [ ] Right-click a row by someone else → "Follow @username" shortcut; Ignore rules and pins apply to followed PRs too
+- [ ] Rows by other people show `· @author` in the secondary line
+- [ ] Editing Sources triggers an immediate refresh
 - [ ] v1.1: "Add teammate" picker listing members of orgs you belong to (`viewer.organizations` → `membersWithRole`), requires `read:org`
 
 ### US-014: Menu bar housing
@@ -202,10 +203,11 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - FR-12: A WidgetKit extension provides small and medium widgets rendered from the shared data
 - FR-13: Settings exposes account, notification mode, count badge, and launch at login only
 - FR-14: All network and provider logic sits behind a `CIProvider` protocol
-- FR-15: Users can hide a repo; hidden repos are excluded from every surface (list, icon, widget, notifications)
+- FR-15: Users can ignore users, repos, and orgs; ignored PRs are excluded from every surface (list, dots, widget, notifications)
 - FR-16: Users can watch any PR by URL; watched PRs are polled, listed under "Watching", and count toward the aggregate
+- FR-16a: Users can follow users, repos, and orgs from Settings; their open PRs are polled in the same request and listed in their own sections
 - FR-17: Users can pin PRs; pinned PRs are listed first under "Pinned" in the popover and the medium widget
-- FR-18: Hidden repos, watched refs, and pins persist in UserDefaults and survive relaunch
+- FR-18: Sources (follow/ignore lists), watched refs, and pins persist in UserDefaults and survive relaunch
 
 ## Non-Goals
 
@@ -213,7 +215,6 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - No automatic review-requested PRs in v1 (watch them manually via US-011; auto-query planned for v1.1 behind `PRQuery`)
 - No GitLab, Bitbucket, or non-GitHub CI providers in v1
 - No multiple GitHub accounts or Enterprise Server hosts
-- No repo allowlist (hide-list only, US-010)
 - No drag-and-drop reordering
 - No commit-level or branch-level status, PRs only
 - No iOS, iPadOS, or Windows
@@ -223,7 +224,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 
 ## Design Considerations
 
-- Popover sections, top to bottom: Pinned, Mine, Watching. Headers are 11pt small-caps secondary text and only render when the section has rows
+- Popover sections, top to bottom: Pinned, Mine, Watching, then followed sources. Headers are 11pt small-caps secondary text, only render when the section has rows, and are omitted entirely when Mine is the only section
 - Naming: "Pin" not "Favorite". macOS uses Pin for Notes, Messages, and Safari tabs; Favorites is a Finder sidebar term
 - Not "Traffic Light": on macOS that already means the window close/minimize/zoom buttons
 - Not "Traffic Light": on macOS that already means the window close/minimize/zoom buttons

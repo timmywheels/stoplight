@@ -34,11 +34,16 @@ public struct GitHubProvider: CIProvider {
 
     // MARK: - Public
 
-    public func fetchPullRequests(_ query: PRQuery) async throws -> [PullRequest] {
-        let data = try await post(["query": Self.searchQuery, "variables": ["q": query.githubSearch]])
+    public func fetchPullRequests(queries: [PRQuery]) async throws -> [[PullRequest]] {
+        guard !queries.isEmpty else { return [] }
+        let data = try await post(["query": Self.searchQuery(queries)])
         let env = try Self.decoder.decode(SearchEnvelope.self, from: data)
-        if env.data == nil, let first = env.errors?.first { throw Error.graphQL(first.message) }
-        return (env.data?.search.nodes ?? []).compactMap(Self.map)
+        guard let results = env.data else {
+            throw Error.graphQL(env.errors?.first?.message ?? "Empty response")
+        }
+        return queries.indices.map { i in
+            (results["q\(i)"]??.nodes ?? []).compactMap(Self.map)
+        }
     }
 
     public func fetchPullRequests(refs: [PRRef]) async throws -> [PullRequest] {
@@ -124,14 +129,13 @@ public struct GitHubProvider: CIProvider {
     }
     """
 
-    static let searchQuery = """
-    query($q: String!) {
-      search(query: $q, type: ISSUE, first: 50) {
-        nodes { ... on PullRequest { ...PRFields } }
-      }
+    /// All searches in one request via aliases q0…qN. Query strings only contain validated identifiers.
+    static func searchQuery(_ queries: [PRQuery]) -> String {
+        let fields = queries.enumerated().map { i, q in
+            "q\(i): search(query: \"\(q.githubSearch)\", type: ISSUE, first: 50) { nodes { ... on PullRequest { ...PRFields } } }"
+        }
+        return "query {\n" + fields.joined(separator: "\n") + "\n}\n" + prFields
     }
-    \(prFields)
-    """
 
     /// One request for all watched refs via aliases. PRRef validates owner/name/number, so interpolation is safe.
     static func refsQuery(_ refs: [PRRef]) -> String {
@@ -146,9 +150,8 @@ public struct GitHubProvider: CIProvider {
     private struct GQLError: Decodable { let message: String }
 
     private struct SearchEnvelope: Decodable {
-        struct Data: Decodable { let search: Search }
         struct Search: Decodable { let nodes: [Node]? }
-        let data: Data?
+        let data: [String: Search?]?
         let errors: [GQLError]?
     }
 

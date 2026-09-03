@@ -17,6 +17,8 @@ final class AppModel {
     /// Raw fetch results, unfiltered.
     private(set) var mine: [PullRequest] = []
     private(set) var watched: [PullRequest] = []
+    /// Followed users/repos/orgs, in `prefs.followQueries` order.
+    private(set) var followed: [(query: PRQuery, prs: [PullRequest])] = []
     private(set) var lastRefresh: Date?
     private(set) var lastError: String?
     private(set) var auth: AuthState = .unknown
@@ -34,22 +36,44 @@ final class AppModel {
     /// Watched refs seen closed/merged once; removed on the next cycle (US-011).
     private var closedSeen: Set<String> = []
 
-    // MARK: Derived lists (US-010, US-012)
+    // MARK: Derived lists (US-010, US-012, US-013)
 
-    /// Everything visible, deduped, hidden repos removed. Source of truth for icon, widget, notifications.
+    struct Section: Identifiable {
+        let title: String
+        let prs: [PullRequest]
+        var id: String { title }
+    }
+
+    /// Everything visible, deduped, ignore rules applied. Source of truth for dots, widget, notifications.
     var all: [PullRequest] {
-        let mineIDs = Set(mine.map(\.id))
-        let others = watched.filter { !mineIDs.contains($0.id) }
-        return Filters.visible(mine + others, hiddenRepos: prefs.hiddenRepos)
+        var seen = Set<String>()
+        var out: [PullRequest] = []
+        for pr in mine + watched + followed.flatMap(\.prs) where seen.insert(pr.id).inserted {
+            out.append(pr)
+        }
+        return Filters.visible(out, ignore: prefs.ignoreRules)
     }
-    var pinnedPRs: [PullRequest] { Rollup.sorted(all.filter { prefs.pinned.contains($0.id) }) }
-    var minePRs: [PullRequest] {
-        Rollup.sorted(Filters.visible(mine, hiddenRepos: prefs.hiddenRepos).filter { !prefs.pinned.contains($0.id) })
-    }
-    var watchingPRs: [PullRequest] {
-        let mineIDs = Set(mine.map(\.id))
-        return Rollup.sorted(Filters.visible(watched, hiddenRepos: prefs.hiddenRepos)
-            .filter { !mineIDs.contains($0.id) && !prefs.pinned.contains($0.id) })
+
+    /// Popover sections in order: Pinned, Mine, Watching, then one per followed source.
+    /// A PR appears once, in the first section that claims it.
+    var sections: [Section] {
+        let allowed = Set(all.map(\.id))
+        var claimed = Set<String>()
+        func take(_ prs: [PullRequest], pinnedOnly: Bool = false, skipPinned: Bool = true) -> [PullRequest] {
+            let picked = prs.filter { pr in
+                guard allowed.contains(pr.id), !claimed.contains(pr.id) else { return false }
+                let isPinned = prefs.pinned.contains(pr.id)
+                return pinnedOnly ? isPinned : (!skipPinned || !isPinned)
+            }
+            picked.forEach { claimed.insert($0.id) }
+            return Rollup.sorted(picked)
+        }
+        var out: [Section] = []
+        out.append(Section(title: "Pinned", prs: take(all, pinnedOnly: true)))
+        out.append(Section(title: "Mine", prs: take(mine)))
+        out.append(Section(title: "Watching", prs: take(watched)))
+        for f in followed { out.append(Section(title: f.query.title, prs: take(f.prs))) }
+        return out.filter { !$0.prs.isEmpty }
     }
     var isEmpty: Bool { all.isEmpty }
 
@@ -61,6 +85,7 @@ final class AppModel {
         return n > 0 ? n : nil
     }
     func isWatched(_ pr: PullRequest) -> Bool { pr.ref.map { prefs.watched.contains($0) } ?? false }
+    func isMine(_ pr: PullRequest) -> Bool { login.map { $0.caseInsensitiveCompare(pr.author) == .orderedSame } ?? false }
     func isPinned(_ pr: PullRequest) -> Bool { prefs.pinned.contains(pr.id) }
 
     // MARK: Lifecycle
@@ -116,6 +141,7 @@ final class AppModel {
         provider = nil
         mine = []
         watched = []
+        followed = []
         auth = .signedOut
         SharedStore.clear()
         WidgetBridge.reload()
@@ -129,11 +155,13 @@ final class AppModel {
         defer { isRefreshing = false }
         do {
             let refs = prefs.watched
-            async let mineTask = provider.fetchPullRequests(.authored)
+            let queries = [PRQuery.authored] + prefs.followQueries
+            async let searchTask = provider.fetchPullRequests(queries: queries)
             async let watchedTask = provider.fetchPullRequests(refs: refs)
-            let (freshMine, freshWatched) = try await (mineTask, watchedTask)
+            let (results, freshWatched) = try await (searchTask, watchedTask)
             let previous = all
-            mine = freshMine
+            mine = results.first ?? []
+            followed = Array(zip(queries.dropFirst(), results.dropFirst()))
             watched = freshWatched
             lastRefresh = .now
             lastError = nil
@@ -205,21 +233,26 @@ final class AppModel {
 
     /// Pins on PRs that no longer exist are dropped silently (US-012).
     private func prunePins() {
-        let live = Set((mine + watched).map(\.id))
+        let live = Set((mine + watched + followed.flatMap(\.prs)).map(\.id))
         let stale = prefs.pinned.subtracting(live)
         if !stale.isEmpty { prefs.pinned.subtract(stale) }
     }
 
     // MARK: User actions
 
-    func hide(repo: String) {
-        prefs.hide(repo)
+    func ignore(_ value: String, kind: UserPrefs.SourceKind) {
+        prefs.add(value, to: kind, list: .ignore)
         publishSnapshot()
     }
 
-    func unhide(repo: String) {
-        prefs.unhide(repo)
-        publishSnapshot()
+    func follow(user: String) {
+        prefs.add(user, to: .users, list: .follow)
+        Task { await refresh() }
+    }
+
+    /// Settings edits call this so the dots and widget update without waiting for the next poll.
+    func sourcesChanged() {
+        Task { await refresh() }
     }
 
     func togglePin(_ pr: PullRequest) {

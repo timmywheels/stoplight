@@ -150,26 +150,81 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
     }
 }
 
-/// Which PRs to fetch. v1 has one case. Adding `.reviewRequested` is the v1.1 path (US-009).
-public enum PRQuery: String, Codable, Sendable, CaseIterable {
+/// One GitHub search. Mine, or a followed user / repo / org (US-013).
+public enum PRQuery: Hashable, Sendable {
     case authored
+    case author(String)
+    case repo(String)   // "owner/name"
+    case org(String)
 
     public var githubSearch: String {
+        let base = "is:pr is:open archived:false"
         switch self {
-        case .authored: "is:pr is:open author:@me archived:false"
+        case .authored: return "\(base) author:@me"
+        case .author(let u): return "\(base) author:\(u)"
+        case .repo(let r): return "\(base) repo:\(r)"
+        case .org(let o): return "\(base) org:\(o)"
+        }
+    }
+
+    /// Section header in the popover.
+    public var title: String {
+        switch self {
+        case .authored: "Mine"
+        case .author(let u): "@\(u)"
+        case .repo(let r): r
+        case .org(let o): o
         }
     }
 }
 
 public protocol CIProvider: Sendable {
-    func fetchPullRequests(_ query: PRQuery) async throws -> [PullRequest]
+    /// One HTTP request for all queries; results are in the same order as `queries`.
+    func fetchPullRequests(queries: [PRQuery]) async throws -> [[PullRequest]]
     /// US-011. Fetches specific PRs by reference. Missing or inaccessible refs are omitted, not thrown.
     func fetchPullRequests(refs: [PRRef]) async throws -> [PullRequest]
 }
 
-/// Single place where user preferences shape the PR list, so every surface agrees (US-010, US-012).
+public extension CIProvider {
+    func fetchPullRequests(_ query: PRQuery) async throws -> [PullRequest] {
+        try await fetchPullRequests(queries: [query]).first ?? []
+    }
+}
+
+/// Users, repos, and orgs to drop from every surface (US-010, US-013). Case-insensitive.
+public struct IgnoreRules: Codable, Sendable, Equatable {
+    public var users: Set<String>
+    public var repos: Set<String>
+    public var orgs: Set<String>
+
+    public init(users: Set<String> = [], repos: Set<String> = [], orgs: Set<String> = []) {
+        self.users = Set(users.map { $0.lowercased() })
+        self.repos = Set(repos.map { $0.lowercased() })
+        self.orgs = Set(orgs.map { $0.lowercased() })
+    }
+
+    public static let none = IgnoreRules()
+
+    public func allows(_ pr: PullRequest) -> Bool {
+        let repo = pr.repo.lowercased()
+        let org = repo.split(separator: "/").first.map(String.init) ?? ""
+        return !users.contains(pr.author.lowercased()) && !repos.contains(repo) && !orgs.contains(org)
+    }
+}
+
+/// Single place where user preferences shape the PR list, so every surface agrees.
 public enum Filters {
-    public static func visible(_ prs: [PullRequest], hiddenRepos: Set<String>) -> [PullRequest] {
-        prs.filter { !hiddenRepos.contains($0.repo) }
+    public static func visible(_ prs: [PullRequest], ignore: IgnoreRules) -> [PullRequest] {
+        prs.filter(ignore.allows)
+    }
+
+    /// GitHub identifiers: usernames and org names.
+    public static func isValidLogin(_ s: String) -> Bool {
+        s.range(of: "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$", options: .regularExpression) != nil
+    }
+
+    /// "owner/name"
+    public static func isValidRepo(_ s: String) -> Bool {
+        s.range(of: "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/[A-Za-z0-9_.-]{1,100}$", options: .regularExpression) != nil
     }
 }

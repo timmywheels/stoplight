@@ -7,12 +7,38 @@ final class PrefsTests: XCTestCase {
                     isDraft: false, updatedAt: .now, headSha: "s", checks: [CheckResult(name: "ci", state: state, url: nil)])
     }
 
-    // US-010
-    func testHiddenRepoDoesNotTurnAggregateRed() {
+    // US-010 / US-013
+    func testIgnoredRepoDoesNotTurnAggregateRed() {
         let prs = [pr(id: "a", repo: "noisy/repo", state: .failure), pr(id: "b", repo: "o/r", state: .success)]
-        let visible = Filters.visible(prs, hiddenRepos: ["noisy/repo"])
+        let visible = Filters.visible(prs, ignore: IgnoreRules(repos: ["Noisy/Repo"]))
         XCTAssertEqual(visible.map(\.id), ["b"])
         XCTAssertEqual(Rollup.aggregate(visible), .success)
+    }
+
+    func testIgnoreUsersAndOrgs() {
+        let bot = PullRequest(id: "bot", repo: "acme/x", number: 1, title: "t", url: URL(string: "https://github.com/acme/x/pull/1")!,
+                              isDraft: false, updatedAt: .now, headSha: "s", checks: [], author: "dependabot[bot]")
+        let other = pr(id: "o", repo: "evil/y")
+        XCTAssertEqual(Filters.visible([bot, other], ignore: IgnoreRules(users: ["dependabot[bot]"])).map(\.id), ["o"])
+        XCTAssertEqual(Filters.visible([bot, other], ignore: IgnoreRules(orgs: ["EVIL"])).map(\.id), ["bot"])
+    }
+
+    func testQueryStringsAndBatching() {
+        XCTAssertEqual(PRQuery.author("bob").githubSearch, "is:pr is:open archived:false author:bob")
+        XCTAssertEqual(PRQuery.repo("acme/api").githubSearch, "is:pr is:open archived:false repo:acme/api")
+        XCTAssertEqual(PRQuery.org("acme").githubSearch, "is:pr is:open archived:false org:acme")
+        let q = GitHubProvider.searchQuery([.authored, .author("bob")])
+        XCTAssertTrue(q.contains("q0: search(query: \"is:pr is:open archived:false author:@me\""))
+        XCTAssertTrue(q.contains("q1: search(query: \"is:pr is:open archived:false author:bob\""))
+    }
+
+    func testIdentifierValidation() {
+        XCTAssertTrue(Filters.isValidLogin("timmywheels"))
+        XCTAssertFalse(Filters.isValidLogin("-bad"))
+        XCTAssertFalse(Filters.isValidLogin("a b"))
+        XCTAssertTrue(Filters.isValidRepo("acme/api.v2"))
+        XCTAssertFalse(Filters.isValidRepo("acme"))
+        XCTAssertFalse(Filters.isValidRepo("acme/api/extra"))
     }
 
     // US-011

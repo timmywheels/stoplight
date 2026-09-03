@@ -50,13 +50,16 @@ struct MenuBarView: View {
         }
     }
 
-    private var rowCount: Int { model.pinnedPRs.count + model.minePRs.count + model.watchingPRs.count }
+    private var rowCount: Int { model.sections.reduce(0) { $0 + $1.prs.count } }
 
     private var list: some View {
-        VStack(spacing: 0) {
-            section("Pinned", model.pinnedPRs, showHeader: true)
-            section("Mine", model.minePRs, showHeader: !model.pinnedPRs.isEmpty || !model.watchingPRs.isEmpty)
-            section("Watching", model.watchingPRs, showHeader: true)
+        let sections = model.sections
+        // With only "Mine" there's nothing to distinguish, so no header at all (looks like v1).
+        let showHeaders = !(sections.count == 1 && sections[0].title == "Mine")
+        return VStack(spacing: 0) {
+            ForEach(sections) { s in
+                section(s.title, s.prs, showHeader: showHeaders)
+            }
         }
     }
 
@@ -161,7 +164,7 @@ struct PRRow: View {
 
     private var pinned: Bool { model.isPinned(pr) }
     private var watched: Bool { model.isWatched(pr) }
-    private var isMine: Bool { model.login == pr.author }
+    private var isMine: Bool { model.isMine(pr) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -171,7 +174,7 @@ struct PRRow: View {
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
                             Text(pr.shortRef).font(.caption).foregroundStyle(.secondary)
-                            if watched && !isMine {
+                            if !isMine {
                                 Text("· @\(pr.author)").font(.caption).foregroundStyle(.secondary)
                             }
                             if pr.isDraft { tag("Draft") }
@@ -212,7 +215,16 @@ struct PRRow: View {
                     Button("Stop watching") { model.unwatch(pr) }
                 }
                 Divider()
-                Button("Hide \(pr.repo)") { model.hide(repo: pr.repo) }
+                if !isMine && !model.prefs.isFollowing(user: pr.author) {
+                    Button("Follow @\(pr.author)") { model.follow(user: pr.author) }
+                }
+                Menu("Ignore") {
+                    if !isMine { Button("@\(pr.author)") { model.ignore(pr.author, kind: .users) } }
+                    Button(pr.repo) { model.ignore(pr.repo, kind: .repos) }
+                    if let org = pr.repo.split(separator: "/").first {
+                        Button("\(org) (org)") { model.ignore(String(org), kind: .orgs) }
+                    }
+                }
                 Button("Copy link") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(pr.url.absoluteString, forType: .string)
