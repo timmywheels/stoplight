@@ -9,6 +9,7 @@ struct SettingsView: View {
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
+        @Bindable var prefs = model.prefs
         Form {
             Section("Account") {
                 switch model.auth {
@@ -29,8 +30,8 @@ struct SettingsView: View {
                 .pickerStyle(.radioGroup)
             }
             Section {
-                Toggle("Dark housing behind the dots", isOn: $model.prefs.housing)
-                Toggle("Show count in menu bar", isOn: $model.prefs.showCount)
+                Toggle("Dark housing behind the dots", isOn: $prefs.housing)
+                Toggle("Show count in menu bar", isOn: $prefs.showCount)
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, on in
                         do {

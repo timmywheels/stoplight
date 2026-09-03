@@ -204,6 +204,7 @@ struct PRRow: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .help(pr.summary.isEmpty ? pr.title : "\(pr.title)\n\n\(pr.summary)")
             .onHover { hovering = $0 }
             .contextMenu {
                 Button(pinned ? "Unpin" : "Pin") { model.togglePin(pr) }

@@ -103,10 +103,12 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
     public let checks: [CheckResult]
     public let author: String
     public let status: PRStatus
+    /// First ~300 chars of the PR body, plain text. Shown as a hover tooltip (US-005).
+    public let summary: String
 
     public init(id: String, repo: String, number: Int, title: String, url: URL,
                 isDraft: Bool, updatedAt: Date, headSha: String, checks: [CheckResult],
-                author: String = "", status: PRStatus = .open) {
+                author: String = "", status: PRStatus = .open, summary: String = "") {
         self.id = id
         self.repo = repo
         self.number = number
@@ -118,6 +120,7 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
         self.checks = checks
         self.author = author
         self.status = status
+        self.summary = summary
     }
 
     // Tolerant decoding so an older prs.json still loads (author/status added in US-011).
@@ -134,6 +137,7 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
         checks = try c.decode([CheckResult].self, forKey: .checks)
         author = try c.decodeIfPresent(String.self, forKey: .author) ?? ""
         status = try c.decodeIfPresent(PRStatus.self, forKey: .status) ?? .open
+        summary = try c.decodeIfPresent(String.self, forKey: .summary) ?? ""
     }
 
     public var state: CIState { Rollup.state(for: checks) }

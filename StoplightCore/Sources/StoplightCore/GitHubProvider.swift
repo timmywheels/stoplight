@@ -103,6 +103,7 @@ public struct GitHubProvider: CIProvider {
       updatedAt
       headRefOid
       author { login }
+      bodyText
       repository { nameWithOwner }
       commits(last: 1) {
         nodes {
@@ -187,6 +188,7 @@ public struct GitHubProvider: CIProvider {
         let updatedAt: Date?
         let headRefOid: String?
         let author: Author?
+        let bodyText: String?
         let repository: Repo?
         let commits: Commits?
     }
@@ -204,8 +206,17 @@ public struct GitHubProvider: CIProvider {
             id: id, repo: repo, number: number, title: title, url: url,
             isDraft: n.isDraft ?? false, updatedAt: n.updatedAt ?? .distantPast,
             headSha: sha, checks: contexts.compactMap(mapCheck),
-            author: n.author?.login ?? "ghost", status: status
+            author: n.author?.login ?? "ghost", status: status,
+            summary: summarize(n.bodyText)
         )
+    }
+
+    /// Collapse whitespace, cap at 300 chars.
+    static func summarize(_ body: String?) -> String {
+        guard let body else { return "" }
+        let collapsed = body.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }.joined(separator: "\n")
+        return collapsed.count > 300 ? String(collapsed.prefix(300)).trimmingCharacters(in: .whitespaces) + "…" : collapsed
     }
 
     private static func mapCheck(_ c: Node.Context) -> CheckResult? {
