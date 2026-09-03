@@ -28,10 +28,10 @@ enum StatusGlyph {
                 (presence.success, .systemGreen, pop),
             ]
             for (i, light) in lights.enumerated() {
-                let x = CGFloat(i) * (dot + gap)
+                let x = pad + CGFloat(i) * (dot + gap)
                 let grow = light.on ? light.pop : 0
                 let rect = NSRect(x: x - grow / 2, y: (height - dot) / 2 - grow / 2, width: dot + grow, height: dot + grow)
-                let color = light.on ? light.color : NSColor.secondaryLabelColor.withAlphaComponent(0.35)
+                let color = light.on ? light.color : dim
                 color.setFill()
                 NSBezierPath(ovalIn: rect).fill()
             }
