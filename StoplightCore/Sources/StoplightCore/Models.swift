@@ -1,0 +1,171 @@
+import Foundation
+
+/// Rolled-up CI state for one pull request. Exactly four values, per PRD FR-4.
+/// Ordering is "worst first" so `min()` over a list yields the aggregate.
+public enum CIState: String, Codable, Sendable, CaseIterable, Comparable {
+    case failure
+    case pending
+    case success
+    case none
+
+    private var rank: Int {
+        switch self {
+        case .failure: 0
+        case .pending: 1
+        case .success: 2
+        case .none: 3
+        }
+    }
+
+    public static func < (lhs: CIState, rhs: CIState) -> Bool { lhs.rank < rhs.rank }
+}
+
+/// Provider-neutral state of a single check or status context.
+public enum CheckState: String, Codable, Sendable {
+    case success
+    case failure
+    case pending
+    /// Skipped or neutral. Counts as success for rollup (US-002).
+    case skipped
+}
+
+/// Whether the PR itself is still open. Used to auto-drop watched PRs (US-011).
+public enum PRStatus: String, Codable, Sendable {
+    case open
+    case merged
+    case closed
+}
+
+public struct CheckResult: Codable, Sendable, Hashable, Identifiable {
+    public var id: String { name }
+    public let name: String
+    public let state: CheckState
+    public let url: URL?
+
+    public init(name: String, state: CheckState, url: URL?) {
+        self.name = name
+        self.state = state
+        self.url = url
+    }
+}
+
+/// A pointer to a PR without its data. What the user "watches" (US-011).
+public struct PRRef: Codable, Sendable, Hashable, Identifiable {
+    public let owner: String
+    public let name: String
+    public let number: Int
+
+    public var id: String { key }
+    /// "owner/repo#123"
+    public var key: String { "\(owner)/\(name)#\(number)" }
+    public var repo: String { "\(owner)/\(name)" }
+
+    private static let segment = try! NSRegularExpression(pattern: "^[A-Za-z0-9_.-]+$")
+
+    public init?(owner: String, name: String, number: Int) {
+        guard number > 0, Self.valid(owner), Self.valid(name) else { return nil }
+        self.owner = owner
+        self.name = name
+        self.number = number
+    }
+
+    /// Accepts https://github.com/owner/repo/pull/123 with anything trailing (/files, #issuecomment, ?diff=…).
+    public init?(url: URL) {
+        guard let host = url.host?.lowercased(), host == "github.com" || host == "www.github.com" else { return nil }
+        let parts = url.pathComponents.filter { $0 != "/" }
+        guard parts.count >= 4, parts[2] == "pull", let n = Int(parts[3]) else { return nil }
+        self.init(owner: parts[0], name: parts[1], number: n)
+    }
+
+    /// Parses the `key` form.
+    public init?(key: String) {
+        guard let hash = key.lastIndex(of: "#"), let n = Int(key[key.index(after: hash)...]) else { return nil }
+        let repo = key[..<hash].split(separator: "/", maxSplits: 1).map(String.init)
+        guard repo.count == 2 else { return nil }
+        self.init(owner: repo[0], name: repo[1], number: n)
+    }
+
+    private static func valid(_ s: String) -> Bool {
+        segment.firstMatch(in: s, range: NSRange(s.startIndex..., in: s)) != nil
+    }
+}
+
+public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
+    public let id: String
+    /// "owner/repo"
+    public let repo: String
+    public let number: Int
+    public let title: String
+    public let url: URL
+    public let isDraft: Bool
+    public let updatedAt: Date
+    public let headSha: String
+    public let checks: [CheckResult]
+    public let author: String
+    public let status: PRStatus
+
+    public init(id: String, repo: String, number: Int, title: String, url: URL,
+                isDraft: Bool, updatedAt: Date, headSha: String, checks: [CheckResult],
+                author: String = "", status: PRStatus = .open) {
+        self.id = id
+        self.repo = repo
+        self.number = number
+        self.title = title
+        self.url = url
+        self.isDraft = isDraft
+        self.updatedAt = updatedAt
+        self.headSha = headSha
+        self.checks = checks
+        self.author = author
+        self.status = status
+    }
+
+    // Tolerant decoding so an older prs.json still loads (author/status added in US-011).
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        repo = try c.decode(String.self, forKey: .repo)
+        number = try c.decode(Int.self, forKey: .number)
+        title = try c.decode(String.self, forKey: .title)
+        url = try c.decode(URL.self, forKey: .url)
+        isDraft = try c.decode(Bool.self, forKey: .isDraft)
+        updatedAt = try c.decode(Date.self, forKey: .updatedAt)
+        headSha = try c.decode(String.self, forKey: .headSha)
+        checks = try c.decode([CheckResult].self, forKey: .checks)
+        author = try c.decodeIfPresent(String.self, forKey: .author) ?? ""
+        status = try c.decodeIfPresent(PRStatus.self, forKey: .status) ?? .open
+    }
+
+    public var state: CIState { Rollup.state(for: checks) }
+    public var failingChecks: [CheckResult] { checks.filter { $0.state == .failure } }
+    public var shortRef: String { "\(repo) #\(number)" }
+    public var ref: PRRef? {
+        let parts = repo.split(separator: "/", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else { return nil }
+        return PRRef(owner: parts[0], name: parts[1], number: number)
+    }
+}
+
+/// Which PRs to fetch. v1 has one case. Adding `.reviewRequested` is the v1.1 path (US-009).
+public enum PRQuery: String, Codable, Sendable, CaseIterable {
+    case authored
+
+    public var githubSearch: String {
+        switch self {
+        case .authored: "is:pr is:open author:@me archived:false"
+        }
+    }
+}
+
+public protocol CIProvider: Sendable {
+    func fetchPullRequests(_ query: PRQuery) async throws -> [PullRequest]
+    /// US-011. Fetches specific PRs by reference. Missing or inaccessible refs are omitted, not thrown.
+    func fetchPullRequests(refs: [PRRef]) async throws -> [PullRequest]
+}
+
+/// Single place where user preferences shape the PR list, so every surface agrees (US-010, US-012).
+public enum Filters {
+    public static func visible(_ prs: [PullRequest], hiddenRepos: Set<String>) -> [PullRequest] {
+        prs.filter { !hiddenRepos.contains($0.repo) }
+    }
+}

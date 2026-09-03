@@ -1,0 +1,70 @@
+name: Stoplight
+options:
+  bundleIdPrefix: com.timwheeler
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    MARKETING_VERSION: 0.1.0
+    CURRENT_PROJECT_VERSION: 1
+    SWIFT_STRICT_CONCURRENCY: complete
+    DEVELOPMENT_TEAM: S3RY6Q3EW2
+    CODE_SIGN_STYLE: Automatic
+packages:
+  StoplightCore:
+    path: StoplightCore
+targets:
+  Stoplight:
+    type: application
+    platform: macOS
+    sources: [Stoplight]
+    dependencies:
+      - package: StoplightCore
+      - target: StoplightWidget
+        embed: true
+    info:
+      path: Stoplight/Info.plist
+      properties:
+        CFBundleDisplayName: Stoplight
+        LSUIElement: true
+        LSApplicationCategoryType: public.app-category.developer-tools
+        NSHumanReadableCopyright: ""
+    entitlements:
+      path: Stoplight/Stoplight.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.timwheeler.stoplight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.timwheeler.stoplight
+        PRODUCT_NAME: Stoplight
+        ENABLE_HARDENED_RUNTIME: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+  StoplightWidget:
+    type: app-extension
+    platform: macOS
+    sources: [StoplightWidget]
+    dependencies:
+      - package: StoplightCore
+    info:
+      path: StoplightWidget/Info.plist
+      properties:
+        CFBundleDisplayName: Stoplight
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: StoplightWidget/StoplightWidget.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.application-groups:
+          - group.com.timwheeler.stoplight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.timwheeler.stoplight.widget
+        PRODUCT_NAME: StoplightWidget
+        ENABLE_HARDENED_RUNTIME: YES
+        SKIP_INSTALL: YES
