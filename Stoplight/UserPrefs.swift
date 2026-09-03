@@ -21,39 +21,43 @@ final class UserPrefs {
             }
         }
     }
-    enum ListKind: String, CaseIterable { case follow, ignore }
-
-    /// Six lists. Stored as one JSON blob so a change to any of them persists together.
+    /// Follow lists plus the one exclusion list. Stored as one JSON blob.
     struct Sources: Codable, Equatable {
         var followUsers: [String] = []
         var followRepos: [String] = []
         var followOrgs: [String] = []
-        var ignoreUsers: [String] = []
-        var ignoreRepos: [String] = []
-        var ignoreOrgs: [String] = []
+        var hiddenRepos: [String] = []
+        var hideBots: Bool = true
 
-        subscript(kind: SourceKind, list: ListKind) -> [String] {
+        subscript(follow kind: SourceKind) -> [String] {
             get {
-                switch (list, kind) {
-                case (.follow, .users): followUsers
-                case (.follow, .repos): followRepos
-                case (.follow, .orgs): followOrgs
-                case (.ignore, .users): ignoreUsers
-                case (.ignore, .repos): ignoreRepos
-                case (.ignore, .orgs): ignoreOrgs
+                switch kind {
+                case .users: followUsers
+                case .repos: followRepos
+                case .orgs: followOrgs
                 }
             }
             set {
-                switch (list, kind) {
-                case (.follow, .users): followUsers = newValue
-                case (.follow, .repos): followRepos = newValue
-                case (.follow, .orgs): followOrgs = newValue
-                case (.ignore, .users): ignoreUsers = newValue
-                case (.ignore, .repos): ignoreRepos = newValue
-                case (.ignore, .orgs): ignoreOrgs = newValue
+                switch kind {
+                case .users: followUsers = newValue
+                case .repos: followRepos = newValue
+                case .orgs: followOrgs = newValue
                 }
             }
         }
+
+        // Tolerate the short-lived ignoreRepos key and default hideBots to on.
+        init() {}
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            followUsers = try c.decodeIfPresent([String].self, forKey: .followUsers) ?? []
+            followRepos = try c.decodeIfPresent([String].self, forKey: .followRepos) ?? []
+            followOrgs = try c.decodeIfPresent([String].self, forKey: .followOrgs) ?? []
+            hiddenRepos = try c.decodeIfPresent([String].self, forKey: .hiddenRepos)
+                ?? (try? decoder.container(keyedBy: LegacyKeys.self).decodeIfPresent([String].self, forKey: .ignoreRepos)) ?? []
+            hideBots = try c.decodeIfPresent(Bool.self, forKey: .hideBots) ?? true
+        }
+        private enum LegacyKeys: String, CodingKey { case ignoreRepos }
     }
 
     private enum Key {
@@ -96,7 +100,7 @@ final class UserPrefs {
         var src = loadJSON(Key.sources, Sources.self) ?? Sources()
         // Migrate the pre-Sources "hiddenRepos" list once.
         if src == Sources(), let legacy = defaults.stringArray(forKey: Key.legacyHidden), !legacy.isEmpty {
-            src.ignoreRepos = legacy
+            src.hiddenRepos = legacy
             defaults.removeObject(forKey: Key.legacyHidden)
         }
         sources = src
@@ -120,7 +124,7 @@ final class UserPrefs {
     // MARK: Derived
 
     var ignoreRules: IgnoreRules {
-        IgnoreRules(users: Set(sources.ignoreUsers), repos: Set(sources.ignoreRepos), orgs: Set(sources.ignoreOrgs))
+        IgnoreRules(repos: Set(sources.hiddenRepos), hideBots: sources.hideBots)
     }
 
     /// Searches to run in addition to `.authored`, in display order.
@@ -138,18 +142,31 @@ final class UserPrefs {
 
     /// Validates, normalizes (strips a leading @), dedupes case-insensitively.
     @discardableResult
-    func add(_ raw: String, to kind: SourceKind, list: ListKind) -> AddResult {
+    func follow(_ raw: String, kind: SourceKind) -> AddResult {
         var value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if value.hasPrefix("@") { value.removeFirst() }
         let valid = kind == .repos ? Filters.isValidRepo(value) : Filters.isValidLogin(value)
         guard valid else { return .invalid }
-        if sources[kind, list].contains(where: { $0.caseInsensitiveCompare(value) == .orderedSame }) { return .duplicate }
-        sources[kind, list].append(value)
+        if sources[follow: kind].contains(where: { $0.caseInsensitiveCompare(value) == .orderedSame }) { return .duplicate }
+        sources[follow: kind].append(value)
         return .added
     }
 
-    func remove(_ value: String, from kind: SourceKind, list: ListKind) {
-        sources[kind, list].removeAll { $0.caseInsensitiveCompare(value) == .orderedSame }
+    func unfollow(_ value: String, kind: SourceKind) {
+        sources[follow: kind].removeAll { $0.caseInsensitiveCompare(value) == .orderedSame }
+    }
+
+    @discardableResult
+    func hide(repo raw: String) -> AddResult {
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard Filters.isValidRepo(value) else { return .invalid }
+        if sources.hiddenRepos.contains(where: { $0.caseInsensitiveCompare(value) == .orderedSame }) { return .duplicate }
+        sources.hiddenRepos.append(value)
+        return .added
+    }
+
+    func unhide(repo value: String) {
+        sources.hiddenRepos.removeAll { $0.caseInsensitiveCompare(value) == .orderedSame }
     }
 
     func toggleCollapsed(_ section: String) {

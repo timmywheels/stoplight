@@ -129,17 +129,17 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - [ ] `PullRequest` and `CheckResult` models are provider-neutral (no GitHub-specific field names leak into the UI layer)
 - [ ] `PRQuery` enum with a single case `.authored` in v1; the GitHub search string is derived from it, so adding `.reviewRequested` is a one-line change plus a UI section
 
-### US-010: Ignore users, repos, orgs
-**Description:** As a user, I want to silence noisy sources (bots, archived-ish repos, a whole org) so they never show up anywhere in Stoplight.
+### US-010: Hide repos and bots
+**Description:** As a user, I want to silence the two things that pollute a broad list, a noisy repo and bot PRs, without a second config system.
 
 **Acceptance Criteria:**
-- [ ] Settings → Sources has an Ignore list for each of Users, Repos, Orgs, each with an add field and per-row remove
-- [ ] Right-click any PR row → Ignore submenu: `@author`, `owner/repo`, `org`
-- [ ] Ignored PRs are excluded from the list, the dots, the widget, and notifications
-- [ ] Matching is case-insensitive; org matches the `owner` half of `owner/repo`
-- [ ] Persisted in UserDefaults inside the `sources` JSON blob; the old `hiddenRepos` list migrates into Ignore → Repos once
+- [ ] Settings → Sources → Hide has one Repos list (add field, per-row remove) and a "Hide bot PRs" toggle, on by default
+- [ ] Right-click any PR row → "Hide owner/repo"
+- [ ] Hidden repos and bot authors (login ends in `[bot]`) are excluded from the list, the dots, the widget, and notifications
+- [ ] Matching is case-insensitive
+- [ ] Persisted inside the `sources` JSON blob; the old `hiddenRepos` list migrates once
 - [ ] Filtering happens in one place (`Filters.visible(_:ignore:)`) so all four surfaces agree
-- [ ] Unit tests: an ignored repo's failing PR does not light the red dot; ignored user and org filters work
+- [ ] No Ignore lists for users or orgs: everything beyond Mine is opt-in, so there is nothing to opt out of
 
 ### US-011: Watch someone else's PR
 **Description:** As a user, I want to watch a teammate's PR (or any PR by URL) so I know when its CI settles.
@@ -170,11 +170,11 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Description:** As a user, I want to follow teammates, key repos, or a whole org from Settings, so their open PRs show up grouped, without typing commands.
 
 **Acceptance Criteria:**
-- [ ] Settings → Sources has a Follow list for each of Users, Repos, Orgs, next to the Ignore list, same editor
+- [ ] Settings → Sources → Follow has a list for each of Users, Repos, Orgs, same editor
 - [ ] Each followed item adds one aliased `search` to the single poll request: `author:USER`, `repo:OWNER/NAME`, or `org:ORG` (50 PRs cap each)
 - [ ] Popover sections, in order: Pinned, Mine, Watching, then one section per followed item titled `@username`, `owner/repo`, or `org`. A PR appears once, in the first section that claims it
 - [ ] Followed PRs count toward the dots and fire notifications like your own
-- [ ] Right-click a row by someone else → "Follow @username" shortcut; Ignore rules and pins apply to followed PRs too
+- [ ] Right-click a row by someone else → "Follow @username" shortcut; hidden repos, bot hiding, and pins apply to followed PRs too
 - [ ] Rows by other people show `· @author` in the secondary line
 - [ ] Editing Sources triggers an immediate refresh
 - [ ] v1.1: "Add teammate" picker listing members of orgs you belong to (`viewer.organizations` → `membersWithRole`), requires `read:org`
@@ -203,7 +203,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - FR-12: A WidgetKit extension provides small and medium widgets rendered from the shared data
 - FR-13: Settings exposes account, notification mode, count badge, and launch at login only
 - FR-14: All network and provider logic sits behind a `CIProvider` protocol
-- FR-15: Users can ignore users, repos, and orgs; ignored PRs are excluded from every surface (list, dots, widget, notifications)
+- FR-15: Users can hide repos and bot PRs; hidden PRs are excluded from every surface (list, dots, widget, notifications)
 - FR-16: Users can watch any PR by URL; watched PRs are polled, listed under "Watching", and count toward the aggregate
 - FR-16a: Users can follow users, repos, and orgs from Settings; their open PRs are polled in the same request and listed in their own sections
 - FR-17: Users can pin PRs; pinned PRs are listed first under "Pinned" in the popover and the medium widget
@@ -229,7 +229,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - Not "Traffic Light": on macOS that already means the window close/minimize/zoom buttons
 - Not "Traffic Light": on macOS that already means the window close/minimize/zoom buttons
 
-- Everything is system-native: SF Symbols, `.secondary` text color, system semantic colors for red/yellow/green (`.red`, `.yellow`, `.green`), default macOS spacing
+- Everything is system-native: SF Symbols, `.secondary` text color, system semantic colors for red/yellow/green (`.red`, `.yellow`, `.green`), default macOS spacing, system accent color (no custom accent)
 - Status color is always paired with a shape cue (filled dot vs hollow dot for draft, chevron for expandable) so it works for colorblind users
 - Popover has no title bar, no toolbar, no tabs. List plus footer
 - Two animations only: the pending dot pulses gently, and the menu bar stoplight bobs once when everything turns green

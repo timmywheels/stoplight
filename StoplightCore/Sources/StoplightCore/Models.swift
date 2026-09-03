@@ -191,24 +191,23 @@ public extension CIProvider {
     }
 }
 
-/// Users, repos, and orgs to drop from every surface (US-010, US-013). Case-insensitive.
+/// What to drop from every surface (US-010). Case-insensitive.
 public struct IgnoreRules: Codable, Sendable, Equatable {
-    public var users: Set<String>
     public var repos: Set<String>
-    public var orgs: Set<String>
+    /// Authors ending in "[bot]" (dependabot, renovate, github-actions).
+    public var hideBots: Bool
 
-    public init(users: Set<String> = [], repos: Set<String> = [], orgs: Set<String> = []) {
-        self.users = Set(users.map { $0.lowercased() })
+    public init(repos: Set<String> = [], hideBots: Bool = true) {
         self.repos = Set(repos.map { $0.lowercased() })
-        self.orgs = Set(orgs.map { $0.lowercased() })
+        self.hideBots = hideBots
     }
 
-    public static let none = IgnoreRules()
+    public static let none = IgnoreRules(hideBots: false)
 
     public func allows(_ pr: PullRequest) -> Bool {
-        let repo = pr.repo.lowercased()
-        let org = repo.split(separator: "/").first.map(String.init) ?? ""
-        return !users.contains(pr.author.lowercased()) && !repos.contains(repo) && !orgs.contains(org)
+        if repos.contains(pr.repo.lowercased()) { return false }
+        if hideBots && pr.author.lowercased().hasSuffix("[bot]") { return false }
+        return true
     }
 }
 

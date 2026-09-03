@@ -247,13 +247,7 @@ struct PRRow: View {
                 if !isMine && !model.prefs.isFollowing(user: pr.author) {
                     Button("Follow @\(pr.author)") { model.follow(user: pr.author) }
                 }
-                Menu("Ignore") {
-                    if !isMine { Button("@\(pr.author)") { model.ignore(pr.author, kind: .users) } }
-                    Button(pr.repo) { model.ignore(pr.repo, kind: .repos) }
-                    if let org = pr.repo.split(separator: "/").first {
-                        Button("\(org) (org)") { model.ignore(String(org), kind: .orgs) }
-                    }
-                }
+                Button("Hide \(pr.repo)") { model.hide(repo: pr.repo) }
                 Button("Copy link") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(pr.url.absoluteString, forType: .string)

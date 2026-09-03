@@ -240,13 +240,13 @@ final class AppModel {
 
     // MARK: User actions
 
-    func ignore(_ value: String, kind: UserPrefs.SourceKind) {
-        prefs.add(value, to: kind, list: .ignore)
+    func hide(repo: String) {
+        prefs.hide(repo: repo)
         publishSnapshot()
     }
 
     func follow(user: String) {
-        prefs.add(user, to: .users, list: .follow)
+        prefs.follow(user, kind: .users)
         Task { await refresh() }
     }
 

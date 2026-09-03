@@ -69,22 +69,33 @@ private struct GeneralTab: View {
     }
 }
 
-/// Three groups (Users, Repos, Orgs), each with a Follow list and an Ignore list. Plus watched PRs.
+/// Follow lists, then the two exclusions that matter: hidden repos and bots.
 private struct SourcesTab: View {
     @Bindable var model: AppModel
 
     var body: some View {
+        @Bindable var prefs = model.prefs
         Form {
-            ForEach(UserPrefs.SourceKind.allCases) { kind in
-                Section(kind.title) {
-                    HStack(alignment: .top, spacing: 16) {
-                        ListEditor(title: "Follow", items: model.prefs.sources[kind, .follow], placeholder: kind.placeholder,
-                                   add: { edit(kind, .follow, add: $0) }, remove: { edit(kind, .follow, remove: $0) })
-                        Divider()
-                        ListEditor(title: "Ignore", items: model.prefs.sources[kind, .ignore], placeholder: kind.placeholder,
-                                   add: { edit(kind, .ignore, add: $0) }, remove: { edit(kind, .ignore, remove: $0) })
+            Section("Follow") {
+                HStack(alignment: .top, spacing: 16) {
+                    ForEach(UserPrefs.SourceKind.allCases) { kind in
+                        ListEditor(title: kind.title, items: model.prefs.sources[follow: kind], placeholder: kind.placeholder,
+                                   add: { r in let res = model.prefs.follow(r, kind: kind); if res == .added { model.sourcesChanged() }; return res },
+                                   remove: { model.prefs.unfollow($0, kind: kind); model.sourcesChanged() })
+                        if kind != .orgs { Divider() }
                     }
                 }
+                Text("Every open PR from a followed user, repo, or org gets its own section in the popover.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section("Hide") {
+                ListEditor(title: "Repos", items: model.prefs.sources.hiddenRepos, placeholder: "owner/repo",
+                           add: { r in let res = model.prefs.hide(repo: r); if res == .added { model.sourcesChanged() }; return res },
+                           remove: { model.prefs.unhide(repo: $0); model.sourcesChanged() })
+                Toggle("Hide bot PRs (dependabot, renovate, …)", isOn: $prefs.sources.hideBots)
+                    .onChange(of: prefs.sources.hideBots) { _, _ in model.sourcesChanged() }
+                Text("Hidden repos and bots are removed everywhere: list, dots, widget, notifications. Right-click a PR to hide its repo.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Section("Watched PRs") {
                 if model.prefs.watched.isEmpty {
@@ -100,23 +111,8 @@ private struct SourcesTab: View {
                     }
                 }
             }
-            Section {
-                Text("Follow shows every open PR from that user, repo, or org in its own section. Ignore removes matching PRs everywhere: list, dots, widget, notifications.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
         }
         .formStyle(.grouped)
-    }
-
-    private func edit(_ kind: UserPrefs.SourceKind, _ list: UserPrefs.ListKind, add value: String) -> UserPrefs.AddResult {
-        let r = model.prefs.add(value, to: kind, list: list)
-        if r == .added { model.sourcesChanged() }
-        return r
-    }
-
-    private func edit(_ kind: UserPrefs.SourceKind, _ list: UserPrefs.ListKind, remove value: String) {
-        model.prefs.remove(value, from: kind, list: list)
-        model.sourcesChanged()
     }
 }
 

@@ -15,12 +15,12 @@ final class PrefsTests: XCTestCase {
         XCTAssertEqual(Rollup.aggregate(visible), .success)
     }
 
-    func testIgnoreUsersAndOrgs() {
+    func testHideBots() {
         let bot = PullRequest(id: "bot", repo: "acme/x", number: 1, title: "t", url: URL(string: "https://github.com/acme/x/pull/1")!,
                               isDraft: false, updatedAt: .now, headSha: "s", checks: [], author: "dependabot[bot]")
-        let other = pr(id: "o", repo: "evil/y")
-        XCTAssertEqual(Filters.visible([bot, other], ignore: IgnoreRules(users: ["dependabot[bot]"])).map(\.id), ["o"])
-        XCTAssertEqual(Filters.visible([bot, other], ignore: IgnoreRules(orgs: ["EVIL"])).map(\.id), ["bot"])
+        let human = pr(id: "h", repo: "acme/y")
+        XCTAssertEqual(Filters.visible([bot, human], ignore: IgnoreRules(hideBots: true)).map(\.id), ["h"])
+        XCTAssertEqual(Filters.visible([bot, human], ignore: IgnoreRules(hideBots: false)).map(\.id), ["bot", "h"])
     }
 
     func testQueryStringsAndBatching() {
