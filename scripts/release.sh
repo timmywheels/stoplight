@@ -12,24 +12,7 @@ xcodebuild archive -scheme Stoplight -configuration Release -archivePath "$DIST/
   -derivedDataPath "$DIST/dd" -allowProvisioningUpdates -quiet
 APP="$DIST/Stoplight.app"; cp -R "$DIST/Stoplight.xcarchive/Products/Applications/Stoplight.app" "$APP"
 APPEX="$APP/Contents/PlugIns/StoplightWidget.appex"
-rm -f "$APP/Contents/embedded.provisionprofile" "$APPEX/Contents/embedded.provisionprofile"
-
-cat > "$DIST/widget.entitlements" <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-  <key>com.apple.security.app-sandbox</key><true/>
-  <key>com.apple.security.application-groups</key><array><string>group.com.timwheeler.stoplight</string></array>
-</dict></plist>
-PLIST
-cat > "$DIST/app.entitlements" <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-  <key>com.apple.security.application-groups</key><array><string>group.com.timwheeler.stoplight</string></array>
-</dict></plist>
-PLIST
-codesign --force --sign - --options runtime --entitlements "$DIST/widget.entitlements" "$APPEX"
-codesign --force --sign - --options runtime --entitlements "$DIST/app.entitlements" "$APP"
-codesign --verify --deep --strict "$APP"
+scripts/sign-adhoc.sh "$APP"
 
 ditto -c -k --keepParent "$APP" "$DIST/Stoplight-$VERSION.zip"
 rm -rf "$DIST/dmgroot"; mkdir "$DIST/dmgroot"; cp -R "$APP" "$DIST/dmgroot/"; ln -s /Applications "$DIST/dmgroot/Applications"

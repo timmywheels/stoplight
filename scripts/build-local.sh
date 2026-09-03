@@ -9,12 +9,12 @@ command -v xcodegen >/dev/null || { echo "install xcodegen first: brew install x
 BUILD=build/local; rm -rf "$BUILD"
 
 xcodegen generate >/dev/null
+# Build unsigned (entitlements would otherwise demand a provisioning profile), then sign ad-hoc.
 xcodebuild -scheme Stoplight -configuration Release -derivedDataPath "$BUILD" build -quiet \
-  CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="-" DEVELOPMENT_TEAM="" PROVISIONING_PROFILE_SPECIFIER="" \
-  CODE_SIGNING_ALLOWED=YES
-
+  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM=""
 APP="$BUILD/Build/Products/Release/Stoplight.app"
-codesign --verify --deep --strict "$APP"
+scripts/sign-adhoc.sh "$APP"
+
 pkill -x Stoplight 2>/dev/null || true
 rm -rf /Applications/Stoplight.app
 cp -R "$APP" /Applications/Stoplight.app
