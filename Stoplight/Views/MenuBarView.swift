@@ -98,10 +98,17 @@ struct MenuBarView: View {
             Button { Task { await model.refresh() } } label: { Image(systemName: "arrow.clockwise") }
                 .keyboardShortcut("r").help("Refresh (⌘R)")
                 .disabled(model.isRefreshing)
-            Button { openSettings() } label: { Image(systemName: "gearshape") }
-                .keyboardShortcut(",").help("Settings (⌘,)")
-            Button { NSApp.terminate(nil) } label: { Image(systemName: "power") }
-                .keyboardShortcut("q").help("Quit (⌘Q)")
+            Menu {
+                Button("Settings…") { openSettings() }.keyboardShortcut(",")
+                Divider()
+                Button("Quit Stoplight") { NSApp.terminate(nil) }.keyboardShortcut("q")
+            } label: {
+                Image(systemName: "gearshape")
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Settings and Quit")
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 12).padding(.vertical, 8)
