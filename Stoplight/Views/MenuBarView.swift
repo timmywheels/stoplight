@@ -101,17 +101,11 @@ struct MenuBarView: View {
             Button { Task { await model.refresh() } } label: { Image(systemName: "arrow.clockwise") }
                 .keyboardShortcut("r").help("Refresh (⌘R)")
                 .disabled(model.isRefreshing)
-            Menu {
-                Button("Settings…") { openSettings() }.keyboardShortcut(",")
-                Divider()
-                Button("Quit Stoplight") { NSApp.terminate(nil) }.keyboardShortcut("q")
-            } label: {
-                Image(systemName: "gearshape")
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .help("Settings and Quit")
+            Button { openSettings() } label: { Image(systemName: "gearshape") }
+                .keyboardShortcut(",").help("Settings (⌘,)")
+            // ⌘Q still quits while the popover is open; the visible Quit button lives in Settings.
+            Button("Quit") { NSApp.terminate(nil) }
+                .keyboardShortcut("q").hidden().frame(width: 0, height: 0)
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 12).padding(.vertical, 8)

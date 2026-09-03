@@ -56,6 +56,14 @@ private struct GeneralTab: View {
                         }
                     }
             }
+            Section {
+                HStack {
+                    Text("Stoplight \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Quit Stoplight") { NSApp.terminate(nil) }.keyboardShortcut("q")
+                }
+            }
         }
         .formStyle(.grouped)
     }
