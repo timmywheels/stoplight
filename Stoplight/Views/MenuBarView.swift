@@ -210,6 +210,11 @@ struct PRRow: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     Spacer(minLength: 8)
+                    // Description tooltip lives on this icon only. Always laid out; visible on hover when there is a body.
+                    Image(systemName: "info.circle")
+                        .font(.caption).foregroundStyle(.secondary).frame(width: 14)
+                        .opacity(hovering && !pr.summary.isEmpty ? 1 : 0)
+                        .help(pr.summary)
                     // US-012 hover pin glyph. Always laid out so the row never shifts; invisible until hover or pinned.
                     Button { model.togglePin(pr) } label: {
                         Image(systemName: pinned ? "pin.fill" : "pin")
@@ -232,7 +237,6 @@ struct PRRow: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(pr.summary.isEmpty ? pr.title : "\(pr.title)\n\n\(pr.summary)")
             .onHover { hovering = $0 }
             .contextMenu {
                 Button(pinned ? "Unpin" : "Pin") { model.togglePin(pr) }
