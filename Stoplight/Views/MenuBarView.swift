@@ -6,7 +6,6 @@ import StoplightCore
 struct MenuBarView: View {
     @Bindable var model: AppModel
     @Environment(\.openSettings) private var openSettings
-    @State private var listHeight: CGFloat = 200
     @State private var showWatchField = false
     @FocusState private var watchFieldFocused: Bool
 
@@ -41,20 +40,23 @@ struct MenuBarView: View {
                 centered("No open PRs")
             } else {
                 // MenuBarExtra windows size to the view's ideal height, and a ScrollView has none.
-                // Measure the content and size the ScrollView to it, capped at 480pt.
-                ScrollView {
-                    VStack(spacing: 0) {
-                        section("Pinned", model.pinnedPRs, showHeader: true)
-                        section("Mine", model.minePRs, showHeader: !model.pinnedPRs.isEmpty || !model.watchingPRs.isEmpty)
-                        section("Watching", model.watchingPRs, showHeader: true)
-                    }
-                    .background(GeometryReader { g in
-                        Color.clear.preference(key: ListHeightKey.self, value: g.size.height)
-                    })
+                // Short lists render inline so the window fits them; long lists get a fixed-height ScrollView.
+                if rowCount > 9 {
+                    ScrollView { list }.frame(height: 480)
+                } else {
+                    list
                 }
-                .onPreferenceChange(ListHeightKey.self) { listHeight = $0 }
-                .frame(height: min(listHeight, 480))
             }
+        }
+    }
+
+    private var rowCount: Int { model.pinnedPRs.count + model.minePRs.count + model.watchingPRs.count }
+
+    private var list: some View {
+        VStack(spacing: 0) {
+            section("Pinned", model.pinnedPRs, showHeader: true)
+            section("Mine", model.minePRs, showHeader: !model.pinnedPRs.isEmpty || !model.watchingPRs.isEmpty)
+            section("Watching", model.watchingPRs, showHeader: true)
         }
     }
 
@@ -290,9 +292,4 @@ struct SignInView: View {
         }
         .padding(16)
     }
-}
-
-private struct ListHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
