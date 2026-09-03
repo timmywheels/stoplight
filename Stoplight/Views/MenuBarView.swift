@@ -50,7 +50,9 @@ struct MenuBarView: View {
         }
     }
 
-    private var rowCount: Int { model.sections.reduce(0) { $0 + $1.prs.count } }
+    private var rowCount: Int {
+        model.sections.reduce(0) { $0 + (model.prefs.collapsedSections.contains($1.title) ? 0 : $1.prs.count) }
+    }
 
     private var list: some View {
         let sections = model.sections
@@ -66,15 +68,15 @@ struct MenuBarView: View {
     @ViewBuilder
     private func section(_ title: String, _ prs: [PullRequest], showHeader: Bool) -> some View {
         if !prs.isEmpty {
+            let collapsed = showHeader && model.prefs.collapsedSections.contains(title)
             if showHeader {
-                Text(title.uppercased())
-                    .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-                    .padding(.horizontal, 12).padding(.top, 8).padding(.bottom, 2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                SectionHeader(title: title, prs: prs, collapsed: collapsed) { model.prefs.toggleCollapsed(title) }
             }
-            ForEach(prs) { pr in
-                PRRow(pr: pr, model: model)
-                Divider().padding(.leading, 28)
+            if !collapsed {
+                ForEach(prs) { pr in
+                    PRRow(pr: pr, model: model)
+                    Divider().padding(.leading, 28)
+                }
             }
         }
     }
@@ -149,6 +151,35 @@ struct WatchField: View {
     }
 }
 
+/// Click to collapse. When collapsed, shows the count and the section's worst-state dot so nothing is lost.
+struct SectionHeader: View {
+    let title: String
+    let prs: [PullRequest]
+    let collapsed: Bool
+    let toggle: () -> Void
+
+    var body: some View {
+        Button(action: toggle) {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(collapsed ? -90 : 0))
+                    .frame(width: 10)
+                Text(title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                if collapsed {
+                    StatusDot(state: Rollup.aggregate(prs)).padding(.leading, 2)
+                    Text("\(prs.count)").font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 12).padding(.top, 8).padding(.bottom, collapsed ? 8 : 2)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .animation(.easeOut(duration: 0.15), value: collapsed)
+    }
+}
+
 struct PRRow: View {
     let pr: PullRequest
     @Bindable var model: AppModel
@@ -179,23 +210,23 @@ struct PRRow: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     Spacer(minLength: 8)
-                    // US-012 hover pin glyph. Stays visible when pinned.
-                    if hovering || pinned {
-                        Button { model.togglePin(pr) } label: {
-                            Image(systemName: pinned ? "pin.fill" : "pin")
-                                .font(.caption).foregroundStyle(pinned ? .primary : .secondary)
-                        }
-                        .buttonStyle(.plain)
-                        .help(pinned ? "Unpin" : "Pin")
+                    // US-012 hover pin glyph. Always laid out so the row never shifts; invisible until hover or pinned.
+                    Button { model.togglePin(pr) } label: {
+                        Image(systemName: pinned ? "pin.fill" : "pin")
+                            .font(.caption).foregroundStyle(pinned ? .primary : .secondary)
+                            .frame(width: 14)
                     }
+                    .buttonStyle(.plain)
+                    .opacity(hovering || pinned ? 1 : 0)
+                    .help(pinned ? "Unpin" : "Pin")
                     Text(pr.updatedAt.compactAgo).font(.caption).foregroundStyle(.tertiary).monospacedDigit()
-                    if pr.state == .failure {
-                        Button { expanded.toggle() } label: {
-                            Image(systemName: "chevron.right").rotationEffect(.degrees(expanded ? 90 : 0))
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
+                    Button { expanded.toggle() } label: {
+                        Image(systemName: "chevron.right").rotationEffect(.degrees(expanded ? 90 : 0))
+                            .font(.caption).foregroundStyle(.secondary).frame(width: 10)
                     }
+                    .buttonStyle(.plain)
+                    .opacity(pr.state == .failure ? 1 : 0)
+                    .disabled(pr.state != .failure)
                 }
                 .padding(.horizontal, 12).padding(.vertical, 8)
                 .contentShape(Rectangle())

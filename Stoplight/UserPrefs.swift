@@ -64,6 +64,7 @@ final class UserPrefs {
         static let all = [sources, watched, pinned]
         static let showCount = Prefs.showCount
         static let housing = Prefs.housing
+        static let collapsed = "collapsedSections"
     }
 
     var sources: Sources { didSet { persistJSON(Key.sources, sources) } }
@@ -73,6 +74,8 @@ final class UserPrefs {
     // Menu bar look. Local only, not synced.
     var showCount: Bool { didSet { defaults.set(showCount, forKey: Key.showCount) } }
     var housing: Bool { didSet { defaults.set(housing, forKey: Key.housing) } }
+    /// Popover section titles the user has collapsed. Local only.
+    var collapsedSections: Set<String> { didSet { defaults.set(Array(collapsedSections).sorted(), forKey: Key.collapsed) } }
 
     private let defaults: UserDefaults
     private let cloud: NSUbiquitousKeyValueStore?
@@ -101,6 +104,7 @@ final class UserPrefs {
         pinned = Set(load(Key.pinned))
         showCount = defaults.bool(forKey: Key.showCount)
         housing = defaults.bool(forKey: Key.housing)
+        collapsedSections = Set(defaults.stringArray(forKey: Key.collapsed) ?? [])
 
         if let cloud {
             observer = NotificationCenter.default.addObserver(
@@ -146,6 +150,10 @@ final class UserPrefs {
 
     func remove(_ value: String, from kind: SourceKind, list: ListKind) {
         sources[kind, list].removeAll { $0.caseInsensitiveCompare(value) == .orderedSame }
+    }
+
+    func toggleCollapsed(_ section: String) {
+        if collapsedSections.contains(section) { collapsedSections.remove(section) } else { collapsedSections.insert(section) }
     }
 
     // MARK: Pins / watches
