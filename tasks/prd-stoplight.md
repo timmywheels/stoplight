@@ -116,7 +116,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 
 **Acceptance Criteria:**
 - [ ] Standard macOS `Settings` scene, one pane, fixed width 400pt
-- [ ] Controls, in order: Account (shows `@login`, source "gh CLI" or "Token", Sign out button), Notifications (All / Fail only / Off), Show count in menu bar (toggle), Launch at login (toggle, via `SMAppService`)
+- [ ] Controls, in order: Account (shows `@username`, source "gh CLI" or "Token", Sign out button), Notifications (All / Fail only / Off), Show count in menu bar (toggle), Launch at login (toggle, via `SMAppService`)
 - [ ] No other settings in v1
 - [ ] Sign out clears Keychain token if present and shows the Sign in state
 
@@ -169,11 +169,11 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Description:** As a user, I want to follow a teammate so all of their open PRs show up, grouped under their name.
 
 **Acceptance Criteria:**
-- [ ] The ⌘N field accepts `@login` (or a github.com/login profile URL) in addition to PR URLs
+- [ ] The ⌘N field accepts `@username` (or a github.com/username profile URL) in addition to PR URLs
 - [ ] Each watched person adds one aliased `search(query: "is:pr is:open author:LOGIN archived:false")` to the existing poll request; still one HTTP call per poll
-- [ ] Their PRs render in a section headed `@login`, below Mine and Watching, worst-first within the section
+- [ ] Their PRs render in a section headed `@username`, below Mine and Watching, worst-first within the section
 - [ ] Their PRs count toward the dots and fire notifications like watched PRs
-- [ ] Right-click a row in a person section → "Stop following @login"; Settings lists followed people with a remove button
+- [ ] Right-click a row in a person section → "Stop following @username"; Settings lists followed people with a remove button
 - [ ] Followed logins persist in UserDefaults as `[String]`
 - [ ] Hidden repos and pins apply to their PRs too
 - [ ] v1.1: "Add teammate" picker listing members of orgs you belong to (`viewer.organizations` → `membersWithRole`), requires `read:org`
