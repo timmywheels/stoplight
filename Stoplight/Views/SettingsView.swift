@@ -13,8 +13,7 @@ struct SettingsView: View {
             SourcesTab(model: model)
                 .tabItem { Label("Sources", systemImage: "person.2") }
         }
-        .frame(width: 520)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(minWidth: 520, idealWidth: 560, minHeight: 480, idealHeight: 680)
     }
 }
 

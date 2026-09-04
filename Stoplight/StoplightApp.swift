@@ -18,5 +18,6 @@ struct StoplightApp: App {
         Settings {
             SettingsView(model: model)
         }
+        .windowResizability(.contentMinSize)
     }
 }
