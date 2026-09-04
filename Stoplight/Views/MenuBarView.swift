@@ -275,6 +275,7 @@ struct PRRow: View {
                                 .onChange(of: aliasFocused) { _, f in if !f { editingAlias = false } }
                         } else {
                             Text(model.displayTitle(pr)).lineLimit(1).truncationMode(.tail)
+                                .help(infoText)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -292,24 +293,23 @@ struct PRRow: View {
             }
             .buttonStyle(.plain)
             // Hover toolbar floats over the trailing edge instead of reserving width (US-005: titles get the room).
+            // Two actions only: open, and copy a pasteable link. Everything else is in the right-click menu.
             .overlay(alignment: .trailing) {
                 if hovering && !editingAlias {
-                    HStack(spacing: 10) {
+                    HStack(spacing: 12) {
                         Button { openURL(pr.url) } label: {
-                            Image(systemName: "arrow.up.right.square").font(.caption).foregroundStyle(.secondary)
+                            Image(systemName: "arrow.up.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain).help("Open on GitHub")
-                        copyGlyph("link", value: pr.url.absoluteString, help: "Copy PR link")
-                        if !pr.headRefName.isEmpty {
-                            copyGlyph("arrow.triangle.branch", value: pr.headRefName, help: "Copy branch name")
+                        Button {
+                            copyRichLink()
+                            copied = "link"
+                            Task { try? await Task.sleep(for: .seconds(1)); if copied == "link" { copied = nil } }
+                        } label: {
+                            Image(systemName: copied == "link" ? "checkmark" : "doc.on.doc")
+                                .font(.caption).foregroundStyle(copied == "link" ? .green : .secondary)
                         }
-                        Image(systemName: "info.circle")
-                            .font(.caption).foregroundStyle(.secondary)
-                            .help(infoText)
-                        Button { model.togglePin(pr) } label: {
-                            Image(systemName: pinned ? "pin.fill" : "pin").font(.caption).foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain).help(pinned ? "Unpin" : "Pin")
+                        .buttonStyle(.plain).help("Copy link (pastes as a rich link in Slack, Markdown elsewhere)")
                     }
                     .padding(.horizontal, 10).padding(.vertical, 6)
                     .background(.regularMaterial, in: Capsule())
@@ -331,7 +331,8 @@ struct PRRow: View {
                 }
                 Button("Hide \(pr.repo)") { model.hide(repo: pr.repo) }
                 Divider()
-                Button("Copy link") { copy(pr.url.absoluteString) }
+                Button("Copy link") { copyRichLink() }
+                Button("Copy URL only") { copy(pr.url.absoluteString) }
                 if !pr.headRefName.isEmpty { Button("Copy branch name") { copy(pr.headRefName) } }
                 if let stack, stack.count > 1 {
                     Button("Copy stack (\(stack.count) PRs) as Markdown") { copy(Stacks.markdown(stack)) }
@@ -375,17 +376,19 @@ struct PRRow: View {
         NSPasteboard.general.setString(value, forType: .string)
     }
 
-    private func copyGlyph(_ symbol: String, value: String, help: String) -> some View {
-        Button {
-            copy(value)
-            copied = symbol
-            Task { try? await Task.sleep(for: .seconds(1)); if copied == symbol { copied = nil } }
-        } label: {
-            Image(systemName: copied == symbol ? "checkmark" : symbol)
-                .font(.caption).foregroundStyle(copied == symbol ? .green : .secondary)
-        }
-        .buttonStyle(.plain)
-        .help(help)
+    /// One clipboard entry, two flavors: HTML (Slack, Notion, Docs paste a real hyperlink) and
+    /// Markdown as the plain-text fallback (GitHub, Linear, terminals).
+    private func copyRichLink() {
+        let label = "\(pr.repo)#\(pr.number) \(pr.title)"
+        let markdown = "[\(label)](\(pr.url.absoluteString))"
+        let escaped = label.replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")
+        let html = "<a href=\"\(pr.url.absoluteString)\">\(escaped)</a>"
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.declareTypes([.html, .string], owner: nil)
+        pb.setString(html, forType: .html)
+        pb.setString(markdown, forType: .string)
     }
 
     private func tag(_ text: String, color: Color = .secondary) -> some View {

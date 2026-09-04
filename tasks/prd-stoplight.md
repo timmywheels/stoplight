@@ -214,10 +214,11 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Description:** As a user, I want the PR link and branch name one click away.
 
 **Acceptance Criteria:**
-- [ ] Hovering a row reveals two glyphs before the pin: link (copies URL) and branch (copies head branch name)
-- [ ] The glyph turns into a green checkmark for one second after copying
-- [ ] Both are also in the right-click menu
-- [ ] Glyphs are always laid out so the row never shifts
+- [ ] Hovering a row reveals two glyphs floating over the trailing edge: ↗ opens the PR, ⧉ copies a link
+- [ ] The copied link carries two flavors on the pasteboard: HTML `<a>` (Slack, Notion, Docs paste a hyperlink) and Markdown `[owner/repo#123 title](url)` as plain text (GitHub, Linear)
+- [ ] The copy glyph turns into a green checkmark for one second
+- [ ] Right-click menu has Copy link, Copy URL only, Copy branch name, Copy stack as Markdown
+- [ ] Description and real title (when nicknamed) are the title's tooltip
 
 ### US-018: Status filter and legend
 **Description:** As a user, I want to narrow the list to red, yellow, or green, and a place that explains every symbol.
@@ -238,7 +239,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - [ ] The nickname replaces the title in the row; the real title appears at the top of the ⓘ tooltip
 - [ ] "Clear nickname" in the context menu when one is set
 - [ ] Nicknames are keyed by PR id, stored in Sources, and dropped when the PR leaves the list
-- [ ] Hover glyphs (link, branch, ⓘ, pin) float over the trailing edge in a material capsule while hovering, so the title keeps the full row width when not hovered
+- [ ] Hover glyphs float over the trailing edge in a material capsule while hovering, so the title keeps the full row width when not hovered
 
 ## Functional Requirements
 
