@@ -135,7 +135,8 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Acceptance Criteria:**
 - [ ] Settings → Sources → Hide has a Users table (pre-filled with dependabot[bot], renovate[bot], github-actions[bot]) and a Repos table
 - [ ] All Sources tables use the System Settings pattern: bordered list, + adds an editable row committed on Return, − removes the selection, Delete key also removes
-- [ ] Right-click any PR row → "Hide owner/repo"
+- [ ] Right-click any PR row → "Hide this PR". Hiding a whole repo is deliberately Settings-only
+- [ ] Settings → Sources → Hide lists hidden PRs (`owner/repo#123 title`) with a remove button; a hidden PR is dropped from the list automatically once it merges or closes
 - [ ] Hidden users and repos are excluded from the list, the dots, the widget, and notifications
 - [ ] Matching is case-insensitive
 - [ ] Persisted inside the `sources` JSON blob; the old `hiddenRepos` list migrates once
@@ -206,6 +207,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 
 **Acceptance Criteria:**
 - [ ] Rows show a "Queue #n" tag while `mergeQueueEntry` exists; "Queue: blocked" in red when its state is UNMERGEABLE
+- [ ] Right-click a queued PR → "Open merge queue" (`github.com/owner/repo/queue/<base branch>`)
 - [ ] Transition from in-queue to not-in-queue while still open posts a notification "Removed from the merge queue", time-sensitive with sound, in both non-off notification modes
 - [ ] Entering the queue posts nothing
 - [ ] Unit test covers the dequeued transition table
@@ -240,6 +242,17 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - [ ] "Clear nickname" in the context menu when one is set
 - [ ] Nicknames are keyed by PR id, stored in Sources, and dropped when the PR leaves the list
 - [ ] Hover glyphs float over the trailing edge in a material capsule while hovering, so the title keeps the full row width when not hovered
+
+### US-020: Built-in updates
+**Description:** As a user, I want to update with one click instead of remembering a command.
+
+**Acceptance Criteria:**
+- [ ] The app checks GitHub Releases at launch and every 6 hours
+- [ ] When a newer version exists: "Update to X" appears in the popover footer and in Settings → General
+- [ ] Update: download the release zip, expand, `spctl --assess` it, confirm the bundle id matches, move the current bundle to Trash, move the new one into place, relaunch
+- [ ] Any failed step aborts before touching the installed app and shows the reason in Settings
+- [ ] Settings shows Up to date / Check Again / Retry states
+- [ ] No third-party framework; loopback-free, no server beyond GitHub
 
 ## Functional Requirements
 

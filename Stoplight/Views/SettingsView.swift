@@ -69,9 +69,9 @@ private struct GeneralTab: View {
             }
             Section {
                 HStack {
-                    Text("Stoplight \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
-                        .foregroundStyle(.secondary)
+                    Text("Stoplight \(model.updater.currentVersion)").foregroundStyle(.secondary)
                     Spacer()
+                    updateControl
                     Button("Quit Stoplight") { NSApp.terminate(nil) }.keyboardShortcut("q")
                 }
             }
@@ -95,6 +95,29 @@ private struct LegendRow<Icon: View>: View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             icon().frame(minWidth: 22, alignment: .center)
             Text(text).font(.callout).foregroundStyle(.secondary)
+        }
+    }
+}
+
+private extension GeneralTab {
+    @ViewBuilder
+    var updateControl: some View {
+        let u = model.updater
+        switch u.state {
+        case .checking:
+            ProgressView().controlSize(.small)
+        case .downloading, .installing:
+            HStack(spacing: 6) { ProgressView().controlSize(.small); Text("Updating…").foregroundStyle(.secondary) }
+        case .available:
+            Button("Update to \(u.latest?.version ?? "")") { Task { await u.install() } }.buttonStyle(.borderedProminent)
+        case .upToDate:
+            Text("Up to date").foregroundStyle(.secondary)
+            Button("Check Again") { Task { await u.check() } }
+        case .failed(let msg):
+            Text(msg).foregroundStyle(.red).font(.caption)
+            Button("Retry") { Task { await u.check() } }
+        case .idle:
+            Button("Check for Updates") { Task { await u.check() } }
         }
     }
 }
@@ -130,7 +153,24 @@ private struct SourcesTab: View {
                             normalize: { UserPrefs.normalize($0, kind: .users, hideList: true) }, onChange: model.sourcesChanged)
                 TableEditor(title: "Repos", items: $prefs.sources.hiddenRepos, placeholder: "owner/repo",
                             normalize: { UserPrefs.normalize($0, kind: .repos, hideList: true) }, onChange: model.sourcesChanged)
-                Text("Hidden users and repos are removed everywhere: list, dots, widget, notifications. Right-click a PR to hide its repo.")
+                LabeledContent("PRs") {
+                    if model.prefs.sources.hiddenPRs.isEmpty {
+                        Text("None. Right-click a PR → Hide this PR. Hidden repos are set here only.").foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(model.prefs.sources.hiddenPRs.sorted(by: { $0.value < $1.value }), id: \.key) { id, label in
+                                HStack {
+                                    Text(label).lineLimit(1).truncationMode(.tail)
+                                    Spacer()
+                                    Button { model.unhide(prID: id) } label: { Image(systemName: "minus.circle") }
+                                        .buttonStyle(.borderless).help("Show again")
+                                }
+                            }
+                        }
+                    }
+                }
+                Text("Hidden users, repos, and PRs are removed everywhere: list, dots, widget, notifications. A hidden PR drops off this list once it merges or closes.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Watched PRs") {

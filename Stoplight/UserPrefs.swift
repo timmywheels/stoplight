@@ -32,6 +32,8 @@ final class UserPrefs {
         var userLabels: [String: String] = [:]
         /// PR id → nickname shown instead of the title (US-019). The real title stays in the tooltip.
         var prAliases: [String: String] = [:]
+        /// PR id → "owner/repo#123 title", for individually hidden PRs (US-010). Label is for the Settings list.
+        var hiddenPRs: [String: String] = [:]
 
         subscript(follow kind: SourceKind) -> [String] {
             get {
@@ -68,6 +70,7 @@ final class UserPrefs {
             }
             userLabels = try c.decodeIfPresent([String: String].self, forKey: .userLabels) ?? [:]
             prAliases = try c.decodeIfPresent([String: String].self, forKey: .prAliases) ?? [:]
+            hiddenPRs = try c.decodeIfPresent([String: String].self, forKey: .hiddenPRs) ?? [:]
         }
         private enum LegacyKeys: String, CodingKey { case ignoreRepos, hideBots }
     }
@@ -207,6 +210,10 @@ final class UserPrefs {
     func toggleCollapsed(_ section: String) {
         if collapsedSections.contains(section) { collapsedSections.remove(section) } else { collapsedSections.insert(section) }
     }
+
+    func hide(pr: PullRequest) { sources.hiddenPRs[pr.id] = "\(pr.shortRef) \(pr.title)" }
+    func unhide(prID: String) { sources.hiddenPRs[prID] = nil }
+    func isHidden(prID: String) -> Bool { sources.hiddenPRs[prID] != nil }
 
     func alias(for prID: String) -> String? {
         let a = sources.prAliases[prID]?.trimmingCharacters(in: .whitespaces)

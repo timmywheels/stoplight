@@ -122,6 +122,18 @@ struct MenuBarView: View {
                     .help("Last refreshed")
             }
             Spacer()
+            if model.updater.updateAvailable, let v = model.updater.latest?.version {
+                Button {
+                    Task { await model.updater.install() }
+                } label: {
+                    Label(model.updater.state == .downloading || model.updater.state == .installing ? "Updating…" : "Update to \(v)",
+                          systemImage: "arrow.down.circle")
+                        .font(.caption).labelStyle(.titleAndIcon)
+                }
+                .buttonStyle(.plain).foregroundStyle(Color.accentColor)
+                .disabled(model.updater.state == .downloading || model.updater.state == .installing)
+                .help("Download, verify, and relaunch")
+            }
             Button {
                 showWatchField.toggle()
                 if showWatchField { watchFieldFocused = true }
@@ -326,7 +338,11 @@ struct PRRow: View {
                 if !isMine && !model.prefs.isFollowing(user: pr.author) {
                     Button("Follow @\(pr.author)") { model.follow(user: pr.author) }
                 }
-                Button("Hide \(pr.repo)") { model.hide(repo: pr.repo) }
+                Button("Hide this PR") { model.hide(pr: pr) }
+                if pr.mergeQueue != nil,
+                   let q = URL(string: "https://github.com/\(pr.repo)/queue/\(pr.baseRefName)") {
+                    Button("Open merge queue") { openURL(q) }
+                }
                 Divider()
                 Button("Share (rich link)") { copyRichLink() }
                 Button("Copy URL") { copy(pr.url.absoluteString) }

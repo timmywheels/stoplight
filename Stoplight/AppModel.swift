@@ -32,6 +32,7 @@ final class AppModel {
     private var loop: Task<Void, Never>?
     private let notifier = NotificationService()
     private let server = SnapshotServer()
+    let updater = Updater()
     /// Keys of events already delivered, per (PR, sha, kind). Pruned when a PR leaves the list (US-006).
     private var sentEvents: Set<String> = []
     /// Watched refs seen closed/merged once; removed on the next cycle (US-011).
@@ -80,7 +81,8 @@ final class AppModel {
         for pr in mine + watched + followed.flatMap(\.prs) where seen.insert(pr.id).inserted {
             out.append(pr)
         }
-        return Filters.visible(out, ignore: prefs.ignoreRules)
+        let hidden = prefs.sources.hiddenPRs
+        return Filters.visible(out, ignore: prefs.ignoreRules).filter { hidden[$0.id] == nil }
     }
 
     /// Popover sections in order: Pinned, Mine, Watching, then one per followed source.
@@ -133,6 +135,7 @@ final class AppModel {
             await self?.signIn()
             while !Task.isCancelled {
                 await self?.refresh()
+                await self?.updater.checkIfDue()
                 let interval = self?.nextInterval ?? 60
                 try? await Task.sleep(for: .seconds(interval))
             }
@@ -290,12 +293,25 @@ final class AppModel {
         if !stale.isEmpty { prefs.pinned.subtract(stale) }
         let staleAliases = Set(prefs.sources.prAliases.keys).subtracting(live)
         for id in staleAliases { prefs.sources.prAliases[id] = nil }
+        // A hidden PR that merged or closed is gone for good; drop it so the Settings list stays honest.
+        let staleHidden = Set(prefs.sources.hiddenPRs.keys).subtracting(live)
+        for id in staleHidden { prefs.sources.hiddenPRs[id] = nil }
     }
 
     // MARK: User actions
 
     func hide(repo: String) {
         prefs.hide(repo: repo)
+        publishSnapshot()
+    }
+
+    func hide(pr: PullRequest) {
+        prefs.hide(pr: pr)
+        publishSnapshot()
+    }
+
+    func unhide(prID: String) {
+        prefs.unhide(prID: prID)
         publishSnapshot()
     }
 
