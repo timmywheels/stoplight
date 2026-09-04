@@ -58,6 +58,14 @@ final class AppModel {
         }
     }
 
+    /// Popover status filter (US-018). Empty = show everything. Session-only, not persisted.
+    var statusFilter: Set<CIState> = []
+    func toggleFilter(_ state: CIState) {
+        if statusFilter.contains(state) { statusFilter.remove(state) } else { statusFilter.insert(state) }
+    }
+    /// Counts per state across everything visible, for the filter buttons.
+    func count(_ state: CIState) -> Int { all.filter { $0.state == state }.count }
+
     /// login (lowercased) → display name, for followed users (US-013).
     private(set) var displayNames: [String: String] = [:]
     private var namesFetchedFor: Set<String> = []
@@ -79,9 +87,11 @@ final class AppModel {
     var sections: [Section] {
         let allowed = Set(all.map(\.id))
         var claimed = Set<String>()
+        let filter = statusFilter
         func take(_ prs: [PullRequest], pinnedOnly: Bool = false, skipPinned: Bool = true) -> [PullRequest] {
             let picked = prs.filter { pr in
                 guard allowed.contains(pr.id), !claimed.contains(pr.id) else { return false }
+                guard filter.isEmpty || filter.contains(pr.state) else { return false }
                 let isPinned = prefs.pinned.contains(pr.id)
                 return pinnedOnly ? isPinned : (!skipPinned || !isPinned)
             }

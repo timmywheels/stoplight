@@ -56,6 +56,18 @@ private struct GeneralTab: View {
                         }
                     }
             }
+            Section("Legend") {
+                LegendRow("Failing. At least one check failed.") { StatusDot(state: .failure) }
+                LegendRow("Running. Checks still in progress.") { StatusDot(state: .pending) }
+                LegendRow("Passed. Every check green, skipped, or neutral.") { StatusDot(state: .success) }
+                LegendRow("No checks configured.") { StatusDot(state: .none) }
+                LegendRow("Hollow dot: draft. Drafts never light the menu bar or notify.") { StatusDot(state: .success, hollow: true) }
+                LegendRow("Stacked on the PR above it. Right-click to copy the whole stack.") { Image(systemName: "arrow.turn.down.right").font(.caption2).foregroundStyle(.tertiary) }
+                LegendRow("In the merge queue at that position. \"Queue: blocked\" means GitHub can't merge it.") { legendTag("Queue #2", .blue) }
+                LegendRow("Based on a branch whose PR isn't in view.") { legendTag("on feat/x", .secondary) }
+                LegendRow("On hover: copy link, copy branch, description, pin.") { HStack(spacing: 6) { Image(systemName: "link"); Image(systemName: "arrow.triangle.branch"); Image(systemName: "info.circle"); Image(systemName: "pin") }.font(.caption).foregroundStyle(.secondary) }
+                LegendRow("Footer dots filter the list by status. Click to toggle, combine freely.") { Text("● 3").font(.caption).foregroundStyle(.secondary) }
+            }
             Section {
                 HStack {
                     Text("Stoplight \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
@@ -66,6 +78,25 @@ private struct GeneralTab: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+private func legendTag(_ text: String, _ color: Color) -> some View {
+    Text(text).font(.caption2).foregroundStyle(color)
+        .padding(.horizontal, 4).padding(.vertical, 1)
+        .background(.quaternary, in: Capsule())
+}
+
+private struct LegendRow<Icon: View>: View {
+    @ViewBuilder let icon: () -> Icon
+    let text: String
+    init(_ text: String, @ViewBuilder icon: @escaping () -> Icon) { self.text = text; self.icon = icon }
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            icon().frame(minWidth: 22, alignment: .center)
+            Text(text).font(.callout).foregroundStyle(.secondary)
+        }
     }
 }
 

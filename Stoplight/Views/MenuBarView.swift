@@ -38,6 +38,8 @@ struct MenuBarView: View {
         case .signedIn:
             if model.isEmpty {
                 centered("No open PRs")
+            } else if rowCount == 0 && !model.statusFilter.isEmpty {
+                centered("No PRs match the filter")
             } else {
                 // MenuBarExtra windows size to the view's ideal height, and a ScrollView has none.
                 // Short lists render inline so the window fits them; long lists get a fixed-height ScrollView.
@@ -100,11 +102,22 @@ struct MenuBarView: View {
 
     private var footer: some View {
         HStack(spacing: 12) {
+            // US-018: status filters. Click a dot to show only that state; click again to clear. Multi-select.
+            if case .signedIn = model.auth, !model.isEmpty {
+                HStack(spacing: 8) {
+                    ForEach([CIState.failure, .pending, .success], id: \.self) { state in
+                        FilterDot(state: state, count: model.count(state),
+                                  active: model.statusFilter.isEmpty || model.statusFilter.contains(state),
+                                  selected: model.statusFilter.contains(state)) { model.toggleFilter(state) }
+                    }
+                }
+            }
             if let err = model.lastError {
                 Label("Stale, retrying", systemImage: "wifi.exclamationmark")
                     .font(.caption).foregroundStyle(.orange).help(err)
             } else if let t = model.lastRefresh {
-                Text("Updated \(t, style: .relative) ago").font(.caption).foregroundStyle(.secondary)
+                Text("\(t, style: .relative) ago").font(.caption).foregroundStyle(.tertiary)
+                    .help("Last refreshed")
             }
             Spacer()
             Button {
@@ -343,6 +356,40 @@ struct PRRow: View {
         Text(text).font(.caption2).foregroundStyle(color)
             .padding(.horizontal, 4).padding(.vertical, 1)
             .background(.quaternary, in: Capsule())
+    }
+}
+
+/// Footer filter toggle: dot + count. Dimmed when another filter excludes it; underlined when selected.
+struct FilterDot: View {
+    let state: CIState
+    let count: Int
+    let active: Bool
+    let selected: Bool
+    let toggle: () -> Void
+
+    var body: some View {
+        Button(action: toggle) {
+            HStack(spacing: 4) {
+                StatusDot(state: state)
+                Text("\(count)").font(.caption).monospacedDigit()
+                    .foregroundStyle(selected ? .primary : .secondary)
+            }
+            .padding(.horizontal, 5).padding(.vertical, 2)
+            .background(selected ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear), in: Capsule())
+            .opacity(active ? 1 : 0.4)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(helpText)
+    }
+
+    private var helpText: String {
+        switch state {
+        case .failure: "Failing (click to filter)"
+        case .pending: "Running (click to filter)"
+        case .success: "Passed (click to filter)"
+        case .none: "No checks"
+        }
     }
 }
 

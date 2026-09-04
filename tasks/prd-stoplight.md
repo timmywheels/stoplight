@@ -219,6 +219,17 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - [ ] Both are also in the right-click menu
 - [ ] Glyphs are always laid out so the row never shifts
 
+### US-018: Status filter and legend
+**Description:** As a user, I want to narrow the list to red, yellow, or green, and a place that explains every symbol.
+
+**Acceptance Criteria:**
+- [ ] Footer, left side: three dots (red, yellow, green) each with its count across everything visible
+- [ ] Click a dot to show only that state; click more to combine; click again to remove. No filter = show all
+- [ ] Non-selected dots dim to 40% while a filter is active; selected dots get a capsule background
+- [ ] Filter is session-only and applies to the popover list only, never to the menu bar dots, widget, or notifications
+- [ ] Empty result shows "No PRs match the filter"
+- [ ] Settings → General → Legend explains: four dot colors, hollow draft dot, stack connector, Queue tag, "on branch" tag, hover glyphs, footer filters
+
 ## Functional Requirements
 
 - FR-1: The app runs as a menu bar accessory only (`LSUIElement = true`), no Dock icon, no main window
