@@ -28,6 +28,8 @@ final class UserPrefs {
         var followOrgs: [String] = []
         var hiddenRepos: [String] = []
         var hideBots: Bool = true
+        /// login (lowercased) → user-chosen label for the section header. Empty means use GitHub's name.
+        var userLabels: [String: String] = [:]
 
         subscript(follow kind: SourceKind) -> [String] {
             get {
@@ -56,6 +58,7 @@ final class UserPrefs {
             hiddenRepos = try c.decodeIfPresent([String].self, forKey: .hiddenRepos)
                 ?? (try? decoder.container(keyedBy: LegacyKeys.self).decodeIfPresent([String].self, forKey: .ignoreRepos)) ?? []
             hideBots = try c.decodeIfPresent(Bool.self, forKey: .hideBots) ?? true
+            userLabels = try c.decodeIfPresent([String: String].self, forKey: .userLabels) ?? [:]
         }
         private enum LegacyKeys: String, CodingKey { case ignoreRepos }
     }
@@ -154,6 +157,17 @@ final class UserPrefs {
 
     func unfollow(_ value: String, kind: SourceKind) {
         sources[follow: kind].removeAll { $0.caseInsensitiveCompare(value) == .orderedSame }
+        if kind == .users { sources.userLabels[value.lowercased()] = nil }
+    }
+
+    func label(for login: String) -> String? {
+        let l = sources.userLabels[login.lowercased()]?.trimmingCharacters(in: .whitespaces)
+        return (l?.isEmpty ?? true) ? nil : l
+    }
+
+    func setLabel(_ label: String, for login: String) {
+        let trimmed = label.trimmingCharacters(in: .whitespaces)
+        sources.userLabels[login.lowercased()] = trimmed.isEmpty ? nil : trimmed
     }
 
     @discardableResult

@@ -80,7 +80,11 @@ private struct SourcesTab: View {
                 HStack(alignment: .top, spacing: 16) {
                     ForEach(UserPrefs.SourceKind.allCases) { kind in
                         ListEditor(title: kind.title, items: model.prefs.sources[follow: kind], placeholder: kind.placeholder,
-                                   subtitle: { kind == .users ? model.displayName(for: $0) : nil },
+                                   label: kind == .users ? { login in
+                                       Binding(get: { model.prefs.label(for: login) ?? "" },
+                                               set: { model.prefs.setLabel($0, for: login) })
+                                   } : nil,
+                                   labelPlaceholder: { model.displayName(for: $0) ?? "Label" },
                                    add: { r in let res = model.prefs.follow(r, kind: kind); if res == .added { model.sourcesChanged() }; return res },
                                    remove: { model.prefs.unfollow($0, kind: kind); model.sourcesChanged() })
                         if kind != .orgs { Divider() }
@@ -122,7 +126,9 @@ private struct ListEditor: View {
     let title: String
     let items: [String]
     let placeholder: String
-    var subtitle: (String) -> String? = { _ in nil }
+    /// Optional per-row editable label (used for Users so "@dholliday3" can read "Daniel").
+    var label: ((String) -> Binding<String>)? = nil
+    var labelPlaceholder: (String) -> String = { _ in "Label" }
     let add: (String) -> UserPrefs.AddResult
     let remove: (String) -> Void
     @State private var text = ""
@@ -133,11 +139,14 @@ private struct ListEditor: View {
             Text(title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
             ForEach(items, id: \.self) { item in
                 HStack(spacing: 4) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(item).lineLimit(1).truncationMode(.middle)
-                        if let sub = subtitle(item) { Text(sub).font(.caption2).foregroundStyle(.secondary) }
-                    }
+                    Text(item).lineLimit(1).truncationMode(.middle)
                     Spacer(minLength: 4)
+                    if let label {
+                        TextField(labelPlaceholder(item), text: label(item))
+                            .textFieldStyle(.roundedBorder).font(.caption)
+                            .frame(width: 90)
+                            .help("Shown as the section title instead of @\(item)")
+                    }
                     Button { remove(item) } label: { Image(systemName: "minus.circle") }
                         .buttonStyle(.borderless).foregroundStyle(.secondary)
                 }

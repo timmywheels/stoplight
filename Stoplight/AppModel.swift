@@ -81,7 +81,7 @@ final class AppModel {
         out.append(Section(id: "Watching", title: "Watching", prs: take(watched)))
         for f in followed {
             var title = f.query.title
-            if case .author(let login) = f.query, let name = displayName(for: login) { title = name }
+            if case .author(let login) = f.query, let name = prefs.label(for: login) ?? displayName(for: login) { title = name }
             out.append(Section(id: f.query.title, title: title, prs: take(f.prs)))
         }
         return out.filter { !$0.prs.isEmpty }
