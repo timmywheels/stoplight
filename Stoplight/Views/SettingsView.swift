@@ -69,7 +69,7 @@ private struct GeneralTab: View {
     }
 }
 
-/// Follow lists, then the two exclusions that matter: hidden repos and bots.
+/// Follow lists, then hidden users (bots by default) and hidden repos.
 private struct SourcesTab: View {
     @Bindable var model: AppModel
 
@@ -77,29 +77,30 @@ private struct SourcesTab: View {
         @Bindable var prefs = model.prefs
         Form {
             Section("Follow") {
-                HStack(alignment: .top, spacing: 16) {
-                    ForEach(UserPrefs.SourceKind.allCases) { kind in
-                        ListEditor(title: kind.title, items: model.prefs.sources[follow: kind], placeholder: kind.placeholder,
-                                   label: kind == .users ? { login in
-                                       Binding(get: { model.prefs.label(for: login) ?? "" },
-                                               set: { model.prefs.setLabel($0, for: login) })
-                                   } : nil,
-                                   labelPlaceholder: { model.displayName(for: $0) ?? "Label" },
-                                   add: { r in let res = model.prefs.follow(r, kind: kind); if res == .added { model.sourcesChanged() }; return res },
-                                   remove: { model.prefs.unfollow($0, kind: kind); model.sourcesChanged() })
-                        if kind != .orgs { Divider() }
-                    }
-                }
+                TableEditor(title: "Users", items: $prefs.sources.followUsers, placeholder: "username",
+                            normalize: { UserPrefs.normalize($0, kind: .users, hideList: false) },
+                            onChange: model.sourcesChanged,
+                            trailing: { login in
+                                AnyView(TextField(model.displayName(for: login) ?? "Label",
+                                                  text: Binding(get: { model.prefs.label(for: login) ?? "" },
+                                                                set: { model.prefs.setLabel($0, for: login) }))
+                                    .textFieldStyle(.plain).font(.callout).foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.trailing).frame(width: 140)
+                                    .help("Section title instead of @\(login)"))
+                            })
+                TableEditor(title: "Repos", items: $prefs.sources.followRepos, placeholder: "owner/repo",
+                            normalize: { UserPrefs.normalize($0, kind: .repos, hideList: false) }, onChange: model.sourcesChanged)
+                TableEditor(title: "Orgs", items: $prefs.sources.followOrgs, placeholder: "org",
+                            normalize: { UserPrefs.normalize($0, kind: .orgs, hideList: false) }, onChange: model.sourcesChanged)
                 Text("Every open PR from a followed user, repo, or org gets its own section in the popover.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Hide") {
-                ListEditor(title: "Repos", items: model.prefs.sources.hiddenRepos, placeholder: "owner/repo",
-                           add: { r in let res = model.prefs.hide(repo: r); if res == .added { model.sourcesChanged() }; return res },
-                           remove: { model.prefs.unhide(repo: $0); model.sourcesChanged() })
-                Toggle("Hide bot PRs (dependabot, renovate, …)", isOn: $prefs.sources.hideBots)
-                    .onChange(of: prefs.sources.hideBots) { _, _ in model.sourcesChanged() }
-                Text("Hidden repos and bots are removed everywhere: list, dots, widget, notifications. Right-click a PR to hide its repo.")
+                TableEditor(title: "Users", items: $prefs.sources.hiddenUsers, placeholder: "username or name[bot]",
+                            normalize: { UserPrefs.normalize($0, kind: .users, hideList: true) }, onChange: model.sourcesChanged)
+                TableEditor(title: "Repos", items: $prefs.sources.hiddenRepos, placeholder: "owner/repo",
+                            normalize: { UserPrefs.normalize($0, kind: .repos, hideList: true) }, onChange: model.sourcesChanged)
+                Text("Hidden users and repos are removed everywhere: list, dots, widget, notifications. Right-click a PR to hide its repo.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Watched PRs") {
@@ -121,56 +122,85 @@ private struct SourcesTab: View {
     }
 }
 
-/// A short list with a remove button per row and an add field at the bottom.
-private struct ListEditor: View {
+/// System Settings style: a bordered table with + / − under it. "+" adds an editable row;
+/// Return commits (validated), Escape or an empty value discards it. "−" removes the selection.
+private struct TableEditor: View {
     let title: String
-    let items: [String]
+    @Binding var items: [String]
     let placeholder: String
-    /// Optional per-row editable label (used for Users so "@dholliday3" can read "Daniel").
-    var label: ((String) -> Binding<String>)? = nil
-    var labelPlaceholder: (String) -> String = { _ in "Label" }
-    let add: (String) -> UserPrefs.AddResult
-    let remove: (String) -> Void
-    @State private var text = ""
-    @State private var error: String?
+    let normalize: (String) -> String?
+    var onChange: () -> Void = {}
+    var trailing: ((String) -> AnyView)? = nil
+
+    @State private var selection: String?
+    @State private var draft: String?
+    @FocusState private var draftFocused: Bool
+
+    private var rowCount: Int { items.count + (draft == nil ? 0 : 1) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-            ForEach(items, id: \.self) { item in
-                HStack(spacing: 4) {
-                    Text(item).lineLimit(1).truncationMode(.middle)
-                    Spacer(minLength: 4)
-                    if let label {
-                        TextField(labelPlaceholder(item), text: label(item))
-                            .textFieldStyle(.roundedBorder).font(.caption)
-                            .frame(width: 90)
-                            .help("Shown as the section title instead of @\(item)")
+        LabeledContent(title) {
+            VStack(alignment: .leading, spacing: 4) {
+                List(selection: $selection) {
+                    ForEach(items, id: \.self) { item in
+                        HStack {
+                            Text(item)
+                            Spacer()
+                            if let trailing { trailing(item) }
+                        }
+                        .tag(item)
                     }
-                    Button { remove(item) } label: { Image(systemName: "minus.circle") }
-                        .buttonStyle(.borderless).foregroundStyle(.secondary)
+                    if draft != nil {
+                        TextField(placeholder, text: Binding(get: { draft ?? "" }, set: { draft = $0 }))
+                            .textFieldStyle(.plain)
+                            .focused($draftFocused)
+                            .onSubmit(commit)
+                            .onExitCommand { draft = nil }
+                            .onChange(of: draftFocused) { _, focused in if !focused { commit() } }
+                    }
                 }
-            }
-            HStack(spacing: 4) {
-                TextField(placeholder, text: $text)
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit(submit)
-                Button { submit() } label: { Image(systemName: "plus.circle") }
-                    .buttonStyle(.borderless)
-                    .disabled(text.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
-            if let error {
-                Text(error).font(.caption2).foregroundStyle(.red)
+                .listStyle(.bordered)
+                .alternatingRowBackgrounds()
+                .frame(height: CGFloat(max(2, min(rowCount, 6))) * 24 + 2)
+                HStack(spacing: 0) {
+                    Button { startDraft() } label: { Image(systemName: "plus").frame(width: 22, height: 18) }
+                        .help("Add")
+                    Divider().frame(height: 12)
+                    Button { removeSelected() } label: { Image(systemName: "minus").frame(width: 22, height: 18) }
+                        .disabled(selection == nil)
+                        .help("Remove")
+                }
+                .buttonStyle(.borderless)
+                .background(.quaternary, in: RoundedRectangle(cornerRadius: 5))
+                .onDeleteCommand(perform: removeSelected)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .labeledContentStyle(.automatic)
     }
 
-    private func submit() {
-        switch add(text) {
-        case .added: text = ""; error = nil
-        case .duplicate: error = "Already listed"
-        case .invalid: error = "Not a valid \(placeholder)"
+    private func startDraft() {
+        guard draft == nil else { draftFocused = true; return }
+        draft = ""
+        DispatchQueue.main.async { draftFocused = true }
+    }
+
+    private func commit() {
+        guard let text = draft else { return }
+        draft = nil
+        guard let value = normalize(text) else {
+            if !text.trimmingCharacters(in: .whitespaces).isEmpty { NSSound.beep() }
+            return
         }
+        guard !items.contains(where: { $0.caseInsensitiveCompare(value) == .orderedSame }) else { return }
+        items.append(value)
+        selection = value
+        onChange()
+    }
+
+    private func removeSelected() {
+        guard let sel = selection else { return }
+        items.removeAll { $0 == sel }
+        selection = nil
+        onChange()
     }
 }

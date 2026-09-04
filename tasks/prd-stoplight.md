@@ -133,9 +133,10 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Description:** As a user, I want to silence the two things that pollute a broad list, a noisy repo and bot PRs, without a second config system.
 
 **Acceptance Criteria:**
-- [ ] Settings → Sources → Hide has one Repos list (add field, per-row remove) and a "Hide bot PRs" toggle, on by default
+- [ ] Settings → Sources → Hide has a Users table (pre-filled with dependabot[bot], renovate[bot], github-actions[bot]) and a Repos table
+- [ ] All Sources tables use the System Settings pattern: bordered list, + adds an editable row committed on Return, − removes the selection, Delete key also removes
 - [ ] Right-click any PR row → "Hide owner/repo"
-- [ ] Hidden repos and bot authors (login ends in `[bot]`) are excluded from the list, the dots, the widget, and notifications
+- [ ] Hidden users and repos are excluded from the list, the dots, the widget, and notifications
 - [ ] Matching is case-insensitive
 - [ ] Persisted inside the `sources` JSON blob; the old `hiddenRepos` list migrates once
 - [ ] Filtering happens in one place (`Filters.visible(_:ignore:)`) so all four surfaces agree
@@ -205,7 +206,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - FR-12: A WidgetKit extension provides small and medium widgets rendered from the shared data
 - FR-13: Settings exposes account, notification mode, count badge, and launch at login only
 - FR-14: All network and provider logic sits behind a `CIProvider` protocol
-- FR-15: Users can hide repos and bot PRs; hidden PRs are excluded from every surface (list, dots, widget, notifications)
+- FR-15: Users can hide users and repos; hidden PRs are excluded from every surface (list, dots, widget, notifications)
 - FR-16: Users can watch any PR by URL; watched PRs are polled, listed under "Watching", and count toward the aggregate
 - FR-16a: Users can follow users, repos, and orgs from Settings; their open PRs are polled in the same request and listed in their own sections
 - FR-17: Users can pin PRs; pinned PRs are listed first under "Pinned" in the popover and the medium widget

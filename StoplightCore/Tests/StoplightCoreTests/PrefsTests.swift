@@ -15,12 +15,14 @@ final class PrefsTests: XCTestCase {
         XCTAssertEqual(Rollup.aggregate(visible), .success)
     }
 
-    func testHideBots() {
+    func testHiddenUsers() {
         let bot = PullRequest(id: "bot", repo: "acme/x", number: 1, title: "t", url: URL(string: "https://github.com/acme/x/pull/1")!,
-                              isDraft: false, updatedAt: .now, headSha: "s", checks: [], author: "dependabot[bot]")
+                              isDraft: false, updatedAt: .now, headSha: "s", checks: [], author: "Dependabot[bot]")
         let human = pr(id: "h", repo: "acme/y")
-        XCTAssertEqual(Filters.visible([bot, human], ignore: IgnoreRules(hideBots: true)).map(\.id), ["h"])
-        XCTAssertEqual(Filters.visible([bot, human], ignore: IgnoreRules(hideBots: false)).map(\.id), ["bot", "h"])
+        XCTAssertEqual(Filters.visible([bot, human], ignore: IgnoreRules(users: Set(IgnoreRules.defaultHiddenUsers))).map(\.id), ["h"])
+        XCTAssertEqual(Filters.visible([bot, human], ignore: .none).map(\.id), ["bot", "h"])
+        XCTAssertTrue(Filters.isValidAuthor("renovate[bot]"))
+        XCTAssertFalse(Filters.isValidAuthor("renovate[bot"))
     }
 
     func testQueryStringsAndBatching() {

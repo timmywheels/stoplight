@@ -27,7 +27,7 @@ final class UserPrefs {
         var followRepos: [String] = []
         var followOrgs: [String] = []
         var hiddenRepos: [String] = []
-        var hideBots: Bool = true
+        var hiddenUsers: [String] = IgnoreRules.defaultHiddenUsers
         /// login (lowercased) → user-chosen label for the section header. Empty means use GitHub's name.
         var userLabels: [String: String] = [:]
 
@@ -57,10 +57,16 @@ final class UserPrefs {
             followOrgs = try c.decodeIfPresent([String].self, forKey: .followOrgs) ?? []
             hiddenRepos = try c.decodeIfPresent([String].self, forKey: .hiddenRepos)
                 ?? (try? decoder.container(keyedBy: LegacyKeys.self).decodeIfPresent([String].self, forKey: .ignoreRepos)) ?? []
-            hideBots = try c.decodeIfPresent(Bool.self, forKey: .hideBots) ?? true
+            // Older blobs had a hideBots Bool; map it onto the default bot list.
+            if let users = try c.decodeIfPresent([String].self, forKey: .hiddenUsers) {
+                hiddenUsers = users
+            } else {
+                let legacyBots = (try? decoder.container(keyedBy: LegacyKeys.self).decodeIfPresent(Bool.self, forKey: .hideBots)) ?? true
+                hiddenUsers = legacyBots ? IgnoreRules.defaultHiddenUsers : []
+            }
             userLabels = try c.decodeIfPresent([String: String].self, forKey: .userLabels) ?? [:]
         }
-        private enum LegacyKeys: String, CodingKey { case ignoreRepos }
+        private enum LegacyKeys: String, CodingKey { case ignoreRepos, hideBots }
     }
 
     private enum Key {
@@ -127,7 +133,7 @@ final class UserPrefs {
     // MARK: Derived
 
     var ignoreRules: IgnoreRules {
-        IgnoreRules(repos: Set(sources.hiddenRepos), hideBots: sources.hideBots)
+        IgnoreRules(users: Set(sources.hiddenUsers), repos: Set(sources.hiddenRepos))
     }
 
     /// Searches to run in addition to `.authored`, in display order.
@@ -140,6 +146,18 @@ final class UserPrefs {
     }
 
     // MARK: Sources editing
+
+    /// Normalizes a typed value (trims, strips a leading @) and validates it for the given list.
+    static func normalize(_ raw: String, kind: SourceKind, hideList: Bool) -> String? {
+        var value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.hasPrefix("@") { value.removeFirst() }
+        let valid: Bool = switch kind {
+        case .repos: Filters.isValidRepo(value)
+        case .users: hideList ? Filters.isValidAuthor(value) : Filters.isValidLogin(value)
+        case .orgs: Filters.isValidLogin(value)
+        }
+        return valid ? value : nil
+    }
 
     enum AddResult { case added, duplicate, invalid }
 

@@ -193,23 +193,22 @@ public extension CIProvider {
     }
 }
 
-/// What to drop from every surface (US-010). Case-insensitive.
+/// What to drop from every surface (US-010). Case-insensitive, exact match.
 public struct IgnoreRules: Codable, Sendable, Equatable {
+    public var users: Set<String>
     public var repos: Set<String>
-    /// Authors ending in "[bot]" (dependabot, renovate, github-actions).
-    public var hideBots: Bool
 
-    public init(repos: Set<String> = [], hideBots: Bool = true) {
+    public init(users: Set<String> = [], repos: Set<String> = []) {
+        self.users = Set(users.map { $0.lowercased() })
         self.repos = Set(repos.map { $0.lowercased() })
-        self.hideBots = hideBots
     }
 
-    public static let none = IgnoreRules(hideBots: false)
+    public static let none = IgnoreRules()
+    /// Sensible starting point for the Hide → Users list.
+    public static let defaultHiddenUsers = ["dependabot[bot]", "renovate[bot]", "github-actions[bot]"]
 
     public func allows(_ pr: PullRequest) -> Bool {
-        if repos.contains(pr.repo.lowercased()) { return false }
-        if hideBots && pr.author.lowercased().hasSuffix("[bot]") { return false }
-        return true
+        !repos.contains(pr.repo.lowercased()) && !users.contains(pr.author.lowercased())
     }
 }
 
@@ -222,6 +221,11 @@ public enum Filters {
     /// GitHub identifiers: usernames and org names.
     public static func isValidLogin(_ s: String) -> Bool {
         s.range(of: "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$", options: .regularExpression) != nil
+    }
+
+    /// A login, optionally with GitHub's "[bot]" suffix. For the Hide → Users list.
+    public static func isValidAuthor(_ s: String) -> Bool {
+        s.range(of: "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})(?:\\[bot\\])?$", options: .regularExpression) != nil
     }
 
     /// "owner/name"
