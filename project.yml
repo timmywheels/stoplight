@@ -8,8 +8,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.10"
-    MARKETING_VERSION: 0.2.0
-    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 0.2.1
+    CURRENT_PROJECT_VERSION: 2
     SWIFT_STRICT_CONCURRENCY: complete
     DEVELOPMENT_TEAM: S3RY6Q3EW2
     CODE_SIGN_STYLE: Automatic
@@ -29,6 +29,8 @@ targets:
       path: Stoplight/Info.plist
       properties:
         CFBundleDisplayName: Stoplight
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSUIElement: true
         LSApplicationCategoryType: public.app-category.developer-tools
         NSHumanReadableCopyright: ""
@@ -53,6 +55,8 @@ targets:
       path: StoplightWidget/Info.plist
       properties:
         CFBundleDisplayName: Stoplight
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     entitlements:
