@@ -4,19 +4,22 @@ macOS menu bar app + widget showing CI status for your open pull requests as thr
 
 Spec: [tasks/prd-stoplight.md](tasks/prd-stoplight.md)
 
-## Build
+## Install
 
 ```bash
-brew install xcodegen   # once
-xcodegen generate
-open Stoplight.xcodeproj
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/timmywheels/stoplight/main/install.sh)"
 ```
 
-Or from the terminal:
+One command. If you have Xcode it builds from source and installs to `/Applications`, which works on managed Macs. Without Xcode it downloads the latest release. Either way it makes sure the GitHub CLI is installed and signed in, then launches the app.
+
+Re-run the same command to update.
+
+## Build from a checkout
 
 ```bash
+brew install xcodegen
 xcodegen generate
-xcodebuild -scheme Stoplight -configuration Debug build
+open Stoplight.xcodeproj      # or: scripts/build-local.sh to build + install
 ```
 
 Core logic tests:
@@ -35,18 +38,6 @@ cd StoplightCore && swift test
 ## Auth
 
 Stoplight runs `gh auth token` at launch and holds the token in memory. If `gh` isn't installed, paste a fine-grained PAT in the popover; it's stored in Keychain.
-
-## Install on a managed Mac (MDM blocks non-notarized apps)
-
-Build it locally. A locally built app has no quarantine flag, so Gatekeeper never evaluates it:
-
-```bash
-brew install xcodegen
-git clone git@github.com:timmywheels/stoplight.git && cd stoplight
-scripts/build-local.sh
-```
-
-No Apple ID needed. Installs to `/Applications/Stoplight.app` and launches it.
 
 ## Release
 
