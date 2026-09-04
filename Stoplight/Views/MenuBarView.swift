@@ -295,6 +295,10 @@ struct PRRow: View {
             .overlay(alignment: .trailing) {
                 if hovering && !editingAlias {
                     HStack(spacing: 10) {
+                        Button { openURL(pr.url) } label: {
+                            Image(systemName: "arrow.up.right.square").font(.caption).foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain).help("Open on GitHub")
                         copyGlyph("link", value: pr.url.absoluteString, help: "Copy PR link")
                         if !pr.headRefName.isEmpty {
                             copyGlyph("arrow.triangle.branch", value: pr.headRefName, help: "Copy branch name")
