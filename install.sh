@@ -2,11 +2,12 @@
 # Stoplight installer. One line:
 #   bash -c "$(curl -fsSL https://raw.githubusercontent.com/timmywheels/stoplight/main/install.sh)"
 #
-# With Xcode:    clones, builds from source, ad-hoc signs, installs to /Applications. Works on managed Macs.
-# Without Xcode: downloads the latest release DMG. Needs "Open Anyway" once unless MDM blocks it.
+# Default:  downloads the latest release (Developer ID signed + notarized), installs to /Applications.
+#           Nothing else needed. Works on managed Macs.
+# Opt-in:   STOPLIGHT_FROM_SOURCE=1 clones and builds locally instead (needs Xcode + xcodegen).
 # Then makes sure `gh` is installed and signed in, and launches the app.
 #
-# Env overrides: STOPLIGHT_SRC_DIR, STOPLIGHT_INSTALL_DIR, STOPLIGHT_NO_LAUNCH=1, STOPLIGHT_FROM_RELEASE=1
+# Env overrides: STOPLIGHT_SRC_DIR, STOPLIGHT_INSTALL_DIR, STOPLIGHT_NO_LAUNCH=1, STOPLIGHT_FROM_SOURCE=1
 set -euo pipefail
 
 REPO="timmywheels/stoplight"
@@ -24,9 +25,8 @@ die()  { printf '\033[1;31m✗\033[0m %s\n' "$*" >&2; exit 1; }
 MACOS_MAJOR=$(sw_vers -productVersion | cut -d. -f1)
 [ "$MACOS_MAJOR" -ge 14 ] || die "Stoplight needs macOS 14 or newer."
 
-have_xcode() {
-  [ -z "${STOPLIGHT_FROM_RELEASE:-}" ] && command -v xcodebuild >/dev/null 2>&1 \
-    && xcodebuild -version >/dev/null 2>&1 && [ -d "$(xcode-select -p 2>/dev/null)/Platforms" ]
+want_source() {
+  [ -n "${STOPLIGHT_FROM_SOURCE:-}" ] && command -v xcodebuild >/dev/null 2>&1 && xcodebuild -version >/dev/null 2>&1
 }
 
 ensure_brew() {
@@ -36,7 +36,7 @@ ensure_brew() {
 }
 
 install_from_source() {
-  say "Xcode found. Building from source (about 2 minutes, no Apple ID needed)."
+  say "Building from source (about 2 minutes)."
   if ! command -v xcodegen >/dev/null 2>&1; then
     ensure_brew xcodegen && { say "Installing xcodegen…"; brew install -q xcodegen; }
   fi
@@ -57,7 +57,7 @@ install_from_source() {
 }
 
 install_from_release() {
-  say "No Xcode. Downloading the latest release."
+  say "Downloading the latest release."
   local url tmp
   url=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep -o 'https://[^"]*Stoplight-[^"]*\.zip' | head -1)
   [ -n "$url" ] || die "Couldn't find a release zip at https://github.com/$REPO/releases"
@@ -66,10 +66,13 @@ install_from_release() {
   ditto -x -k "$tmp/Stoplight.zip" "$tmp"
   pkill -x Stoplight 2>/dev/null || true
   rm -rf "$APP"; cp -R "$tmp/Stoplight.app" "$APP"
-  xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
   rm -rf "$tmp"
-  warn "This build is not notarized. If macOS refuses to open it: System Settings → Privacy & Security → Open Anyway."
-  warn "If that button never appears, your Mac's policy requires notarized apps. Install Xcode and re-run to build locally."
+  if spctl --assess --type execute "$APP" >/dev/null 2>&1; then
+    say "Notarized by Apple. No security prompts."
+  else
+    warn "Gatekeeper did not accept this build. If macOS refuses to open it: Privacy & Security → Open Anyway,"
+    warn "or re-run with STOPLIGHT_FROM_SOURCE=1 to build locally (needs Xcode)."
+  fi
 }
 
 ensure_gh() {
@@ -90,7 +93,7 @@ ensure_gh() {
   fi
 }
 
-if have_xcode; then install_from_source; else install_from_release; fi
+if want_source; then install_from_source; else install_from_release; fi
 ensure_gh
 say "Installed $APP"
 if [ -z "${STOPLIGHT_NO_LAUNCH:-}" ]; then

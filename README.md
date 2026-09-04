@@ -10,9 +10,9 @@ Spec: [tasks/prd-stoplight.md](tasks/prd-stoplight.md)
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/timmywheels/stoplight/main/install.sh)"
 ```
 
-One command. If you have Xcode it builds from source and installs to `/Applications`, which works on managed Macs. Without Xcode it downloads the latest release. Either way it makes sure the GitHub CLI is installed and signed in, then launches the app.
+One command. Downloads the latest release, Developer ID signed and notarized by Apple, installs to `/Applications`, makes sure the GitHub CLI is installed and signed in, and launches. No Xcode, no security prompts, works on managed Macs.
 
-Re-run the same command to update.
+Re-run the same command to update. Prefer building from source? `STOPLIGHT_FROM_SOURCE=1` in front of the command (needs Xcode and xcodegen).
 
 ## Build from a checkout
 
@@ -45,7 +45,7 @@ Stoplight runs `gh auth token` at launch and holds the token in memory. If `gh` 
 scripts/release.sh          # → dist/Stoplight-<version>.dmg and .zip, ad-hoc signed
 ```
 
-Builds are ad-hoc signed (no Developer ID yet), so macOS shows "Apple could not verify" on first launch. Click Done, then System Settings → Privacy & Security → Open Anyway. Development-signed builds from Xcode only run on Macs registered to the team; the release script strips the profile so the app runs anywhere.
+Releases are Developer ID signed and notarized. The script archives, exports with the Developer ID profile, submits to Apple's notary service, staples the ticket, and packages a DMG and zip. Falls back to ad-hoc signing when no Developer ID certificate is in the keychain. One-time setup is in the script header.
 
 ## Signing
 
