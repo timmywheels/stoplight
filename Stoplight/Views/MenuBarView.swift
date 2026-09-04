@@ -81,6 +81,17 @@ struct MenuBarView: View {
         }
     }
 
+    /// Menu bar apps aren't the active app, so the Settings window would open behind whatever is frontmost.
+    private func showSettings() {
+        openSettings()
+        NSApp.activate()
+        DispatchQueue.main.async {
+            let win = NSApp.windows.first { $0.identifier?.rawValue.contains("Settings") == true }
+                ?? NSApp.windows.first { $0.title == "Settings" || $0.title.hasPrefix("Stoplight") && $0.isVisible }
+            win?.makeKeyAndOrderFront(nil)
+        }
+    }
+
     private func centered(_ text: String) -> some View {
         Text(text).foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 80)
     }
@@ -103,7 +114,7 @@ struct MenuBarView: View {
             Button { Task { await model.refresh() } } label: { Image(systemName: "arrow.clockwise") }
                 .keyboardShortcut("r").help("Refresh (⌘R)")
                 .disabled(model.isRefreshing)
-            Button { openSettings() } label: { Image(systemName: "gearshape") }
+            Button { showSettings() } label: { Image(systemName: "gearshape") }
                 .keyboardShortcut(",").help("Settings (⌘,)")
             // ⌘Q still quits while the popover is open; the visible Quit button lives in Settings.
             Button("Quit") { NSApp.terminate(nil) }
