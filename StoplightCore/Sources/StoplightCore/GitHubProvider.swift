@@ -57,6 +57,20 @@ public struct GitHubProvider: CIProvider {
         return repos.values.compactMap { $0?.pullRequest }.compactMap(Self.map)
     }
 
+    public func fetchDisplayNames(logins: [String]) async throws -> [String: String] {
+        guard !logins.isEmpty else { return [:] }
+        let fields = logins.enumerated().map { i, l in "u\(i): user(login: \"\(l)\") { login name }" }
+        let data = try await post(["query": "query {\n" + fields.joined(separator: "\n") + "\n}"])
+        struct U: Decodable { let login: String; let name: String? }
+        struct Env: Decodable { let data: [String: U?]? }
+        let users = try JSONDecoder().decode(Env.self, from: data).data ?? [:]
+        var out: [String: String] = [:]
+        for case let u?? in users.values {
+            if let name = u.name?.trimmingCharacters(in: .whitespaces), !name.isEmpty { out[u.login.lowercased()] = name }
+        }
+        return out
+    }
+
     /// Validate the token and return the login (US-001).
     public func viewerLogin() async throws -> String {
         let data = try await post(["query": "{ viewer { login } }"])

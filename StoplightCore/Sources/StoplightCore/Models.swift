@@ -183,6 +183,8 @@ public protocol CIProvider: Sendable {
     func fetchPullRequests(queries: [PRQuery]) async throws -> [[PullRequest]]
     /// US-011. Fetches specific PRs by reference. Missing or inaccessible refs are omitted, not thrown.
     func fetchPullRequests(refs: [PRRef]) async throws -> [PullRequest]
+    /// US-013. login → profile display name. Logins without a name are omitted.
+    func fetchDisplayNames(logins: [String]) async throws -> [String: String]
 }
 
 public extension CIProvider {

@@ -172,7 +172,8 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Acceptance Criteria:**
 - [ ] Settings → Sources → Follow has a list for each of Users, Repos, Orgs, same editor
 - [ ] Each followed item adds one aliased `search` to the single poll request: `author:USER`, `repo:OWNER/NAME`, or `org:ORG` (50 PRs cap each)
-- [ ] Popover sections, in order: Pinned, Mine, Watching, then one section per followed item titled `@username`, `owner/repo`, or `org`. A PR appears once, in the first section that claims it
+- [ ] Popover sections, in order: Pinned, Mine, Watching, then one section per followed item titled with the user's GitHub display name (fallback `@username`), `owner/repo`, or `org`. A PR appears once, in the first section that claims it
+- [ ] Display names come from one `user(login:) { name }` request, fetched only when the followed-user set changes; Settings shows the resolved name under each login
 - [ ] Followed PRs count toward the dots and fire notifications like your own
 - [ ] Right-click a row by someone else → "Follow @username" shortcut; hidden repos, bot hiding, and pins apply to followed PRs too
 - [ ] Rows by other people show `· @author` in the secondary line

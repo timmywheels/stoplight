@@ -39,10 +39,17 @@ final class AppModel {
     // MARK: Derived lists (US-010, US-012, US-013)
 
     struct Section: Identifiable {
+        /// Stable key for collapse state: "Pinned", "Mine", "Watching", or the query title ("@login", "owner/repo", "org").
+        let id: String
         let title: String
         let prs: [PullRequest]
-        var id: String { title }
     }
+
+    /// login (lowercased) → display name, for followed users (US-013).
+    private(set) var displayNames: [String: String] = [:]
+    private var namesFetchedFor: Set<String> = []
+
+    func displayName(for login: String) -> String? { displayNames[login.lowercased()] }
 
     /// Everything visible, deduped, ignore rules applied. Source of truth for dots, widget, notifications.
     var all: [PullRequest] {
@@ -69,10 +76,14 @@ final class AppModel {
             return Rollup.sorted(picked)
         }
         var out: [Section] = []
-        out.append(Section(title: "Pinned", prs: take(all, pinnedOnly: true)))
-        out.append(Section(title: "Mine", prs: take(mine)))
-        out.append(Section(title: "Watching", prs: take(watched)))
-        for f in followed { out.append(Section(title: f.query.title, prs: take(f.prs))) }
+        out.append(Section(id: "Pinned", title: "Pinned", prs: take(all, pinnedOnly: true)))
+        out.append(Section(id: "Mine", title: "Mine", prs: take(mine)))
+        out.append(Section(id: "Watching", title: "Watching", prs: take(watched)))
+        for f in followed {
+            var title = f.query.title
+            if case .author(let login) = f.query, let name = displayName(for: login) { title = name }
+            out.append(Section(id: f.query.title, title: title, prs: take(f.prs)))
+        }
         return out.filter { !$0.prs.isEmpty }
     }
     var isEmpty: Bool { all.isEmpty }
@@ -170,6 +181,7 @@ final class AppModel {
             publishSnapshot()
             await notify(previous: previous)
             bobIfJustTurnedGreen()
+            await resolveDisplayNames(provider)
         } catch {
             // Keep last good data on screen; surface the error as "stale" (US-002).
             lastError = error.localizedDescription
@@ -211,6 +223,17 @@ final class AppModel {
         // Drop keys for PRs that are gone so the set can't grow forever.
         let live = Set(current.map(\.id))
         sentEvents = sentEvents.filter { key in live.contains(String(key.split(separator: "|")[0])) }
+    }
+
+    /// One extra request, only when the followed-user set changes.
+    private func resolveDisplayNames(_ provider: GitHubProvider) async {
+        let wanted = Set(prefs.sources.followUsers.map { $0.lowercased() })
+        let missing = wanted.subtracting(namesFetchedFor)
+        guard !missing.isEmpty else { return }
+        namesFetchedFor.formUnion(missing)
+        if let names = try? await provider.fetchDisplayNames(logins: Array(missing)) {
+            displayNames.merge(names) { _, new in new }
+        }
     }
 
     private func publishSnapshot() {

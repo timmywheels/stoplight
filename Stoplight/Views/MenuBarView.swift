@@ -51,7 +51,7 @@ struct MenuBarView: View {
     }
 
     private var rowCount: Int {
-        model.sections.reduce(0) { $0 + (model.prefs.collapsedSections.contains($1.title) ? 0 : $1.prs.count) }
+        model.sections.reduce(0) { $0 + (model.prefs.collapsedSections.contains($1.id) ? 0 : $1.prs.count) }
     }
 
     private var list: some View {
@@ -60,20 +60,20 @@ struct MenuBarView: View {
         let showHeaders = !(sections.count == 1 && sections[0].title == "Mine")
         return VStack(spacing: 0) {
             ForEach(sections) { s in
-                section(s.title, s.prs, showHeader: showHeaders)
+                section(s, showHeader: showHeaders)
             }
         }
     }
 
     @ViewBuilder
-    private func section(_ title: String, _ prs: [PullRequest], showHeader: Bool) -> some View {
-        if !prs.isEmpty {
-            let collapsed = showHeader && model.prefs.collapsedSections.contains(title)
+    private func section(_ sec: AppModel.Section, showHeader: Bool) -> some View {
+        if !sec.prs.isEmpty {
+            let collapsed = showHeader && model.prefs.collapsedSections.contains(sec.id)
             if showHeader {
-                SectionHeader(title: title, prs: prs, collapsed: collapsed) { model.prefs.toggleCollapsed(title) }
+                SectionHeader(title: sec.title, prs: sec.prs, collapsed: collapsed) { model.prefs.toggleCollapsed(sec.id) }
             }
             if !collapsed {
-                ForEach(prs) { pr in
+                ForEach(sec.prs) { pr in
                     PRRow(pr: pr, model: model)
                     Divider().padding(.leading, 28)
                 }
