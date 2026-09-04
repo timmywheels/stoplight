@@ -43,6 +43,19 @@ final class AppModel {
         let id: String
         let title: String
         let prs: [PullRequest]
+        /// The followed source this section came from; nil for Pinned / Mine / Watching.
+        var query: PRQuery? = nil
+
+        /// Rows drop whatever the header already says (US-005: no duplicated data).
+        var hidesAuthor: Bool { if case .author = query { return true }; return false }
+        func refLabel(for pr: PullRequest) -> String {
+            switch query {
+            case .repo: return "#\(pr.number)"
+            case .org(let o) where pr.repo.lowercased().hasPrefix(o.lowercased() + "/"):
+                return "\(pr.repo.dropFirst(o.count + 1)) #\(pr.number)"
+            default: return pr.shortRef
+            }
+        }
     }
 
     /// login (lowercased) → display name, for followed users (US-013).
@@ -82,7 +95,7 @@ final class AppModel {
         for f in followed {
             var title = f.query.title
             if case .author(let login) = f.query, let name = prefs.label(for: login) ?? displayName(for: login) { title = name }
-            out.append(Section(id: f.query.title, title: title, prs: take(f.prs)))
+            out.append(Section(id: f.query.title, title: title, prs: take(f.prs), query: f.query))
         }
         return out.filter { !$0.prs.isEmpty }
     }

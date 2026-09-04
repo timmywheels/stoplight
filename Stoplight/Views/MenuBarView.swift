@@ -74,7 +74,7 @@ struct MenuBarView: View {
             }
             if !collapsed {
                 ForEach(sec.prs) { pr in
-                    PRRow(pr: pr, model: model)
+                    PRRow(pr: pr, model: model, section: sec)
                     Divider().padding(.leading, 28)
                 }
             }
@@ -203,6 +203,7 @@ struct SectionHeader: View {
 struct PRRow: View {
     let pr: PullRequest
     @Bindable var model: AppModel
+    var section: AppModel.Section? = nil
     @Environment(\.openURL) private var openURL
     @State private var expanded = false
     @State private var hovering = false
@@ -218,9 +219,10 @@ struct PRRow: View {
                     StatusDot(state: pr.state, hollow: pr.isDraft)
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
-                            Text(pr.shortRef).font(.caption).foregroundStyle(.secondary)
-                            if !isMine {
-                                Text("· @\(pr.author)").font(.caption).foregroundStyle(.secondary)
+                            Text(section?.refLabel(for: pr) ?? pr.shortRef)
+                                .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                            if !isMine && !(section?.hidesAuthor ?? false) {
+                                Text("· @\(pr.author)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                             }
                             if pr.isDraft { tag("Draft") }
                             if pr.status == .merged { tag("Merged", color: .purple) }
