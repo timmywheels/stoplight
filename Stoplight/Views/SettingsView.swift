@@ -64,7 +64,7 @@ private struct GeneralTab: View {
                 LegendRow("Stacked on the PR above it. Right-click to copy the whole stack.") { Image(systemName: "arrow.turn.down.right").font(.caption2).foregroundStyle(.tertiary) }
                 LegendRow("In the merge queue at that position. \"Queue: blocked\" means GitHub can't merge it.") { legendTag("Queue #2", .blue) }
                 LegendRow("Based on a branch whose PR isn't in view.") { legendTag("on feat/x", .secondary) }
-                LegendRow("On hover: open on GitHub, copy URL, share. Share copies a rich link: a hyperlink in Slack, Markdown in GitHub. Hover the title for the description. Right-click for everything else.") { HStack(spacing: 8) { Image(systemName: "arrow.up.right"); Image(systemName: "doc.on.doc"); Image(systemName: "square.and.arrow.up") }.font(.caption).foregroundStyle(.secondary) }
+                LegendRow("On hover: open on GitHub, copy URL, share. Share copies the PR title as a link: a hyperlink in Slack, Markdown in GitHub. Hover the title for the description. Right-click for everything else.") { HStack(spacing: 8) { Image(systemName: "arrow.up.right"); Image(systemName: "doc.on.doc"); Image(systemName: "square.and.arrow.up") }.font(.caption).foregroundStyle(.secondary) }
                 LegendRow("Footer dots filter the list by status. Click to toggle, combine freely.") { Text("● 3").font(.caption).foregroundStyle(.secondary) }
             }
             Section {

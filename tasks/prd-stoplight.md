@@ -215,7 +215,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 
 **Acceptance Criteria:**
 - [ ] Hovering a row reveals three glyphs floating over the trailing edge: ↗ opens the PR, ⧉ copies the URL, share copies a rich link
-- [ ] The shared link carries two flavors on the pasteboard: HTML `<a>` (Slack, Notion, Docs paste a hyperlink) and Markdown `[owner/repo#123 title](url)` as plain text (GitHub, Linear)
+- [ ] The shared link carries two flavors on the pasteboard: HTML `<a>` (Slack, Notion, Docs paste a hyperlink) and Markdown `[title](url)` as plain text (GitHub, Linear). Link text is the PR title only
 - [ ] The copy glyph turns into a green checkmark for one second
 - [ ] Right-click menu has Share (rich link), Copy URL, Copy branch name, Copy stack as Markdown
 - [ ] Description and real title (when nicknamed) are the title's tooltip

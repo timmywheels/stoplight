@@ -398,9 +398,9 @@ struct PRRow: View {
     }
 
     /// One clipboard entry, two flavors: HTML (Slack, Notion, Docs paste a real hyperlink) and
-    /// Markdown as the plain-text fallback (GitHub, Linear, terminals).
+    /// Markdown as the plain-text fallback (GitHub, Linear, terminals). Link text is just the PR title.
     private func copyRichLink() {
-        let label = "\(pr.repo)#\(pr.number) \(pr.title)"
+        let label = pr.title
         let markdown = "[\(label)](\(pr.url.absoluteString))"
         let escaped = label.replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")
