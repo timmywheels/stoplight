@@ -11,23 +11,31 @@ struct Entry: TimelineEntry {
     let snapshot: Snapshot?
 }
 
+/// WidgetKit's completion handlers aren't Sendable; we only ever call them once, from one task.
+private struct Once<T>: @unchecked Sendable { let call: T }
+
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> Entry {
         Entry(date: .now, snapshot: Snapshot(prs: Self.sample))
     }
 
     func getSnapshot(in context: Context, completion: @escaping (Entry) -> Void) {
-        completion(Entry(date: .now, snapshot: context.isPreview ? Snapshot(prs: Self.sample) : SharedStore.load()))
+        if context.isPreview { completion(Entry(date: .now, snapshot: Snapshot(prs: Self.sample))); return }
+        let done = Once(call: completion)
+        Task { done.call(Entry(date: .now, snapshot: await SharedStore.load())) }
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> Void) {
         // The app calls reloadAllTimelines after every fetch; this policy is only a fallback tick.
-        let snap = SharedStore.load()
-        log.notice("getTimeline: prs=\(snap?.prs.count ?? -1)")
-        let entry = Entry(date: .now, snapshot: snap)
-        // No data yet (app not launched / not signed in): poll the file every minute instead of every 15.
-        let next: TimeInterval = snap == nil ? 60 : 15 * 60
-        completion(Timeline(entries: [entry], policy: .after(.now.addingTimeInterval(next))))
+        let done = Once(call: completion)
+        Task {
+            let snap = await SharedStore.load()
+            log.notice("getTimeline: prs=\(snap?.prs.count ?? -1)")
+            let entry = Entry(date: .now, snapshot: snap)
+            // No data yet (app not running / not signed in): retry every minute instead of every 15.
+            let next: TimeInterval = snap == nil ? 60 : 15 * 60
+            done.call(Timeline(entries: [entry], policy: .after(.now.addingTimeInterval(next))))
+        }
     }
 
     static let sample: [PullRequest] = [
@@ -58,7 +66,7 @@ struct StoplightWidgetView: View {
                 HStack(spacing: 8) {
                     ForEach(0..<3, id: \.self) { _ in Circle().fill(Color.secondary.opacity(0.25)).frame(width: 14, height: 14) }
                 }
-                Text("Open Stoplight to sign in").font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                Text("Open Stoplight and sign in").font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
         }
     }

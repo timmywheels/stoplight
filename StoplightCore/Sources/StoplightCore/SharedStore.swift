@@ -28,77 +28,61 @@ public struct Snapshot: Codable, Sendable {
 
 /// Where the snapshot lives.
 ///
-/// App Groups would be the textbook answer, but a `group.*` container needs the group in the
-/// provisioning profile, which Personal teams and ad-hoc builds can't get; macOS 15 then denies the
-/// sandboxed widget. So the unsandboxed app writes directly into the widget's own sandbox container,
-/// which the widget can always read. The App Group path is kept as a secondary location for builds
-/// that do have the entitlement.
+/// Primary channel: the app serves it on loopback (`SnapshotServer`) and the widget fetches it.
+/// Secondary: the App Group container, for builds whose profile actually grants the group.
+/// (Writing into the widget's own container works too, but trips macOS's "access data from other
+/// apps" prompt, so we don't.)
 public enum SharedStore {
     public static let groupID = "group.com.timwheeler.stoplight"
-    public static let widgetBundleID = "com.timwheeler.stoplight.widget"
+    public static let loopbackPort: UInt16 = 47391
+    public static var loopbackURL: URL { URL(string: "http://127.0.0.1:\(loopbackPort)/prs.json")! }
     static let fileName = "prs.json"
 
-    /// App Group container file (works only when the profile grants the group).
     public static var groupFileURL: URL? {
         FileManager.default
             .containerURL(forSecurityApplicationGroupIdentifier: groupID)?
             .appendingPathComponent(fileName)
     }
 
-    /// The widget's Application Support folder, addressed from OUTSIDE its sandbox (the app side).
-    /// Only valid once the widget has run at least once and macOS has created its container.
-    public static var widgetContainerFileURL: URL? {
-        let container = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Containers/\(widgetBundleID)/Data")
-        guard FileManager.default.fileExists(atPath: container.path) else { return nil }
-        return container.appendingPathComponent("Library/Application Support/Stoplight/\(fileName)")
+    private static let encoder: JSONEncoder = { let e = JSONEncoder(); e.dateEncodingStrategy = .iso8601; return e }()
+    private static let decoder: JSONDecoder = { let d = JSONDecoder(); d.dateDecodingStrategy = .iso8601; return d }()
+
+    public static func encode(_ prs: [PullRequest], pinnedIDs: [String] = []) throws -> Data {
+        try encoder.encode(Snapshot(prs: prs, pinnedIDs: pinnedIDs))
     }
 
-    /// The same folder, addressed from INSIDE the sandbox (the widget side).
-    static var localFileURL: URL? {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
-            .appendingPathComponent("Stoplight/\(fileName)")
+    public static func decode(_ data: Data) -> Snapshot? {
+        do { return try decoder.decode(Snapshot.self, from: data) }
+        catch { log.error("decode failed: \(String(describing: error), privacy: .public)"); return nil }
     }
 
-    /// App side. Writes to every location we can.
-    public static func save(_ prs: [PullRequest], pinnedIDs: [String] = []) throws {
-        let enc = JSONEncoder()
-        enc.dateEncodingStrategy = .iso8601
-        let data = try enc.encode(Snapshot(prs: prs, pinnedIDs: pinnedIDs))
-        var wrote = 0
-        for url in [widgetContainerFileURL, groupFileURL].compactMap({ $0 }) {
-            do {
-                try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try data.write(to: url, options: .atomic)
-                wrote += 1
-            } catch {
-                log.error("save: \(url.path, privacy: .public): \(String(describing: error), privacy: .public)")
-            }
+    /// App side: best-effort write to the App Group file (harmless no-op where the group isn't granted).
+    public static func save(_ data: Data) {
+        guard let url = groupFileURL else { return }
+        try? data.write(to: url, options: .atomic)
+    }
+
+    /// Widget side, synchronous fallback when the app isn't running.
+    public static func loadFromDisk() -> Snapshot? {
+        guard let url = groupFileURL, let data = try? Data(contentsOf: url) else { return nil }
+        return decode(data)
+    }
+
+    /// Widget side: ask the running app first, fall back to the file.
+    public static func load() async -> Snapshot? {
+        var req = URLRequest(url: loopbackURL)
+        req.timeoutInterval = 2
+        if let (data, resp) = try? await URLSession.shared.data(for: req),
+           (resp as? HTTPURLResponse)?.statusCode == 200, let snap = decode(data) {
+            log.notice("load: \(snap.prs.count) PRs via loopback")
+            return snap
         }
-        if wrote == 0 { log.error("save: no writable location (widget not yet launched?)") }
-    }
-
-    /// Widget side. Own container first, App Group second.
-    public static func load() -> Snapshot? {
-        let dec = JSONDecoder()
-        dec.dateDecodingStrategy = .iso8601
-        for url in [localFileURL, groupFileURL].compactMap({ $0 }) {
-            guard let data = try? Data(contentsOf: url) else { continue }
-            do {
-                let snap = try dec.decode(Snapshot.self, from: data)
-                log.notice("load: \(snap.prs.count) PRs from \(url.path, privacy: .public)")
-                return snap
-            } catch {
-                log.error("load: decode failed at \(url.path, privacy: .public): \(String(describing: error), privacy: .public)")
-            }
-        }
-        log.notice("load: no snapshot found")
-        return nil
+        let disk = loadFromDisk()
+        log.notice("load: loopback unavailable, disk \(disk == nil ? "miss" : "hit")")
+        return disk
     }
 
     public static func clear() {
-        for url in [widgetContainerFileURL, groupFileURL].compactMap({ $0 }) {
-            try? FileManager.default.removeItem(at: url)
-        }
+        if let url = groupFileURL { try? FileManager.default.removeItem(at: url) }
     }
 }

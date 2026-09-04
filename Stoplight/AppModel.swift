@@ -31,6 +31,7 @@ final class AppModel {
     private var provider: GitHubProvider?
     private var loop: Task<Void, Never>?
     private let notifier = NotificationService()
+    private let server = SnapshotServer()
     /// Keys of events already delivered, per (PR, sha, kind). Pruned when a PR leaves the list (US-006).
     private var sentEvents: Set<String> = []
     /// Watched refs seen closed/merged once; removed on the next cycle (US-011).
@@ -127,6 +128,7 @@ final class AppModel {
 
     func start() {
         guard loop == nil else { return }
+        server.start()
         loop = Task { [weak self] in
             await self?.signIn()
             while !Task.isCancelled {
@@ -179,6 +181,7 @@ final class AppModel {
         followed = []
         auth = .signedOut
         SharedStore.clear()
+        server.update(Data("{}".utf8))
         WidgetBridge.reload()
     }
 
@@ -261,7 +264,9 @@ final class AppModel {
     }
 
     private func publishSnapshot() {
-        try? SharedStore.save(all, pinnedIDs: Array(prefs.pinned))
+        guard let data = try? SharedStore.encode(all, pinnedIDs: Array(prefs.pinned)) else { return }
+        server.update(data)
+        SharedStore.save(data)
         WidgetBridge.reload()
     }
 

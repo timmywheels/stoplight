@@ -235,7 +235,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Description:** As a user, I want to give a PR a short name I recognize without touching the PR itself.
 
 **Acceptance Criteria:**
-- [ ] Right-click → "Nickname…" turns the title into an inline field; Return saves, Escape cancels, empty clears
+- [ ] Right-click → "Show description" expands the row with the PR body (and the real title when nicknamed); "Nickname…" turns the title into an inline field; Return saves, Escape cancels, empty clears
 - [ ] The nickname replaces the title in the row; the real title appears at the top of the ⓘ tooltip
 - [ ] "Clear nickname" in the context menu when one is set
 - [ ] Nicknames are keyed by PR id, stored in Sources, and dropped when the PR leaves the list
@@ -296,7 +296,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - **Stack:** Swift 5.10+, SwiftUI, macOS 14 Sonoma minimum (needed for `MenuBarExtra` window style and desktop widgets)
 - **Project layout:** one Xcode project, two targets: `Stoplight` (app) and `StoplightWidget` (widget extension), plus `StoplightCore` (Swift package with models, provider, rollup logic, so it's unit-testable and shared by both targets)
 - **Networking:** `URLSession` + hand-written GraphQL string. No Apollo, no codegen. One query, one `Codable` response struct
-- **Persistence:** `prs.json` written by the unsandboxed app directly into the widget's sandbox container (`~/Library/Containers/<widget id>/Data/Library/Application Support/Stoplight/`). App Groups need the group in the provisioning profile, which Personal teams and ad-hoc builds can't get, and macOS 15 denies the sandboxed widget otherwise. The App Group path is kept as a secondary location. No Core Data, no SwiftData
+- **App → widget channel:** the app serves the snapshot JSON on `127.0.0.1:47391`; the widget fetches it (sandbox `network.client`, no profile needed) and falls back to the App Group file. App Groups need the group in the provisioning profile, which Personal teams and ad-hoc builds can't get; writing into the widget's container trips the "access data from other apps" prompt. No Core Data, no SwiftData
 - **Secrets:** token held in memory when from `gh`; Keychain when pasted. Never in the shared container
 - **Sandbox:** app is sandboxed with `com.apple.security.network.client`. Running `gh` requires a `Process` call, which the sandbox blocks. Decision: ship v1 **unsandboxed** with hardened runtime and notarization. Revisit if App Store distribution becomes a goal, in which case the `gh` path is dropped
 - **Login item:** `SMAppService.mainApp.register()`

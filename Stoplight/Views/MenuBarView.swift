@@ -36,7 +36,9 @@ struct MenuBarView: View {
             }
             .padding(24)
         case .signedIn:
-            if model.isEmpty {
+            if model.lastRefresh == nil && model.lastError == nil {
+                centered("Loading…")
+            } else if model.isEmpty {
                 centered("No open PRs")
             } else if rowCount == 0 && !model.statusFilter.isEmpty {
                 centered("No PRs match the filter")
@@ -228,6 +230,7 @@ struct PRRow: View {
     @State private var hovering = false
     @State private var copied: String?  // which glyph just copied, for the 1s checkmark
     @State private var editingAlias = false
+    @State private var showDescription = false
     @State private var aliasDraft = ""
     @FocusState private var aliasFocused: Bool
 
@@ -320,6 +323,7 @@ struct PRRow: View {
             .onHover { hovering = $0 }
             .contextMenu {
                 Button(pinned ? "Unpin" : "Pin") { model.togglePin(pr) }
+                Button(showDescription ? "Hide description" : "Show description") { showDescription.toggle() }
                 Button(alias == nil ? "Nickname…" : "Edit nickname…") { startEditingAlias() }
                 if alias != nil { Button("Clear nickname") { model.prefs.setAlias("", for: pr.id) } }
                 if watched {
@@ -337,6 +341,16 @@ struct PRRow: View {
                 if let stack, stack.count > 1 {
                     Button("Copy stack (\(stack.count) PRs) as Markdown") { copy(Stacks.markdown(stack)) }
                 }
+            }
+
+            if showDescription {
+                VStack(alignment: .leading, spacing: 4) {
+                    if alias != nil { Text(pr.title).font(.caption.weight(.medium)) }
+                    Text(pr.summary.isEmpty ? "No description." : pr.summary)
+                        .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                }
+                .padding(.leading, 34).padding(.trailing, 12).padding(.bottom, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             if expanded {
