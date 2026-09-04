@@ -23,7 +23,7 @@ struct Provider: TimelineProvider {
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> Void) {
         // The app calls reloadAllTimelines after every fetch; this policy is only a fallback tick.
         let snap = SharedStore.load()
-        log.info("getTimeline: file=\(SharedStore.fileURL?.path ?? "nil", privacy: .public) prs=\(snap?.prs.count ?? -1)")
+        log.notice("getTimeline: prs=\(snap?.prs.count ?? -1)")
         let entry = Entry(date: .now, snapshot: snap)
         // No data yet (app not launched / not signed in): poll the file every minute instead of every 15.
         let next: TimeInterval = snap == nil ? 60 : 15 * 60
