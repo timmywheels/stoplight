@@ -227,14 +227,18 @@ struct PRRow: View {
     @State private var expanded = false
     @State private var hovering = false
     @State private var copied: String?  // which glyph just copied, for the 1s checkmark
+    @State private var editingAlias = false
+    @State private var aliasDraft = ""
+    @FocusState private var aliasFocused: Bool
 
     private var pinned: Bool { model.isPinned(pr) }
     private var watched: Bool { model.isWatched(pr) }
     private var isMine: Bool { model.isMine(pr) }
+    private var alias: String? { model.prefs.alias(for: pr.id) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Button { openURL(pr.url) } label: {
+            Button { if !editingAlias { openURL(pr.url) } } label: {
                 HStack(spacing: 10) {
                     if depth > 0 {
                         // Stack connector: this PR is based on the row above.
@@ -260,45 +264,60 @@ struct PRRow: View {
                                 // Based on a branch we can't see: part of a stack whose bottom isn't in view.
                                 tag("on \(pr.baseRefName)")
                             }
+                            if pinned { Image(systemName: "pin.fill").font(.caption2).foregroundStyle(.secondary) }
                         }
-                        Text(pr.title).lineLimit(1).truncationMode(.tail)
+                        if editingAlias {
+                            TextField(pr.title, text: $aliasDraft)
+                                .textFieldStyle(.plain)
+                                .focused($aliasFocused)
+                                .onSubmit { model.prefs.setAlias(aliasDraft, for: pr.id); editingAlias = false }
+                                .onExitCommand { editingAlias = false }
+                                .onChange(of: aliasFocused) { _, f in if !f { editingAlias = false } }
+                        } else {
+                            Text(model.displayTitle(pr)).lineLimit(1).truncationMode(.tail)
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    Spacer(minLength: 8)
-                    // One-click copy: link, branch. Always laid out; visible on hover. Checkmark for 1s after copying.
-                    copyGlyph("link", value: pr.url.absoluteString, help: "Copy PR link")
-                    copyGlyph("arrow.triangle.branch", value: pr.headRefName, help: "Copy branch name")
-                        .opacity(pr.headRefName.isEmpty ? 0 : 1)
-                    // Description tooltip lives on this icon only. Always laid out; visible on hover when there is a body.
-                    Image(systemName: "info.circle")
-                        .font(.caption).foregroundStyle(.secondary).frame(width: 14)
-                        .opacity(hovering && !pr.summary.isEmpty ? 1 : 0)
-                        .help(pr.summary)
-                    // US-012 hover pin glyph. Always laid out so the row never shifts; invisible until hover or pinned.
-                    Button { model.togglePin(pr) } label: {
-                        Image(systemName: pinned ? "pin.fill" : "pin")
-                            .font(.caption).foregroundStyle(pinned ? .primary : .secondary)
-                            .frame(width: 14)
-                    }
-                    .buttonStyle(.plain)
-                    .opacity(hovering || pinned ? 1 : 0)
-                    .help(pinned ? "Unpin" : "Pin")
                     Text(pr.updatedAt.compactAgo).font(.caption).foregroundStyle(.tertiary).monospacedDigit()
-                    Button { expanded.toggle() } label: {
-                        Image(systemName: "chevron.right").rotationEffect(.degrees(expanded ? 90 : 0))
-                            .font(.caption).foregroundStyle(.secondary).frame(width: 10)
+                    if pr.state == .failure {
+                        Button { expanded.toggle() } label: {
+                            Image(systemName: "chevron.right").rotationEffect(.degrees(expanded ? 90 : 0))
+                                .font(.caption).foregroundStyle(.secondary).frame(width: 10)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-                    .opacity(pr.state == .failure ? 1 : 0)
-                    .disabled(pr.state != .failure)
                 }
                 .padding(.horizontal, 12).padding(.vertical, 8)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            // Hover toolbar floats over the trailing edge instead of reserving width (US-005: titles get the room).
+            .overlay(alignment: .trailing) {
+                if hovering && !editingAlias {
+                    HStack(spacing: 10) {
+                        copyGlyph("link", value: pr.url.absoluteString, help: "Copy PR link")
+                        if !pr.headRefName.isEmpty {
+                            copyGlyph("arrow.triangle.branch", value: pr.headRefName, help: "Copy branch name")
+                        }
+                        Image(systemName: "info.circle")
+                            .font(.caption).foregroundStyle(.secondary)
+                            .help(infoText)
+                        Button { model.togglePin(pr) } label: {
+                            Image(systemName: pinned ? "pin.fill" : "pin").font(.caption).foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain).help(pinned ? "Unpin" : "Pin")
+                    }
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .background(.regularMaterial, in: Capsule())
+                    .padding(.trailing, 10)
+                    .transition(.opacity)
+                }
+            }
             .onHover { hovering = $0 }
             .contextMenu {
                 Button(pinned ? "Unpin" : "Pin") { model.togglePin(pr) }
+                Button(alias == nil ? "Nickname…" : "Edit nickname…") { startEditingAlias() }
+                if alias != nil { Button("Clear nickname") { model.prefs.setAlias("", for: pr.id) } }
                 if watched {
                     Button("Stop watching") { model.unwatch(pr) }
                 }
@@ -333,6 +352,20 @@ struct PRRow: View {
         }
     }
 
+    /// Tooltip: real title when nicknamed, then the description.
+    private var infoText: String {
+        var parts: [String] = []
+        if alias != nil { parts.append(pr.title) }
+        if !pr.summary.isEmpty { parts.append(pr.summary) }
+        return parts.isEmpty ? pr.title : parts.joined(separator: "\n\n")
+    }
+
+    private func startEditingAlias() {
+        aliasDraft = alias ?? ""
+        editingAlias = true
+        DispatchQueue.main.async { aliasFocused = true }
+    }
+
     private func copy(_ value: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(value, forType: .string)
@@ -345,10 +378,9 @@ struct PRRow: View {
             Task { try? await Task.sleep(for: .seconds(1)); if copied == symbol { copied = nil } }
         } label: {
             Image(systemName: copied == symbol ? "checkmark" : symbol)
-                .font(.caption).foregroundStyle(copied == symbol ? .green : .secondary).frame(width: 14)
+                .font(.caption).foregroundStyle(copied == symbol ? .green : .secondary)
         }
         .buttonStyle(.plain)
-        .opacity(hovering || copied == symbol ? 1 : 0)
         .help(help)
     }
 

@@ -30,6 +30,8 @@ final class UserPrefs {
         var hiddenUsers: [String] = IgnoreRules.defaultHiddenUsers
         /// login (lowercased) → user-chosen label for the section header. Empty means use GitHub's name.
         var userLabels: [String: String] = [:]
+        /// PR id → nickname shown instead of the title (US-019). The real title stays in the tooltip.
+        var prAliases: [String: String] = [:]
 
         subscript(follow kind: SourceKind) -> [String] {
             get {
@@ -65,6 +67,7 @@ final class UserPrefs {
                 hiddenUsers = legacyBots ? IgnoreRules.defaultHiddenUsers : []
             }
             userLabels = try c.decodeIfPresent([String: String].self, forKey: .userLabels) ?? [:]
+            prAliases = try c.decodeIfPresent([String: String].self, forKey: .prAliases) ?? [:]
         }
         private enum LegacyKeys: String, CodingKey { case ignoreRepos, hideBots }
     }
@@ -203,6 +206,16 @@ final class UserPrefs {
 
     func toggleCollapsed(_ section: String) {
         if collapsedSections.contains(section) { collapsedSections.remove(section) } else { collapsedSections.insert(section) }
+    }
+
+    func alias(for prID: String) -> String? {
+        let a = sources.prAliases[prID]?.trimmingCharacters(in: .whitespaces)
+        return (a?.isEmpty ?? true) ? nil : a
+    }
+
+    func setAlias(_ alias: String, for prID: String) {
+        let trimmed = alias.trimmingCharacters(in: .whitespaces)
+        sources.prAliases[prID] = trimmed.isEmpty ? nil : trimmed
     }
 
     // MARK: Pins / watches

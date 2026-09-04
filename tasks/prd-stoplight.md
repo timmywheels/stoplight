@@ -230,6 +230,16 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - [ ] Empty result shows "No PRs match the filter"
 - [ ] Settings → General → Legend explains: four dot colors, hollow draft dot, stack connector, Queue tag, "on branch" tag, hover glyphs, footer filters
 
+### US-019: Nicknames
+**Description:** As a user, I want to give a PR a short name I recognize without touching the PR itself.
+
+**Acceptance Criteria:**
+- [ ] Right-click → "Nickname…" turns the title into an inline field; Return saves, Escape cancels, empty clears
+- [ ] The nickname replaces the title in the row; the real title appears at the top of the ⓘ tooltip
+- [ ] "Clear nickname" in the context menu when one is set
+- [ ] Nicknames are keyed by PR id, stored in Sources, and dropped when the PR leaves the list
+- [ ] Hover glyphs (link, branch, ⓘ, pin) float over the trailing edge in a material capsule while hovering, so the title keeps the full row width when not hovered
+
 ## Functional Requirements
 
 - FR-1: The app runs as a menu bar accessory only (`LSUIElement = true`), no Dock icon, no main window

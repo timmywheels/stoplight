@@ -121,6 +121,7 @@ final class AppModel {
     func isWatched(_ pr: PullRequest) -> Bool { pr.ref.map { prefs.watched.contains($0) } ?? false }
     func isMine(_ pr: PullRequest) -> Bool { login.map { $0.caseInsensitiveCompare(pr.author) == .orderedSame } ?? false }
     func isPinned(_ pr: PullRequest) -> Bool { prefs.pinned.contains(pr.id) }
+    func displayTitle(_ pr: PullRequest) -> String { prefs.alias(for: pr.id) ?? pr.title }
 
     // MARK: Lifecycle
 
@@ -277,11 +278,13 @@ final class AppModel {
         }
     }
 
-    /// Pins on PRs that no longer exist are dropped silently (US-012).
+    /// Pins and nicknames on PRs that no longer exist are dropped silently (US-012, US-019).
     private func prunePins() {
         let live = Set((mine + watched + followed.flatMap(\.prs)).map(\.id))
         let stale = prefs.pinned.subtracting(live)
         if !stale.isEmpty { prefs.pinned.subtract(stale) }
+        let staleAliases = Set(prefs.sources.prAliases.keys).subtracting(live)
+        for id in staleAliases { prefs.sources.prAliases[id] = nil }
     }
 
     // MARK: User actions
