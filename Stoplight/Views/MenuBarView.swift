@@ -73,9 +73,11 @@ struct MenuBarView: View {
                 SectionHeader(title: sec.title, prs: sec.prs, collapsed: collapsed) { model.prefs.toggleCollapsed(sec.id) }
             }
             if !collapsed {
-                ForEach(sec.prs) { pr in
-                    PRRow(pr: pr, model: model, section: sec)
-                    Divider().padding(.leading, 28)
+                let rows = Stacks.layout(sec.prs)
+                ForEach(rows) { row in
+                    PRRow(pr: row.pr, model: model, section: sec, depth: row.depth,
+                          stack: row.stackID.map { Stacks.members(of: $0, in: rows) })
+                    Divider().padding(.leading, 28 + CGFloat(row.depth) * 14)
                 }
             }
         }
@@ -204,9 +206,14 @@ struct PRRow: View {
     let pr: PullRequest
     @Bindable var model: AppModel
     var section: AppModel.Section? = nil
+    /// Stack depth (US-015). 0 = bottom of stack or standalone.
+    var depth: Int = 0
+    /// All rows of this PR's stack, bottom-up. nil when not stacked.
+    var stack: [StackRow]? = nil
     @Environment(\.openURL) private var openURL
     @State private var expanded = false
     @State private var hovering = false
+    @State private var copied: String?  // which glyph just copied, for the 1s checkmark
 
     private var pinned: Bool { model.isPinned(pr) }
     private var watched: Bool { model.isWatched(pr) }
@@ -216,6 +223,12 @@ struct PRRow: View {
         VStack(alignment: .leading, spacing: 0) {
             Button { openURL(pr.url) } label: {
                 HStack(spacing: 10) {
+                    if depth > 0 {
+                        // Stack connector: this PR is based on the row above.
+                        Image(systemName: "arrow.turn.down.right")
+                            .font(.caption2).foregroundStyle(.tertiary)
+                            .padding(.leading, CGFloat(depth - 1) * 14)
+                    }
                     StatusDot(state: pr.state, hollow: pr.isDraft)
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
@@ -227,11 +240,22 @@ struct PRRow: View {
                             if pr.isDraft { tag("Draft") }
                             if pr.status == .merged { tag("Merged", color: .purple) }
                             if pr.status == .closed { tag("Closed", color: .red) }
+                            if let q = pr.mergeQueue {
+                                tag(q.isBlocked ? "Queue: blocked" : "Queue #\(q.position)", color: q.isBlocked ? .red : .blue)
+                            }
+                            if depth == 0, stack == nil, pr.hasNonTrunkBase {
+                                // Based on a branch we can't see: part of a stack whose bottom isn't in view.
+                                tag("on \(pr.baseRefName)")
+                            }
                         }
                         Text(pr.title).lineLimit(1).truncationMode(.tail)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     Spacer(minLength: 8)
+                    // One-click copy: link, branch. Always laid out; visible on hover. Checkmark for 1s after copying.
+                    copyGlyph("link", value: pr.url.absoluteString, help: "Copy PR link")
+                    copyGlyph("arrow.triangle.branch", value: pr.headRefName, help: "Copy branch name")
+                        .opacity(pr.headRefName.isEmpty ? 0 : 1)
                     // Description tooltip lives on this icon only. Always laid out; visible on hover when there is a body.
                     Image(systemName: "info.circle")
                         .font(.caption).foregroundStyle(.secondary).frame(width: 14)
@@ -270,9 +294,11 @@ struct PRRow: View {
                     Button("Follow @\(pr.author)") { model.follow(user: pr.author) }
                 }
                 Button("Hide \(pr.repo)") { model.hide(repo: pr.repo) }
-                Button("Copy link") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(pr.url.absoluteString, forType: .string)
+                Divider()
+                Button("Copy link") { copy(pr.url.absoluteString) }
+                if !pr.headRefName.isEmpty { Button("Copy branch name") { copy(pr.headRefName) } }
+                if let stack, stack.count > 1 {
+                    Button("Copy stack (\(stack.count) PRs) as Markdown") { copy(Stacks.markdown(stack)) }
                 }
             }
 
@@ -292,6 +318,25 @@ struct PRRow: View {
                 .padding(.bottom, 6)
             }
         }
+    }
+
+    private func copy(_ value: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(value, forType: .string)
+    }
+
+    private func copyGlyph(_ symbol: String, value: String, help: String) -> some View {
+        Button {
+            copy(value)
+            copied = symbol
+            Task { try? await Task.sleep(for: .seconds(1)); if copied == symbol { copied = nil } }
+        } label: {
+            Image(systemName: copied == symbol ? "checkmark" : symbol)
+                .font(.caption).foregroundStyle(copied == symbol ? .green : .secondary).frame(width: 14)
+        }
+        .buttonStyle(.plain)
+        .opacity(hovering || copied == symbol ? 1 : 0)
+        .help(help)
     }
 
     private func tag(_ text: String, color: Color = .secondary) -> some View {

@@ -90,6 +90,16 @@ public struct PRRef: Codable, Sendable, Hashable, Identifiable {
     }
 }
 
+/// GitHub merge queue membership (US-016).
+public struct MergeQueueInfo: Codable, Sendable, Hashable {
+    /// 1-based position in the queue.
+    public let position: Int
+    /// AWAITING_CHECKS, QUEUED, LOCKED, MERGEABLE, UNMERGEABLE
+    public let state: String
+    public init(position: Int, state: String) { self.position = position; self.state = state }
+    public var isBlocked: Bool { state == "UNMERGEABLE" }
+}
+
 public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
     public let id: String
     /// "owner/repo"
@@ -105,10 +115,15 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
     public let status: PRStatus
     /// First ~300 chars of the PR body, plain text. Shown as a hover tooltip (US-005).
     public let summary: String
+    /// Branch names, for stacks (US-015) and "copy branch".
+    public let headRefName: String
+    public let baseRefName: String
+    public let mergeQueue: MergeQueueInfo?
 
     public init(id: String, repo: String, number: Int, title: String, url: URL,
                 isDraft: Bool, updatedAt: Date, headSha: String, checks: [CheckResult],
-                author: String = "", status: PRStatus = .open, summary: String = "") {
+                author: String = "", status: PRStatus = .open, summary: String = "",
+                headRefName: String = "", baseRefName: String = "", mergeQueue: MergeQueueInfo? = nil) {
         self.id = id
         self.repo = repo
         self.number = number
@@ -121,6 +136,9 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
         self.author = author
         self.status = status
         self.summary = summary
+        self.headRefName = headRefName
+        self.baseRefName = baseRefName
+        self.mergeQueue = mergeQueue
     }
 
     // Tolerant decoding so an older prs.json still loads (author/status added in US-011).
@@ -138,11 +156,18 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
         author = try c.decodeIfPresent(String.self, forKey: .author) ?? ""
         status = try c.decodeIfPresent(PRStatus.self, forKey: .status) ?? .open
         summary = try c.decodeIfPresent(String.self, forKey: .summary) ?? ""
+        headRefName = try c.decodeIfPresent(String.self, forKey: .headRefName) ?? ""
+        baseRefName = try c.decodeIfPresent(String.self, forKey: .baseRefName) ?? ""
+        mergeQueue = try c.decodeIfPresent(MergeQueueInfo.self, forKey: .mergeQueue)
     }
 
     public var state: CIState { Rollup.state(for: checks) }
     public var failingChecks: [CheckResult] { checks.filter { $0.state == .failure } }
     public var shortRef: String { "\(repo) #\(number)" }
+    /// Base looks like a feature branch rather than a trunk.
+    public var hasNonTrunkBase: Bool {
+        !baseRefName.isEmpty && !["main", "master", "develop", "dev", "trunk", "release"].contains(baseRefName.lowercased())
+    }
     public var ref: PRRef? {
         let parts = repo.split(separator: "/", maxSplits: 1).map(String.init)
         guard parts.count == 2 else { return nil }

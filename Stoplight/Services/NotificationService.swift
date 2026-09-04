@@ -32,8 +32,9 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         content.body = event.body
         content.userInfo = ["url": event.url.absoluteString]
         content.threadIdentifier = event.pr.id
-        content.sound = event.kind == .failed ? .default : nil
-        content.interruptionLevel = event.kind == .failed ? .timeSensitive : .active
+        let urgent = event.kind != .passed
+        content.sound = urgent ? .default : nil
+        content.interruptionLevel = urgent ? .timeSensitive : .active
         let req = UNNotificationRequest(identifier: event.key, content: content, trigger: nil)
         try? await center.add(req)
     }

@@ -8,7 +8,7 @@ public enum NotificationMode: String, Codable, Sendable {
 
 /// Something worth telling the user about (US-006).
 public struct CIEvent: Equatable, Sendable, Identifiable {
-    public enum Kind: String, Sendable { case failed, passed }
+    public enum Kind: String, Sendable { case failed, passed, dequeued }
 
     public let pr: PullRequest
     public let kind: Kind
@@ -25,6 +25,8 @@ public struct CIEvent: Equatable, Sendable, Identifiable {
             return pr.title
         case .passed:
             return "\(pr.title)\nAll checks passed"
+        case .dequeued:
+            return "\(pr.title)\nRemoved from the merge queue"
         }
     }
     public var url: URL { pr.url }
@@ -42,6 +44,11 @@ public enum Transitions {
         for pr in current where !pr.isDraft && pr.status == .open {
             // Unknown before now (first launch, newly opened, newly watched): nothing to compare against.
             guard let prev = prevByID[pr.id] else { continue }
+
+            // Merge queue kicked it out (US-016). Fires in both non-off modes; it's a failure in spirit.
+            if prev.mergeQueue != nil, pr.mergeQueue == nil {
+                out.append(CIEvent(pr: pr, kind: .dequeued))
+            }
             // New push: treat the old state as "pending" so a fresh red or green fires.
             let prevState: CIState = prev.headSha == pr.headSha ? prev.state : .pending
 

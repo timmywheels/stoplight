@@ -190,6 +190,35 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - [ ] Housing is a 14pt-tall pill, dark gray, 4pt padding around the dots; unlit dots become white at 28% so they show on the pill
 - [ ] Toggle takes effect immediately without restart
 
+### US-015: Stacks
+**Description:** As a user, I want stacked PRs shown as a stack, and a one-click way to share the whole stack.
+
+**Acceptance Criteria:**
+- [ ] A PR whose base branch equals another visible PR's head branch, in the same repo, is rendered directly under it, indented 14pt per level with a ↳ connector
+- [ ] Stacks render bottom-up (closest to trunk first); a stack sorts by its worst state, so a red anywhere in it lifts the whole stack
+- [ ] Right-click any PR in a stack → "Copy stack (N PRs) as Markdown": one line per PR, bottom-up, status emoji, link, title, branch
+- [ ] A PR based on a non-trunk branch whose parent isn't visible shows an "on branch" tag
+- [ ] Cycles or missing parents never drop a PR from the list
+- [ ] Unit tests: three-level stack order and depth, cross-repo non-linking, red stack sorts first, cycle safety, markdown output
+
+### US-016: Merge queue
+**Description:** As a user, I want to see when a PR is in the merge queue and be told if it gets kicked out.
+
+**Acceptance Criteria:**
+- [ ] Rows show a "Queue #n" tag while `mergeQueueEntry` exists; "Queue: blocked" in red when its state is UNMERGEABLE
+- [ ] Transition from in-queue to not-in-queue while still open posts a notification "Removed from the merge queue", time-sensitive with sound, in both non-off notification modes
+- [ ] Entering the queue posts nothing
+- [ ] Unit test covers the dequeued transition table
+
+### US-017: One-click copy
+**Description:** As a user, I want the PR link and branch name one click away.
+
+**Acceptance Criteria:**
+- [ ] Hovering a row reveals two glyphs before the pin: link (copies URL) and branch (copies head branch name)
+- [ ] The glyph turns into a green checkmark for one second after copying
+- [ ] Both are also in the right-click menu
+- [ ] Glyphs are always laid out so the row never shifts
+
 ## Functional Requirements
 
 - FR-1: The app runs as a menu bar accessory only (`LSUIElement = true`), no Dock icon, no main window
@@ -211,6 +240,8 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - FR-16a: Users can follow users, repos, and orgs from Settings; their open PRs are polled in the same request and listed in their own sections
 - FR-17: Users can pin PRs; pinned PRs are listed first under "Pinned" in the popover and the medium widget
 - FR-18: Sources (follow/ignore lists), watched refs, and pins persist in UserDefaults and survive relaunch
+- FR-19: PRs based on another visible PR's branch render as a stack; any stack can be copied as Markdown
+- FR-20: Merge queue membership is shown per PR; leaving the queue while open triggers a notification
 
 ## Non-Goals
 

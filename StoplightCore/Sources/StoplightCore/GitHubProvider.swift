@@ -123,6 +123,9 @@ public struct GitHubProvider: CIProvider {
       headRefOid
       author { login }
       bodyText
+      headRefName
+      baseRefName
+      mergeQueueEntry { position state }
       repository { nameWithOwner }
       commits(last: 1) {
         nodes {
@@ -206,7 +209,11 @@ public struct GitHubProvider: CIProvider {
         let headRefOid: String?
         let author: Author?
         let bodyText: String?
+        let headRefName: String?
+        let baseRefName: String?
+        let mergeQueueEntry: MQ?
         let repository: Repo?
+        struct MQ: Decodable { let position: Int?; let state: String? }
         let commits: Commits?
     }
 
@@ -224,7 +231,9 @@ public struct GitHubProvider: CIProvider {
             isDraft: n.isDraft ?? false, updatedAt: n.updatedAt ?? .distantPast,
             headSha: sha, checks: contexts.compactMap(mapCheck),
             author: n.author?.login ?? "ghost", status: status,
-            summary: summarize(n.bodyText)
+            summary: summarize(n.bodyText),
+            headRefName: n.headRefName ?? "", baseRefName: n.baseRefName ?? "",
+            mergeQueue: n.mergeQueueEntry.map { MergeQueueInfo(position: $0.position ?? 0, state: $0.state ?? "QUEUED") }
         )
     }
 
