@@ -304,15 +304,8 @@ struct PRRow: View {
                             Image(systemName: "arrow.up.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain).help("Open on GitHub")
-                        Button {
-                            copyRichLink()
-                            copied = "link"
-                            Task { try? await Task.sleep(for: .seconds(1)); if copied == "link" { copied = nil } }
-                        } label: {
-                            Image(systemName: copied == "link" ? "checkmark" : "doc.on.doc")
-                                .font(.caption).foregroundStyle(copied == "link" ? .green : .secondary)
-                        }
-                        .buttonStyle(.plain).help("Copy link (pastes as a rich link in Slack, Markdown elsewhere)")
+                        copyGlyph("doc.on.doc", help: "Copy URL") { copy(pr.url.absoluteString) }
+                        copyGlyph("square.and.arrow.up", help: "Share: copies a rich link (hyperlink in Slack, Markdown in GitHub)") { copyRichLink() }
                     }
                     .padding(.horizontal, 10).padding(.vertical, 6)
                     .background(.regularMaterial, in: Capsule())
@@ -335,8 +328,8 @@ struct PRRow: View {
                 }
                 Button("Hide \(pr.repo)") { model.hide(repo: pr.repo) }
                 Divider()
-                Button("Copy link") { copyRichLink() }
-                Button("Copy URL only") { copy(pr.url.absoluteString) }
+                Button("Share (rich link)") { copyRichLink() }
+                Button("Copy URL") { copy(pr.url.absoluteString) }
                 if !pr.headRefName.isEmpty { Button("Copy branch name") { copy(pr.headRefName) } }
                 if let stack, stack.count > 1 {
                     Button("Copy stack (\(stack.count) PRs) as Markdown") { copy(Stacks.markdown(stack)) }
@@ -388,6 +381,20 @@ struct PRRow: View {
     private func copy(_ value: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(value, forType: .string)
+    }
+
+    /// Toolbar glyph that runs a copy action and shows a checkmark for a second.
+    private func copyGlyph(_ symbol: String, help: String, action: @escaping () -> Void) -> some View {
+        Button {
+            action()
+            copied = symbol
+            Task { try? await Task.sleep(for: .seconds(1)); if copied == symbol { copied = nil } }
+        } label: {
+            Image(systemName: copied == symbol ? "checkmark" : symbol)
+                .font(.caption).foregroundStyle(copied == symbol ? .green : .secondary)
+        }
+        .buttonStyle(.plain)
+        .help(help)
     }
 
     /// One clipboard entry, two flavors: HTML (Slack, Notion, Docs paste a real hyperlink) and

@@ -214,10 +214,10 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Description:** As a user, I want the PR link and branch name one click away.
 
 **Acceptance Criteria:**
-- [ ] Hovering a row reveals two glyphs floating over the trailing edge: ↗ opens the PR, ⧉ copies a link
-- [ ] The copied link carries two flavors on the pasteboard: HTML `<a>` (Slack, Notion, Docs paste a hyperlink) and Markdown `[owner/repo#123 title](url)` as plain text (GitHub, Linear)
+- [ ] Hovering a row reveals three glyphs floating over the trailing edge: ↗ opens the PR, ⧉ copies the URL, share copies a rich link
+- [ ] The shared link carries two flavors on the pasteboard: HTML `<a>` (Slack, Notion, Docs paste a hyperlink) and Markdown `[owner/repo#123 title](url)` as plain text (GitHub, Linear)
 - [ ] The copy glyph turns into a green checkmark for one second
-- [ ] Right-click menu has Copy link, Copy URL only, Copy branch name, Copy stack as Markdown
+- [ ] Right-click menu has Share (rich link), Copy URL, Copy branch name, Copy stack as Markdown
 - [ ] Description and real title (when nicknamed) are the title's tooltip
 
 ### US-018: Status filter and legend
