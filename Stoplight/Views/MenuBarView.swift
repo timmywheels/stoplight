@@ -167,8 +167,17 @@ struct SectionHeader: View {
                     .frame(width: 10)
                 Text(title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
                 if collapsed {
-                    StatusDot(state: Rollup.aggregate(prs)).padding(.leading, 2)
-                    Text("\(prs.count)").font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                    // One count per state, worst first, zeros omitted. Drafts count under "none".
+                    ForEach(CIState.allCases, id: \.self) { state in
+                        let n = prs.filter { $0.state == state }.count
+                        if n > 0 {
+                            HStack(spacing: 3) {
+                                StatusDot(state: state)
+                                Text("\(n)").font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                            }
+                            .padding(.leading, 4)
+                        }
+                    }
                 }
                 Spacer()
             }
