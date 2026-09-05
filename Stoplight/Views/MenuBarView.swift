@@ -20,7 +20,6 @@ struct MenuBarView: View {
             Divider()
             footer
         }
-        .padding(.top, 6)  // room under the (hidden) title bar of the panel
     }
 
     @ViewBuilder

@@ -90,6 +90,7 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
 
         let host = NSHostingView(rootView: PanelRoot(model: model, close: { [weak self] in self?.close() }))
         host.translatesAutoresizingMaskIntoConstraints = false
+        host.safeAreaRegions = []  // no inset for the hidden title bar
         let effect = NSVisualEffectView()
         effect.material = .menu
         effect.blendingMode = .behindWindow
@@ -149,6 +150,7 @@ private struct PanelRoot: View {
     var body: some View {
         MenuBarView(model: model)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .ignoresSafeArea()
             .onExitCommand(perform: close)
     }
 }
