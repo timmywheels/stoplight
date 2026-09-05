@@ -221,12 +221,14 @@ public struct GitHubProvider: CIProvider {
     private static func map(_ n: Node) -> PullRequest? {
         guard let id = n.id, let number = n.number, let title = n.title, let url = n.url,
               let repo = n.repository?.nameWithOwner, let sha = n.headRefOid else { return nil }
-        let contexts = n.commits?.nodes.first?.commit.statusCheckRollup?.contexts.nodes ?? []
         let status: PRStatus = switch n.state {
         case "MERGED": .merged
         case "CLOSED": .closed
         default: .open
         }
+        // Once merged, the branch's checks are history; what matters is what ran on the merge commit (US-022).
+        let commit = status == .merged ? n.mergeCommit : n.commits?.nodes.first?.commit
+        let contexts = commit?.statusCheckRollup?.contexts.nodes ?? []
         return PullRequest(
             id: id, repo: repo, number: number, title: title, url: url,
             isDraft: n.isDraft ?? false, updatedAt: n.updatedAt ?? .distantPast,
