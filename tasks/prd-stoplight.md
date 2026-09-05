@@ -218,7 +218,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Description:** As a user, I want the PR link and branch name one click away.
 
 **Acceptance Criteria:**
-- [ ] Superseded by US-021: actions live in the expanded row
+- [ ] Hovering a collapsed row shows a floating toolbar: ↗ open, ⧉ copy URL, share. Attached outside the row's tap gesture so clicks never fall through
 - [ ] The shared link carries two flavors on the pasteboard: HTML `<a>` (Slack, Notion, Docs paste a hyperlink) and Markdown `[title](url)` as plain text (GitHub, Linear). Link text is the PR title only
 - [ ] The copy glyph turns into a green checkmark for one second
 - [ ] Right-click menu has Share (rich link), Copy URL, Copy branch name, Copy stack as Markdown
