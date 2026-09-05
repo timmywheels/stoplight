@@ -14,26 +14,26 @@ struct TourView: View {
     }
 
     private let slides: [Slide] = [
-        Slide(title: "Three dots, one answer",
-              body: "Red: something failed. Yellow: checks running. Green: all passed. Each dot lights when any of your PRs is in that state.",
+        Slide(title: "Stop refreshing GitHub",
+              body: "Stoplight watches every open PR you have. Red means go fix something. Yellow means keep working, it's still running. Green means ship it. One glance at the menu bar is the whole check.",
               art: AnyView(HStack(spacing: 10) {
                   Circle().fill(.red).frame(width: 14, height: 14)
                   Circle().fill(.yellow).frame(width: 14, height: 14)
                   Circle().fill(.green).frame(width: 14, height: 14)
               }.padding(.horizontal, 14).padding(.vertical, 10).background(Color(white: 0.22), in: Capsule()))),
-        Slide(title: "Click a PR to expand it",
-              body: "Description, failing checks, and buttons for Open, Copy URL, Share, Pin. Double-click or ⌘-click opens the PR on GitHub. Swap those two in Settings.",
+        Slide(title: "Everything about a PR, one click away",
+              body: "Click a PR to see its description, exactly which checks failed, and buttons to open, copy, share, or pin it. Double-click opens it on GitHub. Swap those two in Settings.",
               art: AnyView(HStack(spacing: 10) {
                   ForEach(["arrow.up.right", "doc.on.doc", "square.and.arrow.up", "pin"], id: \.self) { name in
                       Image(systemName: name).font(.system(size: 13, weight: .medium)).foregroundStyle(.secondary)
                           .frame(width: 32, height: 32).background(.quaternary, in: Circle())
                   }
               })),
-        Slide(title: "Right-click for the rest",
-              body: "Nickname a PR, hide it, follow its author, copy a whole stack as Markdown. Click a section header to collapse it, drag one to reorder.",
+        Slide(title: "Make it yours",
+              body: "Right-click to nickname a PR, hide the ones that just sit there, or copy a whole stack as Markdown to share. Collapse sections, drag them into your order.",
               art: AnyView(Image(systemName: "contextualmenu.and.cursorarrow").font(.system(size: 34)).foregroundStyle(.secondary))),
-        Slide(title: "Follow your team",
-              body: "Settings → Sources: follow people, repos, or orgs and each gets its own section. Hide bots and noisy repos. The desktop widget mirrors whatever you set up here.",
+        Slide(title: "Watch your team, not just yourself",
+              body: "Follow people, repos, or orgs in Settings → Sources and each gets its own section. You get a notification the moment CI fails, or goes green. The desktop widget shows the same list.",
               art: AnyView(Image(systemName: "person.2").font(.system(size: 34)).foregroundStyle(.secondary))),
     ]
 
