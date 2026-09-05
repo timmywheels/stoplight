@@ -33,6 +33,10 @@ final class AppModel {
     private(set) var merged: [PullRequest] = []
     /// Followed branches' latest CI verdict, as rows (US-029).
     private(set) var branches: [PullRequest] = []
+    /// pattern key → resolved branch name, from the last poll (US-030). Changes mean a new release branch.
+    private var resolvedPatterns: [String: String] = [:]
+    /// Open PRs targeting each resolved release branch (US-030).
+    private(set) var inbound: [(query: PRQuery, prs: [PullRequest])] = []
     private(set) var lastRefresh: Date?
     private(set) var lastError: String?
     private(set) var auth: AuthState = .unknown
@@ -66,7 +70,7 @@ final class AppModel {
         var hidesAuthor: Bool { if case .author = query { return true }; return false }
         func refLabel(for pr: PullRequest) -> String {
             switch query {
-            case .repo: return "#\(pr.number)"
+            case .repo, .base: return "#\(pr.number)"
             case .org(let o) where pr.repo.lowercased().hasPrefix(o.lowercased() + "/"):
                 return "\(pr.repo.dropFirst(o.count + 1)) #\(pr.number)"
             default: return pr.shortRef
@@ -181,7 +185,7 @@ final class AppModel {
         var seen = Set<String>()
         var out: [PullRequest] = []
         let mergedWithChecks = merged.filter { !$0.checks.isEmpty }
-        for pr in mine + watched + followed.flatMap(\.prs) + branches + mergedWithChecks where seen.insert(pr.id).inserted {
+        for pr in mine + watched + followed.flatMap(\.prs) + inbound.flatMap(\.prs) + branches + mergedWithChecks where seen.insert(pr.id).inserted {
             out.append(pr)
         }
         let hidden = prefs.sources.hiddenPRs
@@ -223,6 +227,7 @@ final class AppModel {
             if case .author(let login) = f.query, let name = prefs.label(for: login) ?? displayName(for: login) { title = name }
             out.append(Section(id: f.query.title, title: title, prs: take(f.prs), query: f.query))
         }
+        for f in inbound { out.append(Section(id: f.query.title, title: f.query.title, prs: take(f.prs), query: f.query)) }
         out.append(Section(id: "Branches", title: "Branches", prs: take(branches)))
         // Merged rows aren't in `all` unless they have checks, so filter them directly here.
         let mergedFiltered = mergedRows.filter { pr in
@@ -236,6 +241,7 @@ final class AppModel {
     var sectionIDs: [String] {
         applyOrder(["Pinned", "Mine", "Watching"].map { Section(id: $0, title: $0, prs: []) }
                    + followed.map { Section(id: $0.query.title, title: $0.query.title, prs: []) }
+                   + inbound.map { Section(id: $0.query.title, title: $0.query.title, prs: []) }
                    + [Section(id: "Branches", title: "Branches", prs: []), Section(id: "Merged", title: "Merged", prs: [])]).map(\.id)
     }
 
@@ -322,6 +328,7 @@ final class AppModel {
         followed = []
         merged = []
         branches = []
+        inbound = []
         auth = .signedOut
         SharedStore.clear()
         server.update(Data("{}".utf8))
@@ -338,19 +345,39 @@ final class AppModel {
             let refs = prefs.watched
             let follow = prefs.followQueries
             let mergedQuery: PRQuery? = prefs.mergedDays > 0 ? .merged(withinDays: prefs.mergedDays) : nil
-            let queries = [PRQuery.authored] + follow + (mergedQuery.map { [$0] } ?? [])
+
+            // US-030: patterns like rc/* resolve to a concrete branch before anything else runs.
+            let patterns = prefs.followedBranches.filter(\.isPattern)
+            let resolvedNow = patterns.isEmpty ? [:] : ((try? await provider.resolveBranchPatterns(patterns)) ?? [:])
+            let concreteBranches: [BranchRef] = prefs.followedBranches.compactMap { b in
+                b.isPattern ? resolvedNow[b.key].map(b.resolved(to:)) : b
+            }
+            let inboundQueries: [PRQuery] = patterns.compactMap { p in resolvedNow[p.key].map { PRQuery.base(repo: p.repo, branch: $0) } }
+
+            let queries = [PRQuery.authored] + follow + inboundQueries + (mergedQuery.map { [$0] } ?? [])
             async let searchTask = provider.fetchPullRequests(queries: queries)
             async let watchedTask = provider.fetchPullRequests(refs: refs)
             let (results, freshWatched) = try await (searchTask, watchedTask)
             let previous = all
+            var cursor = 1
             mine = results.first ?? []
-            followed = Array(zip(follow, results.dropFirst().prefix(follow.count)))
-            var freshMerged = mergedQuery == nil ? [] : (results.last ?? [])
+            followed = Array(zip(follow, results.dropFirst(cursor).prefix(follow.count))); cursor += follow.count
+            inbound = Array(zip(inboundQueries, results.dropFirst(cursor).prefix(inboundQueries.count))); cursor += inboundQueries.count
+            var freshMerged = mergedQuery == nil ? [] : (results.dropFirst(cursor).first ?? [])
+
             // One branch request covers both: followed branches (US-029) and the base branches behind red merges (US-028).
             let redRefs = freshMerged.filter { $0.state == .failure }.map { BranchRef(repo: $0.repo, branch: $0.baseRefName) }
-            let wanted = Array(Set(prefs.followedBranches + redRefs))
+            let wanted = Array(Set(concreteBranches + redRefs))
             let statuses = wanted.isEmpty ? [:] : ((try? await provider.fetchBranchStatuses(wanted)) ?? [:])
-            branches = prefs.followedBranches.compactMap { statuses[$0.key]?.asRow }
+            branches = prefs.followedBranches.compactMap { b -> PullRequest? in
+                let concrete = b.isPattern ? resolvedNow[b.key].map(b.resolved(to:)) : b
+                guard let c = concrete, let st = statuses[c.key] else { return nil }
+                let row = st.asRow
+                // Pattern rows say which pattern found them.
+                return b.isPattern ? PullRequest(id: row.id, repo: row.repo, number: 0, title: row.title, url: row.url, isDraft: false,
+                                                 updatedAt: row.updatedAt, headSha: row.headSha, checks: row.checks, status: .open,
+                                                 headRefName: row.headRefName, note: b.branch) : row
+            }
             // A red merge commit that the base branch has since moved past (and gone green) is history, not a problem.
             freshMerged = freshMerged.map { pr in
                 guard pr.state == .failure, let head = statuses[BranchRef(repo: pr.repo, branch: pr.baseRefName).key],
@@ -359,6 +386,15 @@ final class AppModel {
             }
             merged = freshMerged
             watched = freshWatched
+
+            // New release branch? Tell the user (only when we knew the previous one).
+            for p in patterns {
+                guard let now = resolvedNow[p.key] else { continue }
+                if let before = resolvedPatterns[p.key], before != now, let row = branches.first(where: { $0.repo == p.repo && $0.headRefName == now }) {
+                    await notifier.post(CIEvent(pr: row, kind: .branchMoved, detail: before))
+                }
+                resolvedPatterns[p.key] = now
+            }
             lastRefresh = .now
             lastError = nil
             pruneClosedWatches()
@@ -447,7 +483,7 @@ final class AppModel {
 
     /// Pins and nicknames on PRs that no longer exist are dropped silently (US-012, US-019).
     private func prunePins() {
-        let live = Set((mine + watched + followed.flatMap(\.prs) + merged + branches).map(\.id))
+        let live = Set((mine + watched + followed.flatMap(\.prs) + inbound.flatMap(\.prs) + merged + branches).map(\.id))
         let stale = prefs.pinned.subtracting(live)
         if !stale.isEmpty { prefs.pinned.subtract(stale) }
         let staleAliases = Set(prefs.sources.prAliases.keys).subtracting(live)

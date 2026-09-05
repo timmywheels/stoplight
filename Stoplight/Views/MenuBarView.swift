@@ -346,7 +346,7 @@ struct PRRow: View {
                     }
                     if pr.isDraft { tag("Draft") }
                     if pr.status == .merged && section?.id != "Merged" { tag("Merged", color: .purple) }
-                    if let note = pr.note { tag(note, color: .green) }
+                    if let note = pr.note { tag(note, color: pr.isBranch ? .secondary : .green) }
                     if pr.status == .closed { tag("Closed", color: .red) }
                     if let q = pr.mergeQueue {
                         tag(q.isBlocked ? "Queue: blocked" : "Queue #\(q.position)", color: q.isBlocked ? .red : .blue)

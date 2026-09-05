@@ -32,7 +32,7 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         content.body = event.body
         content.userInfo = ["url": event.url.absoluteString]
         content.threadIdentifier = event.pr.id
-        let urgent = event.kind != .passed
+        let urgent = event.kind != .passed && event.kind != .branchMoved
         content.sound = urgent ? .default : nil
         content.interruptionLevel = urgent ? .timeSensitive : .active
         let req = UNNotificationRequest(identifier: event.key, content: content, trigger: nil)

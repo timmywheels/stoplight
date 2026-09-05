@@ -346,6 +346,16 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - [ ] Branch rows count toward the dots and widget and notify like open PRs (red → "failed", pending → green → "passed")
 - [ ] Right-click → Stop following; no Fix, Follow-author, or Hide-PR on branch rows
 
+### US-030: Branch patterns
+**Description:** As a user on a release-branch workflow (rc/090526-1, rc/090526-2, …), I want to follow "the current RC" without renaming anything.
+
+**Acceptance Criteria:**
+- [ ] A followed branch may contain `*` (e.g. `owner/repo@rc/*`); each poll lists branches under the prefix ordered by newest commit and picks the first glob match
+- [ ] The Branches row shows the resolved name with the pattern as a tag
+- [ ] For each resolved pattern, a "→ rc/090526-2" section lists open PRs targeting it (`repo:X base:Y`)
+- [ ] When the resolved branch changes, a quiet notification: "New release branch in owner/repo: Now following rc/090626-1 (was rc/090526-2)"
+- [ ] Merged PRs into the RC get the same "green now" treatment via their base branch
+
 ## Functional Requirements
 
 - FR-1: The app runs as a menu bar accessory only (`LSUIElement = true`), no Dock icon, no main window

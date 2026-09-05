@@ -165,9 +165,9 @@ private struct SourcesTab: View {
                             normalize: { UserPrefs.normalize($0, kind: .repos, hideList: false) }, onChange: model.sourcesChanged)
                 TableEditor(title: "Orgs", items: $prefs.sources.followOrgs, placeholder: "org",
                             normalize: { UserPrefs.normalize($0, kind: .orgs, hideList: false) }, onChange: model.sourcesChanged)
-                TableEditor(title: "Branches", items: $prefs.sources.followBranches, placeholder: "owner/repo@main",
+                TableEditor(title: "Branches", items: $prefs.sources.followBranches, placeholder: "owner/repo@main  or  owner/repo@rc/*",
                             normalize: { UserPrefs.normalize($0, kind: .branches, hideList: false) }, onChange: model.sourcesChanged)
-                Text("Every open PR from a followed user, repo, or org gets its own section. A followed branch shows the latest CI verdict on that branch (e.g. is main green?) and notifies when it goes red.")
+                Text("Every open PR from a followed user, repo, or org gets its own section. A followed branch shows the latest CI verdict on that branch (is main green?) and notifies when it goes red. A pattern like rc/* follows whichever matching branch has the newest commit, adds a section of PRs targeting it, and tells you when a new one is cut.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Hide") {
