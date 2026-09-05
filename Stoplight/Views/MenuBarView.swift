@@ -127,7 +127,7 @@ struct MenuBarView: View {
     }
 
     private var footer: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 4) {
             // US-018: status filters. Click a dot to show only that state; click again to clear. Multi-select.
             if case .signedIn = model.auth, !model.isEmpty {
                 HStack(spacing: 8) {
@@ -161,10 +161,10 @@ struct MenuBarView: View {
             Button {
                 showWatchField.toggle()
                 if showWatchField { watchFieldFocused = true }
-            } label: { Image(systemName: showWatchField ? "minus" : "plus") }
+            } label: { Image(systemName: showWatchField ? "minus" : "plus").frame(width: 22, height: 22) }
                 .keyboardShortcut("n").help("Watch a PR by URL (⌘N)")
                 .disabled(model.auth == .signedOut || model.auth == .unknown)
-            Button { Task { await model.refresh() } } label: { Image(systemName: "arrow.clockwise") }
+            Button { Task { await model.refresh() } } label: { Image(systemName: "arrow.clockwise").frame(width: 22, height: 22) }
                 .keyboardShortcut("r").help("Refresh (⌘R)")
                 .disabled(model.isRefreshing)
             Button { showSettings() } label: { Image(systemName: "gearshape") }
@@ -175,7 +175,7 @@ struct MenuBarView: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.secondary)
-        .padding(.leading, 12).padding(.trailing, 12).padding(.top, 8).padding(.bottom, 6)
+        .padding(.leading, 12).padding(.trailing, 6).padding(.top, 4).padding(.bottom, 4)
     }
 }
 
