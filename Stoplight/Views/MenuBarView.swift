@@ -411,7 +411,7 @@ struct PRRow: View {
                 }
                 if pr.state == .failure && model.canFix(pr) {
                     // US-025: worktree + terminal + your agent, prompt prefilled with the failure.
-                    circle("wrench.and.screwdriver", help: "Fix with \(model.agentTitle): worktree, terminal, agent", tint: .orange) {
+                    circle("terminal", help: "Fix with \(model.agentTitle): worktree, terminal, agent") {
                         model.fix(pr, runAgent: true)
                     }
                 }

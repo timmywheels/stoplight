@@ -31,8 +31,7 @@ struct TourView: View {
               })),
         Slide(title: "Fix CI without leaving your chair",
               body: "Pick your coding agent in Settings → Agent. Then on any red PR, one click checks out the branch in a fresh worktree, opens your terminal, and hands the failure to the agent.",
-              art: AnyView(Image(systemName: "wrench.and.screwdriver").font(.system(size: 30, weight: .medium)).foregroundStyle(.orange)
-                  .frame(width: 48, height: 48).background(.quaternary, in: Circle()))),
+              art: AnyView(Image(systemName: "terminal").font(.system(size: 34)).foregroundStyle(.secondary))),
         Slide(title: "Make it yours",
               body: "Right-click to nickname a PR, hide the ones that just sit there, or copy a whole stack as Markdown to share. Collapse sections, drag them into your order.",
               art: AnyView(Image(systemName: "contextualmenu.and.cursorarrow").font(.system(size: 34)).foregroundStyle(.secondary))),
@@ -52,8 +51,8 @@ struct TourView: View {
             }
             .id(index)
             .transition(.opacity)
-            .padding(.horizontal, 28)
-            .frame(maxWidth: 360)
+            .padding(.horizontal, 36)
+            .frame(maxWidth: .infinity)
             Spacer()
             HStack {
                 Button("Skip", action: done).buttonStyle(.plain).foregroundStyle(.secondary)
