@@ -262,8 +262,6 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Acceptance Criteria:**
 - [ ] Single click on a row expands it; one row is expanded at a time (accordion); clicking again collapses
 - [ ] Double-click or ⌘-click opens the PR directly
-- [ ] Settings → Popover → "Clicking a PR": Expands it (default) or Opens it; the other action moves to double-click / ⌘-click
-- [ ] In Opens-it mode, hovering a row shows a floating toolbar: Copy URL, Share, and a chevron that expands the row
 - [ ] Expansion shows, top to bottom: real title (if nicknamed), description (2 lines), failing checks as links, then four 32pt circular buttons: Open, Copy URL, Share, Pin
 - [ ] Copy and Share flash a checkmark for one second
 - [ ] Motion: a single 200ms snappy curve with no bounce; content fades and slides 8pt from under the header; nothing but row height moves
@@ -274,7 +272,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Description:** As a user, I want to see what I shipped recently, and when checks run on the merge commit (CD on main), whether the deploy is green.
 
 **Acceptance Criteria:**
-- [ ] One extra aliased search per poll: `is:pr is:merged author:@me merged:>=<day>`; window is Off / 24h / 7d in Settings → Popover, default 24h
+- [ ] One extra aliased search per poll: `is:pr is:merged author:@me merged:>=<day>`; window is Off / 24h / 7d in Settings → General → Merged, default 24h
 - [ ] "Merged" section at the bottom, collapsed by default; rows sorted red first then newest merge
 - [ ] A merged PR's `checks` are the merge commit's checks, not the branch's
 - [ ] Rows with no merge-commit checks show a purple checkmark instead of a dot and never count toward the dots, widget, or notifications

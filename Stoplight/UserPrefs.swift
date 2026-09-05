@@ -84,16 +84,11 @@ final class UserPrefs {
         static let showCount = Prefs.showCount
         static let housing = Prefs.housing
         static let collapsed = "collapsedSections"
-        static let rowClick = "rowClick"
         static let mergedDays = "mergedDays"
         static let sectionOrder = "sectionOrder"
         static let tourSeen = "tourSeen"
     }
 
-    enum RowClick: String, CaseIterable, Identifiable {
-        case expand, open
-        var id: String { rawValue }
-    }
 
     var sources: Sources { didSet { persistJSON(Key.sources, sources) } }
     var watched: [PRRef] { didSet { persist(Key.watched, watched.map(\.key)) } }
@@ -102,8 +97,6 @@ final class UserPrefs {
     // Menu bar look. Local only, not synced.
     var showCount: Bool { didSet { defaults.set(showCount, forKey: Key.showCount) } }
     var housing: Bool { didSet { defaults.set(housing, forKey: Key.housing) } }
-    /// What a single click on a row does (US-021). Local only.
-    var rowClick: RowClick { didSet { defaults.set(rowClick.rawValue, forKey: Key.rowClick) } }
     /// Recently-merged window in days (US-022). 0 = off. Local only.
     var mergedDays: Int { didSet { defaults.set(mergedDays, forKey: Key.mergedDays) } }
     /// First-run tour dismissed (US-024). Local only.
@@ -145,7 +138,6 @@ final class UserPrefs {
         mergedDays = defaults.object(forKey: Key.mergedDays) == nil ? 1 : defaults.integer(forKey: Key.mergedDays)
         sectionOrder = defaults.stringArray(forKey: Key.sectionOrder) ?? []
         tourSeen = defaults.bool(forKey: Key.tourSeen)
-        rowClick = RowClick(rawValue: defaults.string(forKey: Key.rowClick) ?? "") ?? .expand
 
         if let cloud {
             observer = NotificationCenter.default.addObserver(
