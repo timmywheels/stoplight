@@ -105,6 +105,11 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
         hk.target = self
         menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",").target = self
         menu.addItem(.separator())
+        let pin = menu.addItem(withTitle: "Pin Panel Open", action: #selector(togglePin), keyEquivalent: "")
+        pin.target = self
+        pin.state = model.pinnedPanel ? .on : .off
+        menu.addItem(withTitle: "Reset Panel Position and Size", action: #selector(resetPanel), keyEquivalent: "").target = self
+        menu.addItem(.separator())
         let login = menu.addItem(withTitle: "Open at Login", action: #selector(toggleLogin), keyEquivalent: "")
         login.target = self
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
@@ -118,6 +123,23 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
 
     @objc private func showTour() {
         model.prefs.tourSeen = false
+        open()
+    }
+
+    @objc private func togglePin() {
+        model.pinnedPanel.toggle()
+        if model.pinnedPanel { open() }
+    }
+
+    /// Back under the dots at the default size, unpinned.
+    @objc private func resetPanel() {
+        model.pinnedPanel = false
+        userMoved = false
+        UserDefaults.standard.removeObject(forKey: Self.sizeKey)
+        if let panel {
+            panel.setContentSize(Self.defaultSize)
+            position(panel)
+        }
         open()
     }
 
