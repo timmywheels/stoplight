@@ -175,7 +175,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Acceptance Criteria:**
 - [ ] Settings → Sources → Follow has a list for each of Users, Repos, Orgs, same editor
 - [ ] Each followed item adds one aliased `search` to the single poll request: `author:USER`, `repo:OWNER/NAME`, or `org:ORG` (50 PRs cap each)
-- [ ] Popover sections, in order: Pinned, Mine, Watching, then one section per followed item titled with the user's GitHub display name (fallback `@username`), `owner/repo`, or `org`. A PR appears once, in the first section that claims it
+- [ ] Popover sections, in order: Pinned, My PRs, Watching, then one section per followed item titled with the user's GitHub display name (fallback `@username`), `owner/repo`, or `org`. A PR appears once, in the first section that claims it
 - [ ] Display names come from one `user(login:) { name }` request, fetched only when the followed-user set changes
 - [ ] Settings → Follow → Users has a per-row Label field; a label overrides the GitHub name in the section header. Placeholder shows the GitHub name
 - [ ] Followed PRs count toward the dots and fire notifications like your own
@@ -294,7 +294,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 
 ## Design Considerations
 
-- Popover sections, top to bottom: Pinned, Mine, Watching, then followed sources. Headers are 11pt small-caps secondary text, only render when the section has rows, and are omitted entirely when Mine is the only section
+- Popover sections, top to bottom: Pinned, My PRs, Watching, then followed sources. Headers are 11pt small-caps secondary text, only render when the section has rows, and are omitted entirely when My PRs is the only section
 - Naming: "Pin" not "Favorite". macOS uses Pin for Notes, Messages, and Safari tabs; Favorites is a Finder sidebar term
 - Not "Traffic Light": on macOS that already means the window close/minimize/zoom buttons
 - Not "Traffic Light": on macOS that already means the window close/minimize/zoom buttons

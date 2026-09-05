@@ -55,8 +55,8 @@ struct MenuBarView: View {
 
     private var list: some View {
         let sections = model.sections
-        // With only "Mine" there's nothing to distinguish, so no header at all (looks like v1).
-        let showHeaders = !(sections.count == 1 && sections[0].title == "Mine")
+        // With only "My PRs" there's nothing to distinguish, so no header at all (looks like v1).
+        let showHeaders = !(sections.count == 1 && sections[0].id == "Mine")
         return VStack(spacing: 0) {
             ForEach(sections) { s in
                 section(s, showHeader: showHeaders)

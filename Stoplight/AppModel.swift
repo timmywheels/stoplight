@@ -43,7 +43,7 @@ final class AppModel {
     // MARK: Derived lists (US-010, US-012, US-013)
 
     struct Section: Identifiable {
-        /// Stable key for collapse state: "Pinned", "Mine", "Watching", or the query title ("@login", "owner/repo", "org").
+        /// Stable key for collapse state: "Pinned", "Mine" (shown as "My PRs"), "Watching", or the query title ("@login", "owner/repo", "org").
         let id: String
         let title: String
         let prs: [PullRequest]
@@ -105,7 +105,7 @@ final class AppModel {
         }
         var out: [Section] = []
         out.append(Section(id: "Pinned", title: "Pinned", prs: take(all, pinnedOnly: true)))
-        out.append(Section(id: "Mine", title: "Mine", prs: take(mine)))
+        out.append(Section(id: "Mine", title: "My PRs", prs: take(mine)))
         out.append(Section(id: "Watching", title: "Watching", prs: take(watched)))
         for f in followed {
             var title = f.query.title
