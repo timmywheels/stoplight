@@ -1,4 +1,5 @@
 import AppKit
+import ServiceManagement
 import SwiftUI
 import StoplightCore
 
@@ -25,11 +26,54 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
         super.init()
         if let button = statusItem.button {
             button.target = self
-            button.action = #selector(toggle)
-            button.sendAction(on: [.leftMouseUp])
+            button.action = #selector(clicked)
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
         observeGlyph()
     }
+
+    /// Left click toggles the panel; right click shows a small utility menu.
+    @objc private func clicked() {
+        if NSApp.currentEvent?.type == .rightMouseUp { showMenu() } else { toggle() }
+    }
+
+    private func showMenu() {
+        close()
+        let menu = NSMenu()
+        menu.addItem(withTitle: "Show Tour", action: #selector(showTour), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",").target = self
+        menu.addItem(.separator())
+        let login = menu.addItem(withTitle: "Open at Login", action: #selector(toggleLogin), keyEquivalent: "")
+        login.target = self
+        login.state = SMAppService.mainApp.status == .enabled ? .on : .off
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Quit Stoplight", action: #selector(quit), keyEquivalent: "q").target = self
+        // Attach just long enough to pop it up, so left click keeps toggling the panel.
+        statusItem.menu = menu
+        statusItem.button?.performClick(nil)
+        statusItem.menu = nil
+    }
+
+    @objc private func showTour() {
+        model.prefs.tourSeen = false
+        open()
+    }
+
+    @objc private func openSettings() {
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        NSApp.activate()
+    }
+
+    @objc private func toggleLogin() {
+        do {
+            if SMAppService.mainApp.status == .enabled { try SMAppService.mainApp.unregister() }
+            else { try SMAppService.mainApp.register() }
+        } catch {
+            NSSound.beep()
+        }
+    }
+
+    @objc private func quit() { NSApp.terminate(nil) }
 
     // MARK: Glyph
 

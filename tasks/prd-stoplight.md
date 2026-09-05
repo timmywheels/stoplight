@@ -74,6 +74,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Acceptance Criteria:**
 - [ ] Panel opens under the dots, right edges aligned, default 380×520, resizable by dragging any edge or corner (min 320×240), size remembered across launches; list scrolls to fill
 - [ ] Panel closes on click outside, Escape, or clicking the dots again
+- [ ] Right-click on the dots: Show Tour, Settings…, Open at Login (checkmark), Quit Stoplight
 - [ ] Each row: 8pt status dot, `owner/repo #123` in secondary color, title on one line truncated with ellipsis, relative time ("4m ago") right-aligned
 - [ ] Rows sorted: `failure` first, then `pending`, then `success`, then `none`; within a group, most recently updated first
 - [ ] Draft PRs show a "Draft" tag and a hollow dot
