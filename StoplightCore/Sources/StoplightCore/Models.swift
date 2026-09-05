@@ -214,6 +214,8 @@ public enum PRQuery: Hashable, Sendable {
     case org(String)
     /// My PRs merged on or after this day (US-022). Day granularity keeps the query string stable across polls.
     case mergedSince(String)
+    /// Open PRs targeting a branch (US-030): the release's inbound queue.
+    case base(repo: String, branch: String)
 
     public var githubSearch: String {
         let base = "is:pr is:open archived:false"
@@ -223,6 +225,7 @@ public enum PRQuery: Hashable, Sendable {
         case .repo(let r): return "\(base) repo:\(r)"
         case .org(let o): return "\(base) org:\(o)"
         case .mergedSince(let day): return "is:pr is:merged author:@me merged:>=\(day) sort:updated-desc"
+        case .base(let r, let b): return "\(base) repo:\(r) base:\(b)"
         }
     }
 
@@ -234,6 +237,7 @@ public enum PRQuery: Hashable, Sendable {
         case .repo(let r): r
         case .org(let o): o
         case .mergedSince: "Merged"
+        case .base(_, let b): "→ \(b)"
         }
     }
 
@@ -255,6 +259,8 @@ public protocol CIProvider: Sendable {
     func fetchDisplayNames(logins: [String]) async throws -> [String: String]
     /// US-028/029. Latest commit with checks on each branch (falls back to the head), keyed by `BranchRef.key`.
     func fetchBranchStatuses(_ refs: [BranchRef]) async throws -> [String: BranchStatus]
+    /// US-030. For each pattern, the matching branch with the newest commit, keyed by the pattern's `key`. Unmatched patterns are omitted.
+    func resolveBranchPatterns(_ patterns: [BranchRef]) async throws -> [String: String]
 }
 
 public struct BranchRef: Hashable, Sendable {
@@ -263,13 +269,33 @@ public struct BranchRef: Hashable, Sendable {
     public init(repo: String, branch: String) { self.repo = repo; self.branch = branch }
     public var key: String { "\(repo.lowercased())#\(branch)" }
 
-    /// "owner/repo@branch"
+    /// "owner/repo@branch" or a pattern like "owner/repo@rc/*" (US-030).
     public init?(spec: String) {
         let parts = spec.split(separator: "@", maxSplits: 1).map(String.init)
-        guard parts.count == 2, Filters.isValidRepo(parts[0]), Filters.isValidBranch(parts[1]) else { return nil }
+        guard parts.count == 2, Filters.isValidRepo(parts[0]), Filters.isValidBranchPattern(parts[1]) else { return nil }
         self.init(repo: parts[0], branch: parts[1])
     }
     public var spec: String { "\(repo)@\(branch)" }
+
+    /// Contains a `*`: resolves to the newest matching branch each poll.
+    public var isPattern: Bool { branch.contains("*") }
+    /// Text before the first `*`, used as the server-side prefix filter.
+    public var patternPrefix: String { String(branch.prefix(while: { $0 != "*" })) }
+    /// Glob match with `*` matching anything (including slashes).
+    public func matches(_ name: String) -> Bool {
+        guard isPattern else { return name == branch }
+        let parts = branch.split(separator: "*", omittingEmptySubsequences: false).map(String.init)
+        var rest = Substring(name)
+        for (i, part) in parts.enumerated() {
+            if part.isEmpty { continue }
+            guard let r = rest.range(of: part) else { return false }
+            if i == 0 && r.lowerBound != rest.startIndex { return false }
+            rest = rest[r.upperBound...]
+        }
+        if let last = parts.last, !last.isEmpty, !name.hasSuffix(last) { return false }
+        return true
+    }
+    public func resolved(to name: String) -> BranchRef { BranchRef(repo: repo, branch: name) }
 }
 
 /// The latest CI verdict on a branch (US-029): the newest commit that actually ran checks.
@@ -336,6 +362,11 @@ public enum Filters {
 
     public static func isValidBranch(_ s: String) -> Bool {
         s.range(of: "^[A-Za-z0-9._/-]{1,200}$", options: .regularExpression) != nil && !s.contains("..")
+    }
+
+    /// A branch name that may also contain `*` wildcards.
+    public static func isValidBranchPattern(_ s: String) -> Bool {
+        s.range(of: "^[A-Za-z0-9._/*-]{1,200}$", options: .regularExpression) != nil && !s.contains("..")
     }
 
     /// "owner/name"

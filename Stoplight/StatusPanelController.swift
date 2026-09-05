@@ -263,8 +263,13 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
     }
 
     func windowDidResignKey(_ notification: Notification) {
-        // Clicking another app's window: behave like a menu and go away, unless pinned.
-        if !model.pinnedPanel && (NSApp.keyWindow == nil || NSApp.keyWindow !== panel) { close() }
+        // Starting a background drag momentarily drops key status; don't treat that as "clicked away".
+        // Re-check shortly after: still not key and not pinned means the user really went elsewhere.
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard let self, let panel = self.panel, panel.isVisible, !self.model.pinnedPanel else { return }
+            if !panel.isKeyWindow && !panel.inLiveResize && NSEvent.pressedMouseButtons == 0 { self.close() }
+        }
     }
 
     /// Esc on a pinned panel unpins and closes.

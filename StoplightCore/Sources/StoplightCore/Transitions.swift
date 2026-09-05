@@ -8,16 +8,20 @@ public enum NotificationMode: String, Codable, Sendable {
 
 /// Something worth telling the user about (US-006).
 public struct CIEvent: Equatable, Sendable, Identifiable {
-    public enum Kind: String, Sendable { case failed, passed, dequeued, deployFailed, deployed }
+    public enum Kind: String, Sendable { case failed, passed, dequeued, deployFailed, deployed, branchMoved }
 
     public let pr: PullRequest
     public let kind: Kind
+    /// Extra context for kinds that need it (branchMoved: the previous branch name).
+    public let detail: String?
+
+    public init(pr: PullRequest, kind: Kind, detail: String? = nil) { self.pr = pr; self.kind = kind; self.detail = detail }
 
     /// One notification per (PR, head commit, kind). A new push changes the sha and resets this.
     public var key: String { "\(pr.id)|\(pr.headSha)|\(kind.rawValue)" }
     public var id: String { key }
 
-    public var title: String { pr.shortRef }
+    public var title: String { kind == .branchMoved ? "New release branch in \(pr.repo)" : pr.shortRef }
     public var body: String {
         switch kind {
         case .failed:
@@ -32,6 +36,8 @@ public struct CIEvent: Equatable, Sendable, Identifiable {
             return "\(pr.title)\nChecks failed after merge"
         case .deployed:
             return "\(pr.title)\nMerged and green"
+        case .branchMoved:
+            return "Now following \(pr.headRefName)" + (detail.map { " (was \($0))" } ?? "")
         }
     }
     public var url: URL { pr.url }

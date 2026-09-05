@@ -100,6 +100,29 @@ public struct GitHubProvider: CIProvider {
         return out
     }
 
+    public func resolveBranchPatterns(_ patterns: [BranchRef]) async throws -> [String: String] {
+        let pats = patterns.filter(\.isPattern)
+        guard !pats.isEmpty else { return [:] }
+        let fields = pats.enumerated().compactMap { i, r -> String? in
+            let parts = r.repo.split(separator: "/", maxSplits: 1).map(String.init)
+            guard parts.count == 2, Filters.isValidRepo(r.repo) else { return nil }
+            // Newest commit first; the prefix narrows server-side, the glob finishes the job client-side.
+            return "p\(i): repository(owner: \"\(parts[0])\", name: \"\(parts[1])\") { refs(refPrefix: \"refs/heads/\", query: \"\(r.patternPrefix)\", first: 100, orderBy: {field: TAG_COMMIT_DATE, direction: DESC}) { nodes { name } } }"
+        }
+        let data = try await post(["query": "query {\n" + fields.joined(separator: "\n") + "\n}"])
+        struct N: Decodable { let name: String }
+        struct Refs: Decodable { let nodes: [N] }
+        struct Repo: Decodable { let refs: Refs? }
+        struct Env: Decodable { let data: [String: Repo?]? }
+        let repos = try JSONDecoder().decode(Env.self, from: data).data ?? [:]
+        var out: [String: String] = [:]
+        for (i, r) in pats.enumerated() {
+            guard let names = repos["p\(i)"]??.refs?.nodes.map(\.name), let hit = names.first(where: r.matches) else { continue }
+            out[r.key] = hit
+        }
+        return out
+    }
+
     /// Validate the token and return the login (US-001).
     public func viewerLogin() async throws -> String {
         let data = try await post(["query": "{ viewer { login } }"])
