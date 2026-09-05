@@ -290,6 +290,14 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - [ ] Snapshot carries the popover's sections (id, title, PR ids) in order; medium (4 rows) and large (12 rows) widgets render them with the same headers, dots, purple merged checkmark, and pins
 - [ ] Small widget counts match the footer: merged rows without checks are excluded
 
+### US-024: Guided tour
+**Description:** As a new user, I want the non-obvious interactions shown to me once.
+
+**Acceptance Criteria:**
+- [ ] Four slides inside the panel, shown the first time it has data: the dots; click to expand / double-click to open; right-click, collapse, drag; Sources and the widget
+- [ ] Next / Done (Return) and Skip (Escape); page dots; 200ms fades
+- [ ] Marked seen in UserDefaults; Settings → General → "Show Again" replays it
+
 ## Functional Requirements
 
 - FR-1: The app runs as a menu bar accessory only (`LSUIElement = true`), no Dock icon, no main window

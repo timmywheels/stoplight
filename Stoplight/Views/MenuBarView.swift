@@ -9,10 +9,22 @@ struct MenuBarView: View {
     @State private var showWatchField = false
     @FocusState private var watchFieldFocused: Bool
 
+    /// Tour shows once the panel has something real to point at.
+    private var showTour: Bool {
+        if case .signedIn = model.auth, !model.prefs.tourSeen, model.lastRefresh != nil { return true }
+        return false
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            content
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ZStack {
+                content
+                if showTour {
+                    TourView { withAnimation(.snappy(duration: 0.2, extraBounce: 0)) { model.prefs.tourSeen = true } }
+                        .transition(.opacity)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             if showWatchField {
                 Divider()
                 WatchField(model: model, isPresented: $showWatchField, focused: $watchFieldFocused)

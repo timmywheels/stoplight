@@ -70,6 +70,13 @@ private struct GeneralTab: View {
                         }
                     }
             }
+            Section {
+                HStack {
+                    Text("Guided tour").foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Show Again") { model.prefs.tourSeen = false }
+                }
+            }
             Section("Legend") {
                 LegendRow("Failing. At least one check failed.") { StatusDot(state: .failure) }
                 LegendRow("Running. Checks still in progress.") { StatusDot(state: .pending) }

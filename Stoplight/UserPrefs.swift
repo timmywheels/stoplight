@@ -87,6 +87,7 @@ final class UserPrefs {
         static let rowClick = "rowClick"
         static let mergedDays = "mergedDays"
         static let sectionOrder = "sectionOrder"
+        static let tourSeen = "tourSeen"
     }
 
     enum RowClick: String, CaseIterable, Identifiable {
@@ -105,6 +106,8 @@ final class UserPrefs {
     var rowClick: RowClick { didSet { defaults.set(rowClick.rawValue, forKey: Key.rowClick) } }
     /// Recently-merged window in days (US-022). 0 = off. Local only.
     var mergedDays: Int { didSet { defaults.set(mergedDays, forKey: Key.mergedDays) } }
+    /// First-run tour dismissed (US-024). Local only.
+    var tourSeen: Bool { didSet { defaults.set(tourSeen, forKey: Key.tourSeen) } }
     /// Section ids in the user's drag order (US-023). Ids not listed keep their default relative order after these.
     var sectionOrder: [String] { didSet { defaults.set(sectionOrder, forKey: Key.sectionOrder) } }
     /// Popover section titles the user has collapsed. Local only.
@@ -141,6 +144,7 @@ final class UserPrefs {
         collapsedSections = Set(defaults.stringArray(forKey: Key.collapsed) ?? ["Merged"])
         mergedDays = defaults.object(forKey: Key.mergedDays) == nil ? 1 : defaults.integer(forKey: Key.mergedDays)
         sectionOrder = defaults.stringArray(forKey: Key.sectionOrder) ?? []
+        tourSeen = defaults.bool(forKey: Key.tourSeen)
         rowClick = RowClick(rawValue: defaults.string(forKey: Key.rowClick) ?? "") ?? .expand
 
         if let cloud {
