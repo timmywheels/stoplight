@@ -386,14 +386,15 @@ struct PRRow: View {
 
     private func toggleExpand() { withAnimation(Self.motion) { model.toggleExpanded(pr.id) } }
 
-    /// "All 16 checks · 3 failed" / "All 4 checks · 2 running" / "All 12 checks passed"
+    /// "3 of 16 checks failed" / "2 of 4 checks running" / "12 checks passed" / "1 check passed"
     private var checksSummary: String {
         let n = pr.checks.count
         let failed = pr.failingChecks.count
         let pending = pr.checks.filter { $0.state == .pending }.count
-        if failed > 0 { return "All \(n) checks · \(failed) failed" }
-        if pending > 0 { return "All \(n) checks · \(pending) running" }
-        return "All \(n) checks passed"
+        let noun = n == 1 ? "check" : "checks"
+        if failed > 0 { return "\(failed) of \(n) \(noun) failed" }
+        if pending > 0 { return "\(pending) of \(n) \(noun) running" }
+        return "\(n) \(noun) passed"
     }
 
     // MARK: Expansion (US-021)
