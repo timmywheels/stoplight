@@ -1,7 +1,10 @@
 import AppKit
+import OSLog
 import ServiceManagement
 import SwiftUI
 import StoplightCore
+
+private let log = Logger(subsystem: "com.timwheeler.stoplight", category: "Panel")
 
 /// Owns the status item and the drop-down panel (US-004/005).
 ///
@@ -79,8 +82,13 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
     }
 
     private func installClickOutside() {
-        clickOutsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            Task { @MainActor in self?.close() }
+        clickOutsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            Task { @MainActor in
+                guard let self, let panel = self.panel else { return }
+                // A press inside our own frame is never "outside", whatever delivered it.
+                if panel.frame.contains(NSEvent.mouseLocation) { return }
+                self.close(reason: "click outside (global monitor, window \(event.windowNumber))")
+            }
         }
     }
 
@@ -90,7 +98,7 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
     }
 
     private func showMenu() {
-        close()
+        close(reason: "right-click menu")
         let menu = NSMenu()
         menu.addItem(withTitle: "Show Tour", action: #selector(showTour), keyEquivalent: "").target = self
         let hk = menu.addItem(withTitle: "Keyboard Shortcuts", action: #selector(showHotkeys), keyEquivalent: "/")
@@ -150,7 +158,7 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
     // MARK: Panel
 
     @objc private func toggle() {
-        if let panel, panel.isVisible { close() } else { open() }
+        if let panel, panel.isVisible { close(reason: "status item click") } else { open() }
     }
 
     func open() {
@@ -171,8 +179,9 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
         }
     }
 
-    func close() {
-        if model.pinnedPanel { return }  // pinned panels only close via the pin button or Esc twice
+    func close(reason: String = "unspecified") {
+        if model.pinnedPanel { return }  // pinned panels only close via the pin button or Esc
+        log.notice("close: \(reason, privacy: .public)")
         panel?.orderOut(nil)
         statusItem.button?.highlight(false)
         userMoved = false
@@ -260,6 +269,7 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
     func windowDidMove(_ notification: Notification) {
         guard !fitting, let panel, panel.isVisible else { return }
         userMoved = true
+        log.notice("moved to \(NSStringFromRect(panel.frame), privacy: .public)")
     }
 
     func windowDidResignKey(_ notification: Notification) {
@@ -268,14 +278,14 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(250))
             guard let self, let panel = self.panel, panel.isVisible, !self.model.pinnedPanel else { return }
-            if !panel.isKeyWindow && !panel.inLiveResize && NSEvent.pressedMouseButtons == 0 { self.close() }
+            if !panel.isKeyWindow && !panel.inLiveResize && NSEvent.pressedMouseButtons == 0 { self.close(reason: "resigned key") }
         }
     }
 
     /// Esc on a pinned panel unpins and closes.
     func forceClose() {
         model.pinnedPanel = false
-        close()
+        close(reason: "escape / forced")
     }
 }
 
