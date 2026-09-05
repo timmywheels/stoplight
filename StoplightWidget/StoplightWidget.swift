@@ -122,6 +122,14 @@ struct ListView: View {
     let snapshot: Snapshot
     let maxRows: Int
 
+    /// "#439" when every row in the section is from one repo; "servicepro #439" when repos differ.
+    private func refLabel(_ row: (section: Snapshot.Section, pr: PullRequest), in rows: [(section: Snapshot.Section, pr: PullRequest)]) -> String {
+        let repos = Set(rows.filter { $0.section.id == row.section.id }.map { $0.pr.repo.lowercased() })
+        if repos.count <= 1 { return "#\(row.pr.number)" }
+        let name = row.pr.repo.split(separator: "/").last.map(String.init) ?? row.pr.repo
+        return "\(name) #\(row.pr.number)"
+    }
+
     var body: some View {
         let rows = Array(snapshot.orderedRows.prefix(maxRows))
         let showHeaders = Set(rows.map(\.section.id)).count > 1 || rows.first?.section.title != "Mine"
@@ -141,7 +149,7 @@ struct ListView: View {
                         if snapshot.pinnedIDs.contains(row.pr.id) {
                             Image(systemName: "pin.fill").font(.caption2).foregroundStyle(.secondary)
                         }
-                        Text(row.pr.shortRef).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        Text(refLabel(row, in: rows)).font(.caption).foregroundStyle(.secondary).lineLimit(1).fixedSize()
                         Text(row.pr.title).font(.caption).lineLimit(1)
                         Spacer(minLength: 0)
                     }

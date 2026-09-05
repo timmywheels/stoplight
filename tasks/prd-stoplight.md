@@ -105,7 +105,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - [ ] Main app writes `prs.json` (list of PRs with state, no token) to the App Group container after every fetch, then calls `WidgetCenter.shared.reloadAllTimelines()`
 - [ ] Widget reads `prs.json` only; it never makes network calls
 - [ ] **Small widget:** three stacked counts with colored dots: red count, yellow count, green count. Tapping opens the app's popover
-- [ ] **Medium widget:** up to 4 PR rows mirroring the popover (sections, order, dot, repo #num, title). **Large:** 12 rows. Tapping a row deep-links to that PR URL
+- [ ] **Medium widget:** up to 4 PR rows mirroring the popover (sections, order, dot, `#num` (repo name added only when a section spans repos), title). **Large:** 12 rows. Tapping a row deep-links to that PR URL
 - [ ] Both sizes show "Open Stoplight to sign in" when `prs.json` is absent
 - [ ] Small widget shows the stoplight silhouette in the aggregate color above the three counts
 - [ ] Both sizes show data age in the corner if older than 5 minutes
