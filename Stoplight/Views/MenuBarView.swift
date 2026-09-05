@@ -386,6 +386,16 @@ struct PRRow: View {
 
     private func toggleExpand() { withAnimation(Self.motion) { model.toggleExpanded(pr.id) } }
 
+    /// "All 16 checks · 3 failed" / "All 4 checks · 2 running" / "All 12 checks passed"
+    private var checksSummary: String {
+        let n = pr.checks.count
+        let failed = pr.failingChecks.count
+        let pending = pr.checks.filter { $0.state == .pending }.count
+        if failed > 0 { return "All \(n) checks · \(failed) failed" }
+        if pending > 0 { return "All \(n) checks · \(pending) running" }
+        return "All \(n) checks passed"
+    }
+
     // MARK: Expansion (US-021)
 
     private var expansion: some View {
@@ -396,7 +406,7 @@ struct PRRow: View {
             if !pr.summary.isEmpty {
                 Text(pr.summary).font(.caption).foregroundStyle(.secondary).lineLimit(2).textSelection(.enabled)
             }
-            if !pr.failingChecks.isEmpty {
+            if !pr.checks.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(pr.failingChecks) { check in
                         Button { if let u = check.url { openURL(u) } } label: {
@@ -407,6 +417,15 @@ struct PRRow: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    // Every job, every workflow: GitHub's checks tab for the PR.
+                    Button { openURL(pr.checksURL) } label: {
+                        HStack(spacing: 4) {
+                            Text(checksSummary).font(.caption).foregroundStyle(.secondary)
+                            Image(systemName: "arrow.up.right").font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .help("Open the full checks summary on GitHub (⌘K)")
                 }
             }
             HStack(spacing: 10) {
@@ -495,6 +514,7 @@ struct PRRow: View {
             Button("Follow @\(pr.author)") { model.follow(user: pr.author) }
         }
         Button("Hide this PR") { model.hide(pr: pr) }
+        if !pr.checks.isEmpty { Button("Open checks summary") { openURL(pr.checksURL) } }
         if pr.mergeQueue != nil, let q = URL(string: "https://github.com/\(pr.repo)/queue/\(pr.baseRefName)") {
             Button("Open merge queue") { openURL(q) }
         }

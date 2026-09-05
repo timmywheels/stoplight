@@ -6,7 +6,7 @@ import StoplightCore
 enum Hotkey: CaseIterable {
     case toggleGlobal
     case moveDown, moveUp, open, expand, collapse, close, nextButton, prevButton
-    case copyURL, share, copyBranch, pin, fix, hide
+    case copyURL, share, copyBranch, pin, fix, hide, checks
     case filterRed, filterYellow, filterGreen, clearFilters
     case toggleSections, refresh, watch, settings, showHotkeys
 
@@ -29,6 +29,7 @@ enum Hotkey: CaseIterable {
         case .pin: Combo(key: "p", symbol: "P", mods: [.command])
         case .fix: Combo(key: "f", symbol: "F", mods: [.command])
         case .hide: Combo(key: "h", symbol: "H", mods: [.command])
+        case .checks: Combo(key: "k", symbol: "K", mods: [.command])
         case .filterRed: Combo(key: "1", symbol: "1", mods: [.command])
         case .filterYellow: Combo(key: "2", symbol: "2", mods: [.command])
         case .filterGreen: Combo(key: "3", symbol: "3", mods: [.command])
@@ -58,6 +59,7 @@ enum Hotkey: CaseIterable {
         case .pin: "Pin or unpin"
         case .fix: "Fix with your agent"
         case .hide: "Hide this PR"
+        case .checks: "Open the full checks summary"
         case .filterRed: "Toggle red filter"
         case .filterYellow: "Toggle yellow filter"
         case .filterGreen: "Toggle green filter"
@@ -82,8 +84,8 @@ enum Hotkey: CaseIterable {
 
     static let groups: [(String, [Hotkey])] = [
         ("Anywhere", [.toggleGlobal]),
-        ("Navigate", [.moveDown, .moveUp, .open, .expand, .nextButton, .prevButton, .collapse, .close]),
-        ("Selected PR", [.copyURL, .share, .copyBranch, .pin, .fix, .hide]),
+        ("Navigate", [.moveDown, .moveUp, .expand, .nextButton, .prevButton, .collapse, .close]),
+        ("Selected PR", [.open, .checks, .copyURL, .share, .copyBranch, .pin, .fix, .hide]),
         ("Filter", [.filterRed, .filterYellow, .filterGreen, .clearFilters]),
         ("Panel", [.toggleSections, .refresh, .watch, .settings, .showHotkeys]),
     ]

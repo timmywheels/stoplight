@@ -169,6 +169,8 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
     public var state: CIState { Rollup.state(for: checks) }
     public var failingChecks: [CheckResult] { checks.filter { $0.state == .failure } }
     public var shortRef: String { "\(repo) #\(number)" }
+    /// GitHub's full checks summary for this PR (every job, every workflow).
+    public var checksURL: URL { url.appendingPathComponent("checks") }
     /// Base looks like a feature branch rather than a trunk.
     public var hasNonTrunkBase: Bool {
         !baseRefName.isEmpty && !["main", "master", "develop", "dev", "trunk", "release"].contains(baseRefName.lowercased())
