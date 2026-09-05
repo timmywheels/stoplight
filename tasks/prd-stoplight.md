@@ -328,14 +328,15 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - [ ] Footer pin toggles pinned mode: floating level, no close on click-outside or focus loss, position kept; Esc unpins and closes
 - [ ] Description in an expanded row is capped at 3 lines and never overlaps the buttons
 
-### US-028: Superseded merges
-**Description:** As a user, I don't want a merged PR to stay red after later merges fixed the base branch.
+### US-028: Merged rows show base branch health
+**Description:** As a user, I want a merged PR to tell me how the branch it landed on is doing now, not relitigate its own merge commit.
 
 **Acceptance Criteria:**
-- [ ] For every red merged PR, the poll also fetches the base branch's latest commit that ran checks (looks back 10 commits; one aliased request shared with followed branches)
-- [ ] If that commit is newer than the merge commit and green, the merged PR is shown with the purple "landed" checkmark and a green "main is green now" tag, and stops counting toward dots and notifications
-- [ ] If the head is red or still running, the merged PR stays red
-- [ ] Unit test: a superseded copy reports `.none`, keeps status merged, fires no transition
+- [ ] Every merged PR row shows the purple "landed" checkmark plus a branch badge (`⑂ main`) colored by the base branch's latest CI run
+- [ ] The base branch state comes from the newest commit that ran checks (10-commit lookback), fetched in the same request as followed branches
+- [ ] A merged PR counts toward the dots and notifications only while its own merge commit is red AND the base branch is still red
+- [ ] Merged section sorts unresolved merges first, then newest
+- [ ] Unit test covers the unresolved-merge rule
 
 ### US-029: Follow a branch
 **Description:** As a user, I want to know whether main is green right now, and be told when it isn't.

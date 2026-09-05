@@ -79,7 +79,7 @@ private struct GeneralTab: View {
                 LegendRow("Running. Checks still in progress.") { StatusDot(state: .pending) }
                 LegendRow("Passed. Every check green, skipped, or neutral.") { StatusDot(state: .success) }
                 LegendRow("No checks configured.") { StatusDot(state: .none) }
-                LegendRow("Merged, nothing ran on the merge commit. In the Merged section only.") { Image(systemName: "checkmark.circle.fill").font(.caption).foregroundStyle(.purple) }
+                LegendRow("Merged. The branch badge next to it is colored by the base branch's current CI state.") { Image(systemName: "checkmark.circle.fill").font(.caption).foregroundStyle(.purple) }
                 LegendRow("Hollow dot: draft. Drafts never light the menu bar or notify.") { StatusDot(state: .success, hollow: true) }
                 LegendRow("Stacked on the PR above it. Right-click to copy the whole stack.") { Image(systemName: "arrow.turn.down.right").font(.caption2).foregroundStyle(.tertiary) }
                 LegendRow("In the merge queue at that position. \"Queue: blocked\" means GitHub can't merge it.") { legendTag("Queue #2", .blue) }

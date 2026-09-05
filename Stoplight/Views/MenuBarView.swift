@@ -349,8 +349,8 @@ struct PRRow: View {
                     .font(.caption2).foregroundStyle(.tertiary)
                     .padding(.leading, CGFloat(depth - 1) * 14)
             }
-            if pr.status == .merged && pr.checks.isEmpty {
-                // Landed, nothing ran on the merge commit: just say it merged.
+            if pr.status == .merged {
+                // Landed. The branch badge says how the base branch is doing now.
                 Image(systemName: "checkmark.circle.fill").font(.caption).foregroundStyle(.purple).frame(width: 8)
             } else {
                 StatusDot(state: pr.state, hollow: pr.isDraft)
@@ -364,7 +364,18 @@ struct PRRow: View {
                     }
                     if pr.isDraft { tag("Draft") }
                     if pr.status == .merged && section?.id != "Merged" { tag("Merged", color: .purple) }
-                    if let note = pr.note { tag(note, color: pr.isBranch ? .secondary : .green) }
+                    if pr.status == .merged, let bs = pr.baseState {
+                        // Base branch health: red / yellow / green by its latest CI run.
+                        HStack(spacing: 3) {
+                            Image(systemName: "arrow.triangle.branch").font(.caption2)
+                            Text(pr.baseRefName).font(.caption2)
+                        }
+                        .foregroundStyle(stateColor(bs))
+                        .padding(.horizontal, 4).padding(.vertical, 1)
+                        .background(.quaternary, in: Capsule())
+                        .help("\(pr.baseRefName) is \(bs == .failure ? "red" : bs == .pending ? "running" : "green") right now")
+                    }
+                    if let note = pr.note { tag(note, color: .secondary) }
                     if pr.status == .closed { tag("Closed", color: .red) }
                     if let q = pr.mergeQueue {
                         tag(q.isBlocked ? "Queue: blocked" : "Queue #\(q.position)", color: q.isBlocked ? .red : .blue)
@@ -593,6 +604,15 @@ struct PRRow: View {
 
     private func copy(_ value: String) { PRActions.copy(value) }
     private func copyRichLink() { PRActions.share(pr) }
+
+    private func stateColor(_ s: CIState) -> Color {
+        switch s {
+        case .failure: .red
+        case .pending: .yellow
+        case .success: .green
+        case .none: .secondary
+        }
+    }
 
     private func tag(_ text: String, color: Color = .secondary) -> some View {
         Text(text).font(.caption2).foregroundStyle(color)

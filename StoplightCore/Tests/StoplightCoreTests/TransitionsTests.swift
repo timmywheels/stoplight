@@ -74,14 +74,12 @@ final class TransitionsTests: XCTestCase {
         XCTAssertEqual(kinds([pr(state: .failure)], [merged(.failure)]), [])
     }
 
-    func testSupersededMergedPRReadsAsLanded() {
+    func testMergedBaseStateBadge() {
         let red = pr(state: .failure, status: .merged)
-        let fixed = red.superseded(note: "main is green now")
-        XCTAssertEqual(fixed.state, .none)
-        XCTAssertEqual(fixed.note, "main is green now")
-        XCTAssertEqual(fixed.status, .merged)
-        // No deploy-failed event once superseded, and none when it goes back the other way either.
-        XCTAssertEqual(kinds([red], [fixed]), [])
+        XCTAssertTrue(red.withBaseState(.failure).isUnresolvedMerge)
+        XCTAssertFalse(red.withBaseState(.success).isUnresolvedMerge)   // main fixed since: badge green, no alarm
+        XCTAssertFalse(pr(state: .success, status: .merged).withBaseState(.failure).isUnresolvedMerge)  // someone else broke main
+        XCTAssertEqual(red.withBaseState(.success).state, .failure)   // own history unchanged
     }
 
     func testMergedQueryFormat() {

@@ -121,14 +121,16 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
     public let mergeQueue: MergeQueueInfo?
     /// Set for merged PRs (US-022). For those, `checks` are the merge commit's checks on the base branch.
     public let mergedAt: Date?
-    /// Short, user-facing context shown as a tag, e.g. "main is green now" (US-028).
+    /// Short, user-facing context shown as a tag (branch patterns show the pattern here).
     public let note: String?
+    /// For merged PRs: the current CI state of the base branch (US-028). Drives the branch badge.
+    public let baseState: CIState?
 
     public init(id: String, repo: String, number: Int, title: String, url: URL,
                 isDraft: Bool, updatedAt: Date, headSha: String, checks: [CheckResult],
                 author: String = "", status: PRStatus = .open, summary: String = "",
                 headRefName: String = "", baseRefName: String = "", mergeQueue: MergeQueueInfo? = nil,
-                mergedAt: Date? = nil, note: String? = nil) {
+                mergedAt: Date? = nil, note: String? = nil, baseState: CIState? = nil) {
         self.id = id
         self.repo = repo
         self.number = number
@@ -146,6 +148,7 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
         self.mergeQueue = mergeQueue
         self.mergedAt = mergedAt
         self.note = note
+        self.baseState = baseState
     }
 
     // Tolerant decoding so an older prs.json still loads (author/status added in US-011).
@@ -168,15 +171,19 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
         mergeQueue = try c.decodeIfPresent(MergeQueueInfo.self, forKey: .mergeQueue)
         mergedAt = try c.decodeIfPresent(Date.self, forKey: .mergedAt)
         note = try c.decodeIfPresent(String.self, forKey: .note)
+        baseState = try c.decodeIfPresent(CIState.self, forKey: .baseState)
     }
 
-    /// A merged PR whose red merge commit has since been fixed on the base branch: drop its checks so it
-    /// reads as "landed", and say why (US-028).
-    public func superseded(note: String) -> PullRequest {
+    /// Same PR, annotated with how its base branch is doing right now (US-028).
+    public func withBaseState(_ state: CIState) -> PullRequest {
         PullRequest(id: id, repo: repo, number: number, title: title, url: url, isDraft: isDraft, updatedAt: updatedAt,
-                    headSha: headSha, checks: [], author: author, status: status, summary: summary,
-                    headRefName: headRefName, baseRefName: baseRefName, mergeQueue: mergeQueue, mergedAt: mergedAt, note: note)
+                    headSha: headSha, checks: checks, author: author, status: status, summary: summary,
+                    headRefName: headRefName, baseRefName: baseRefName, mergeQueue: mergeQueue, mergedAt: mergedAt,
+                    note: note, baseState: state)
     }
+
+    /// A merged PR is a live problem only when its own merge commit is red AND the base branch is still red.
+    public var isUnresolvedMerge: Bool { status == .merged && state == .failure && baseState == .failure }
 
     public var state: CIState { Rollup.state(for: checks) }
     public var failingChecks: [CheckResult] { checks.filter { $0.state == .failure } }

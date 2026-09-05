@@ -184,8 +184,9 @@ final class AppModel {
     var all: [PullRequest] {
         var seen = Set<String>()
         var out: [PullRequest] = []
-        let mergedWithChecks = merged.filter { !$0.checks.isEmpty }
-        for pr in mine + watched + followed.flatMap(\.prs) + inbound.flatMap(\.prs) + branches + mergedWithChecks where seen.insert(pr.id).inserted {
+        // Merged PRs alert only while their own merge is red and the base branch is still red.
+        let mergedAlerts = merged.filter { $0.isUnresolvedMerge || ($0.baseState == nil && !$0.checks.isEmpty) }
+        for pr in mine + watched + followed.flatMap(\.prs) + inbound.flatMap(\.prs) + branches + mergedAlerts where seen.insert(pr.id).inserted {
             out.append(pr)
         }
         let hidden = prefs.sources.hiddenPRs
@@ -197,7 +198,8 @@ final class AppModel {
         let hidden = prefs.sources.hiddenPRs
         let visible = Filters.visible(merged, ignore: prefs.ignoreRules).filter { hidden[$0.id] == nil }
         return visible.sorted {
-            if $0.state != $1.state { return $0.state < $1.state }
+            let a = $0.isUnresolvedMerge ? 0 : 1, b = $1.isUnresolvedMerge ? 0 : 1
+            if a != b { return a < b }
             return ($0.mergedAt ?? .distantPast) > ($1.mergedAt ?? .distantPast)
         }
     }
@@ -365,9 +367,9 @@ final class AppModel {
             inbound = Array(zip(inboundQueries, results.dropFirst(cursor).prefix(inboundQueries.count))); cursor += inboundQueries.count
             var freshMerged = mergedQuery == nil ? [] : (results.dropFirst(cursor).first ?? [])
 
-            // One branch request covers both: followed branches (US-029) and the base branches behind red merges (US-028).
-            let redRefs = freshMerged.filter { $0.state == .failure }.map { BranchRef(repo: $0.repo, branch: $0.baseRefName) }
-            let wanted = Array(Set(concreteBranches + redRefs))
+            // One branch request covers both: followed branches (US-029) and the base branches behind merges (US-028).
+            let baseRefs = freshMerged.filter { !$0.baseRefName.isEmpty }.map { BranchRef(repo: $0.repo, branch: $0.baseRefName) }
+            let wanted = Array(Set(concreteBranches + baseRefs))
             let statuses = wanted.isEmpty ? [:] : ((try? await provider.fetchBranchStatuses(wanted)) ?? [:])
             branches = prefs.followedBranches.compactMap { b -> PullRequest? in
                 let concrete = b.isPattern ? resolvedNow[b.key].map(b.resolved(to:)) : b
@@ -378,11 +380,10 @@ final class AppModel {
                                                  updatedAt: row.updatedAt, headSha: row.headSha, checks: row.checks, status: .open,
                                                  headRefName: row.headRefName, note: b.branch) : row
             }
-            // A red merge commit that the base branch has since moved past (and gone green) is history, not a problem.
+            // Badge each merged PR with how its base branch is doing right now.
             freshMerged = freshMerged.map { pr in
-                guard pr.state == .failure, let head = statuses[BranchRef(repo: pr.repo, branch: pr.baseRefName).key],
-                      !head.checks.isEmpty, head.sha != pr.headSha, head.state == .success else { return pr }
-                return pr.superseded(note: "\(pr.baseRefName) is green now")
+                guard let head = statuses[BranchRef(repo: pr.repo, branch: pr.baseRefName).key], !head.checks.isEmpty else { return pr }
+                return pr.withBaseState(head.state)
             }
             merged = freshMerged
             watched = freshWatched
