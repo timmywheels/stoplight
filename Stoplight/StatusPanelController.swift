@@ -91,6 +91,7 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
         let host = NSHostingView(rootView: PanelRoot(model: model, close: { [weak self] in self?.close() }))
         host.translatesAutoresizingMaskIntoConstraints = false
         host.safeAreaRegions = []  // no inset for the hidden title bar
+        host.sizingOptions = []    // the user sizes the panel; content never resizes the window
         let effect = NSVisualEffectView()
         effect.material = .menu
         effect.blendingMode = .behindWindow
@@ -116,10 +117,14 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
         let buttonFrame = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
         let screen = buttonWindow.screen ?? NSScreen.main
         let visible = screen?.visibleFrame ?? .zero
-        var origin = NSPoint(x: buttonFrame.maxX - panel.frame.width, y: buttonFrame.minY - panel.frame.height - 6)
-        origin.x = max(visible.minX + 8, min(origin.x, visible.maxX - panel.frame.width - 8))
+        // Never taller than the screen below the menu bar.
+        var size = panel.frame.size
+        size.height = min(size.height, buttonFrame.minY - 6 - visible.minY - 8)
+        size.width = min(size.width, visible.width - 16)
+        var origin = NSPoint(x: buttonFrame.maxX - size.width, y: buttonFrame.minY - size.height - 6)
+        origin.x = max(visible.minX + 8, min(origin.x, visible.maxX - size.width - 8))
         origin.y = max(visible.minY + 8, origin.y)
-        panel.setFrameOrigin(origin)
+        panel.setFrame(NSRect(origin: origin, size: size), display: true)
     }
 
     // MARK: Size persistence
