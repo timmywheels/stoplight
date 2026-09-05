@@ -30,8 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         for url in urls where url.scheme == "stoplight" {
             let model = AppModel.shared
             if url.host == "pr", let id = url.pathComponents.dropFirst().first {
-                model.selectedID = id
-                model.expandedID = id
+                model.reveal(prID: id)
             }
             model.openPanel?()
         }

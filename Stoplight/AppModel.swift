@@ -97,6 +97,16 @@ final class AppModel {
         return (all + mergedRows).first { $0.id == id }
     }
 
+    /// Deep link / widget tap: make sure the PR is on screen, then select and expand it.
+    func reveal(prID id: String) {
+        if let sec = sections.first(where: { $0.prs.contains { $0.id == id } }) {
+            prefs.collapsedSections.remove(sec.id)
+        }
+        statusFilter = []
+        selectedID = id
+        expandedID = id
+    }
+
     func moveSelection(_ delta: Int) {
         focusedButton = nil
         let ids = visibleRowIDs
