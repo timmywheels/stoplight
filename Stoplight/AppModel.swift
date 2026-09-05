@@ -351,6 +351,30 @@ final class AppModel {
         for id in staleHidden { prefs.sources.hiddenPRs[id] = nil }
     }
 
+    // MARK: Agent (US-025)
+
+    var agentConfig: AgentLauncher.Config? {
+        guard let agent = AgentLauncher.Agent(rawValue: prefs.agent),
+              let terminal = AgentLauncher.Terminal(rawValue: prefs.terminal) else { return nil }
+        return AgentLauncher.Config(agent: agent, customCommand: prefs.agentCustomCommand, terminal: terminal,
+                                    promptTemplate: prefs.promptTemplate, repoPaths: prefs.repoPaths)
+    }
+    var agentTitle: String { AgentLauncher.Agent(rawValue: prefs.agent)?.title ?? "agent" }
+    func canFix(_ pr: PullRequest) -> Bool {
+        agentConfig != nil && prefs.repoPaths[pr.repo.lowercased()] != nil && !pr.headRefName.isEmpty
+    }
+    private(set) var agentError: String?
+
+    /// One button: worktree + terminal + agent with the failure as the prompt.
+    func fix(_ pr: PullRequest, runAgent: Bool) {
+        guard let config = agentConfig else { agentError = AgentLauncher.Err.noAgent.localizedDescription; return }
+        agentError = nil
+        Task {
+            do { try await AgentLauncher.fix(pr, config: config, runAgent: runAgent) }
+            catch { agentError = error.localizedDescription }
+        }
+    }
+
     // MARK: User actions
 
     func hide(repo: String) {

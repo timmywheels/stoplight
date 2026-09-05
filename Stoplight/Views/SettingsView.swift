@@ -12,6 +12,8 @@ struct SettingsView: View {
                 .tabItem { Label("General", systemImage: "gearshape") }
             SourcesTab(model: model)
                 .tabItem { Label("Sources", systemImage: "person.2") }
+            AgentSettingsTab(model: model)
+                .tabItem { Label("Agent", systemImage: "wrench.and.screwdriver") }
         }
         .frame(minWidth: 520, idealWidth: 560, minHeight: 480, idealHeight: 680)
     }

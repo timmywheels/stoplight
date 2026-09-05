@@ -392,7 +392,16 @@ struct PRRow: View {
                 circle(pinned ? "pin.fill" : "pin", help: pinned ? "Unpin" : "Pin", tint: pinned ? .primary : nil) {
                     withAnimation(Self.motion) { model.togglePin(pr) }
                 }
+                if pr.state == .failure && model.canFix(pr) {
+                    // US-025: worktree + terminal + your agent, prompt prefilled with the failure.
+                    circle("wrench.and.screwdriver", help: "Fix with \(model.agentTitle): worktree, terminal, agent", tint: .orange) {
+                        model.fix(pr, runAgent: true)
+                    }
+                }
                 Spacer()
+            }
+            if let err = model.agentError {
+                Text(err).font(.caption2).foregroundStyle(.red).lineLimit(2)
             }
         }
         .padding(.leading, 34 + CGFloat(depth) * 14).padding(.trailing, 12).padding(.bottom, 10)
@@ -432,6 +441,13 @@ struct PRRow: View {
         Button("Hide this PR") { model.hide(pr: pr) }
         if pr.mergeQueue != nil, let q = URL(string: "https://github.com/\(pr.repo)/queue/\(pr.baseRefName)") {
             Button("Open merge queue") { openURL(q) }
+        }
+        if !pr.headRefName.isEmpty && model.agentConfig != nil {
+            Divider()
+            Button("Fix with \(model.agentTitle)") { model.fix(pr, runAgent: true) }
+                .disabled(!model.canFix(pr))
+            Button("Open worktree in terminal") { model.fix(pr, runAgent: false) }
+                .disabled(!model.canFix(pr))
         }
         Divider()
         Button("Share (rich link)") { copyRichLink() }

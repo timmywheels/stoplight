@@ -87,6 +87,12 @@ final class UserPrefs {
         static let mergedDays = "mergedDays"
         static let sectionOrder = "sectionOrder"
         static let tourSeen = "tourSeen"
+        static let agent = "agent"
+        static let agentCustom = "agentCustomCommand"
+        static let terminal = "terminal"
+        static let promptTemplate = "agentPrompt"
+        static let scanRoot = "repoScanRoot"
+        static let repoPaths = "repoPaths"
     }
 
 
@@ -99,6 +105,15 @@ final class UserPrefs {
     var housing: Bool { didSet { defaults.set(housing, forKey: Key.housing) } }
     /// Recently-merged window in days (US-022). 0 = off. Local only.
     var mergedDays: Int { didSet { defaults.set(mergedDays, forKey: Key.mergedDays) } }
+    // Agent launcher (US-025). Local only.
+    var agent: String { didSet { defaults.set(agent, forKey: Key.agent) } }
+    var agentCustomCommand: String { didSet { defaults.set(agentCustomCommand, forKey: Key.agentCustom) } }
+    var terminal: String { didSet { defaults.set(terminal, forKey: Key.terminal) } }
+    var promptTemplate: String { didSet { defaults.set(promptTemplate, forKey: Key.promptTemplate) } }
+    var scanRoot: String { didSet { defaults.set(scanRoot, forKey: Key.scanRoot) } }
+    /// "owner/name" (lowercased) → local clone path.
+    var repoPaths: [String: String] { didSet { defaults.set(repoPaths, forKey: Key.repoPaths) } }
+
     /// First-run tour dismissed (US-024). Local only.
     var tourSeen: Bool { didSet { defaults.set(tourSeen, forKey: Key.tourSeen) } }
     /// Section ids in the user's drag order (US-023). Ids not listed keep their default relative order after these.
@@ -138,6 +153,12 @@ final class UserPrefs {
         mergedDays = defaults.object(forKey: Key.mergedDays) == nil ? 1 : defaults.integer(forKey: Key.mergedDays)
         sectionOrder = defaults.stringArray(forKey: Key.sectionOrder) ?? []
         tourSeen = defaults.bool(forKey: Key.tourSeen)
+        agent = defaults.string(forKey: Key.agent) ?? ""
+        agentCustomCommand = defaults.string(forKey: Key.agentCustom) ?? "my-agent {prompt}"
+        terminal = defaults.string(forKey: Key.terminal) ?? "terminal"
+        promptTemplate = defaults.string(forKey: Key.promptTemplate) ?? AgentLauncher.defaultPrompt
+        scanRoot = defaults.string(forKey: Key.scanRoot) ?? (NSHomeDirectory() + "/dev")
+        repoPaths = (defaults.dictionary(forKey: Key.repoPaths) as? [String: String]) ?? [:]
 
         if let cloud {
             observer = NotificationCenter.default.addObserver(
