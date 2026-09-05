@@ -58,7 +58,8 @@ struct StoplightWidgetView: View {
     var body: some View {
         if let snap = entry.snapshot {
             switch family {
-            case .systemMedium: MediumView(snapshot: snap)
+            case .systemMedium: ListView(snapshot: snap, maxRows: 4)
+            case .systemLarge: ListView(snapshot: snap, maxRows: 12)
             default: SmallView(snapshot: snap)
             }
         } else {
@@ -83,7 +84,7 @@ func stateColor(_ s: CIState) -> Color {
 
 struct SmallView: View {
     let snapshot: Snapshot
-    private var live: [PullRequest] { snapshot.prs.filter { !$0.isDraft } }
+    private var live: [PullRequest] { snapshot.counted.filter { !$0.isDraft } }
     private func count(_ s: CIState) -> Int { live.filter { $0.state == s }.count }
 
     var body: some View {
@@ -116,25 +117,37 @@ struct SmallView: View {
     }
 }
 
-struct MediumView: View {
+/// Medium and large: the popover's sections, in the popover's order, with the same rows (US-023).
+struct ListView: View {
     let snapshot: Snapshot
+    let maxRows: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ForEach(Rollup.sorted(snapshot.prs, pinnedFirst: Set(snapshot.pinnedIDs)).prefix(4)) { pr in
-                Link(destination: pr.url) {
+        let rows = Array(snapshot.orderedRows.prefix(maxRows))
+        let showHeaders = Set(rows.map(\.section.id)).count > 1 || rows.first?.section.title != "Mine"
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(rows.enumerated()), id: \.element.pr.id) { i, row in
+                if showHeaders && (i == 0 || rows[i - 1].section.id != row.section.id) && !row.section.title.isEmpty {
+                    Text(row.section.title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                        .padding(.top, i == 0 ? 0 : 4)
+                }
+                Link(destination: row.pr.url) {
                     HStack(spacing: 8) {
-                        Circle().fill(stateColor(pr.state)).frame(width: 8, height: 8)
-                        if snapshot.pinnedIDs.contains(pr.id) {
+                        if row.pr.status == .merged && row.pr.checks.isEmpty {
+                            Image(systemName: "checkmark.circle.fill").font(.caption2).foregroundStyle(.purple).frame(width: 8)
+                        } else {
+                            Circle().fill(stateColor(row.pr.state)).frame(width: 8, height: 8)
+                        }
+                        if snapshot.pinnedIDs.contains(row.pr.id) {
                             Image(systemName: "pin.fill").font(.caption2).foregroundStyle(.secondary)
                         }
-                        Text(pr.shortRef).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                        Text(pr.title).font(.caption).lineLimit(1)
+                        Text(row.pr.shortRef).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        Text(row.pr.title).font(.caption).lineLimit(1)
                         Spacer(minLength: 0)
                     }
                 }
             }
-            if snapshot.prs.isEmpty {
+            if rows.isEmpty {
                 Text("No open PRs").font(.caption).foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
@@ -152,7 +165,7 @@ struct StoplightWidget: Widget {
         }
         .configurationDisplayName("Stoplight")
         .description("CI status for your open pull requests.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }
 

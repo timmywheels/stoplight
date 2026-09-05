@@ -86,6 +86,7 @@ final class UserPrefs {
         static let collapsed = "collapsedSections"
         static let rowClick = "rowClick"
         static let mergedDays = "mergedDays"
+        static let sectionOrder = "sectionOrder"
     }
 
     enum RowClick: String, CaseIterable, Identifiable {
@@ -104,6 +105,8 @@ final class UserPrefs {
     var rowClick: RowClick { didSet { defaults.set(rowClick.rawValue, forKey: Key.rowClick) } }
     /// Recently-merged window in days (US-022). 0 = off. Local only.
     var mergedDays: Int { didSet { defaults.set(mergedDays, forKey: Key.mergedDays) } }
+    /// Section ids in the user's drag order (US-023). Ids not listed keep their default relative order after these.
+    var sectionOrder: [String] { didSet { defaults.set(sectionOrder, forKey: Key.sectionOrder) } }
     /// Popover section titles the user has collapsed. Local only.
     var collapsedSections: Set<String> { didSet { defaults.set(Array(collapsedSections).sorted(), forKey: Key.collapsed) } }
 
@@ -137,6 +140,7 @@ final class UserPrefs {
         // Merged starts collapsed: a one-line count until you ask for it.
         collapsedSections = Set(defaults.stringArray(forKey: Key.collapsed) ?? ["Merged"])
         mergedDays = defaults.object(forKey: Key.mergedDays) == nil ? 1 : defaults.integer(forKey: Key.mergedDays)
+        sectionOrder = defaults.stringArray(forKey: Key.sectionOrder) ?? []
         rowClick = RowClick(rawValue: defaults.string(forKey: Key.rowClick) ?? "") ?? .expand
 
         if let cloud {
@@ -219,6 +223,18 @@ final class UserPrefs {
 
     func unhide(repo value: String) {
         sources.hiddenRepos.removeAll { $0.caseInsensitiveCompare(value) == .orderedSame }
+    }
+
+    /// Drag `moving` onto `target`. Dropping on a header below it lands after that header; above it, before.
+    func moveSection(_ moving: String, onto target: String, currentOrder: [String]) {
+        guard moving != target else { return }
+        var order = currentOrder
+        guard let from = order.firstIndex(of: moving), let to = order.firstIndex(of: target) else { return }
+        order.remove(at: from)
+        // After the removal, `to` points just past the target when moving down (lands after it),
+        // and at the target when moving up (lands before it). Exactly the list-reorder feel.
+        order.insert(moving, at: min(to, order.count))
+        sectionOrder = order
     }
 
     func toggleCollapsed(_ section: String) {

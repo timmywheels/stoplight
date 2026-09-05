@@ -136,7 +136,26 @@ final class AppModel {
             !claimed.contains(pr.id) && (filter.isEmpty || filter.contains(pr.state))
         }
         out.append(Section(id: "Merged", title: "Merged", prs: mergedFiltered))
-        return out.filter { !$0.prs.isEmpty }
+        return applyOrder(out).filter { !$0.prs.isEmpty }
+    }
+
+    /// All section ids in default order, for drag reordering (includes empty ones so order survives).
+    var sectionIDs: [String] {
+        applyOrder(["Pinned", "Mine", "Watching"].map { Section(id: $0, title: $0, prs: []) }
+                   + followed.map { Section(id: $0.query.title, title: $0.query.title, prs: []) }
+                   + [Section(id: "Merged", title: "Merged", prs: [])]).map(\.id)
+    }
+
+    private func applyOrder(_ sections: [Section]) -> [Section] {
+        let rank = Dictionary(uniqueKeysWithValues: prefs.sectionOrder.enumerated().map { ($1, $0) })
+        return sections.enumerated().sorted { a, b in
+            switch (rank[a.element.id], rank[b.element.id]) {
+            case let (x?, y?): return x < y
+            case (_?, nil): return true
+            case (nil, _?): return false
+            case (nil, nil): return a.offset < b.offset
+            }
+        }.map(\.element)
     }
     var isEmpty: Bool { all.isEmpty }
 
@@ -297,7 +316,11 @@ final class AppModel {
     }
 
     private func publishSnapshot() {
-        guard let data = try? SharedStore.encode(all, pinnedIDs: Array(prefs.pinned)) else { return }
+        // The widget mirrors the popover: same sections, same order, merged rows included for display.
+        let secs = sections.map { Snapshot.Section(id: $0.id, title: $0.title, prIDs: $0.prs.map(\.id)) }
+        var seen = Set<String>()
+        let prs = (all + mergedRows).filter { seen.insert($0.id).inserted }
+        guard let data = try? SharedStore.encode(prs, pinnedIDs: Array(prefs.pinned), sections: secs) else { return }
         server.update(data)
         SharedStore.save(data)
         WidgetBridge.reload()

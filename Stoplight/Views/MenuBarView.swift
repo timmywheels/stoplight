@@ -69,7 +69,14 @@ struct MenuBarView: View {
         if !sec.prs.isEmpty {
             let collapsed = showHeader && model.prefs.collapsedSections.contains(sec.id)
             if showHeader {
-                SectionHeader(title: sec.title, prs: sec.prs, collapsed: collapsed) { model.prefs.toggleCollapsed(sec.id) }
+                SectionHeader(id: sec.id, title: sec.title, prs: sec.prs, collapsed: collapsed,
+                              toggle: { model.prefs.toggleCollapsed(sec.id) },
+                              drop: { moving in
+                                  withAnimation(.snappy(duration: 0.2, extraBounce: 0)) {
+                                      model.prefs.moveSection(moving, onto: sec.id, currentOrder: model.sectionIDs)
+                                  }
+                                  model.sourcesChanged()
+                              })
             }
             if !collapsed {
                 let rows = Stacks.layout(sec.prs)
@@ -188,40 +195,52 @@ struct WatchField: View {
     }
 }
 
-/// Click to collapse. When collapsed, shows the count and the section's worst-state dot so nothing is lost.
+/// Click to collapse. Drag to reorder (US-023). Collapsed: per-state counts so nothing is lost.
 struct SectionHeader: View {
+    let id: String
     let title: String
     let prs: [PullRequest]
     let collapsed: Bool
     let toggle: () -> Void
+    let drop: (String) -> Void
+    @State private var targeted = false
 
     var body: some View {
-        Button(action: toggle) {
-            HStack(spacing: 6) {
-                Image(systemName: "chevron.down")
-                    .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-                    .rotationEffect(.degrees(collapsed ? -90 : 0))
-                    .frame(width: 10)
-                Text(title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-                if collapsed {
-                    // One count per state, worst first, zeros omitted. Drafts count under "none".
-                    ForEach(CIState.allCases, id: \.self) { state in
-                        let n = prs.filter { $0.state == state }.count
-                        if n > 0 {
-                            HStack(spacing: 3) {
-                                StatusDot(state: state)
-                                Text("\(n)").font(.caption2).foregroundStyle(.secondary).monospacedDigit()
-                            }
-                            .padding(.leading, 4)
+        HStack(spacing: 6) {
+            Image(systemName: "chevron.down")
+                .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                .rotationEffect(.degrees(collapsed ? -90 : 0))
+                .frame(width: 10)
+            Text(title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+            if collapsed {
+                // One count per state, worst first, zeros omitted. Drafts count under "none".
+                ForEach(CIState.allCases, id: \.self) { state in
+                    let n = prs.filter { $0.state == state }.count
+                    if n > 0 {
+                        HStack(spacing: 3) {
+                            StatusDot(state: state)
+                            Text("\(n)").font(.caption2).foregroundStyle(.secondary).monospacedDigit()
                         }
+                        .padding(.leading, 4)
                     }
                 }
-                Spacer()
             }
-            .padding(.horizontal, 12).padding(.top, 8).padding(.bottom, collapsed ? 8 : 2)
-            .contentShape(Rectangle())
+            Spacer()
+            Image(systemName: "line.3.horizontal").font(.caption2).foregroundStyle(.quaternary)
+                .help("Drag to reorder")
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 12).padding(.top, 8).padding(.bottom, collapsed ? 8 : 2)
+        .contentShape(Rectangle())
+        .overlay(alignment: .top) {
+            if targeted { Rectangle().fill(Color.accentColor).frame(height: 2).padding(.horizontal, 8) }
+        }
+        .onTapGesture(perform: toggle)
+        .draggable(id)
+        .dropDestination(for: String.self) { items, _ in
+            guard let moving = items.first else { return false }
+            drop(moving)
+            return true
+        } isTargeted: { targeted = $0 }
         .animation(.easeOut(duration: 0.15), value: collapsed)
     }
 }

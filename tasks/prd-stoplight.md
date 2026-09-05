@@ -105,7 +105,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - [ ] Main app writes `prs.json` (list of PRs with state, no token) to the App Group container after every fetch, then calls `WidgetCenter.shared.reloadAllTimelines()`
 - [ ] Widget reads `prs.json` only; it never makes network calls
 - [ ] **Small widget:** three stacked counts with colored dots: red count, yellow count, green count. Tapping opens the app's popover
-- [ ] **Medium widget:** up to 4 PR rows in the same style as the dropdown (dot, repo #num, title). Tapping a row deep-links to that PR URL
+- [ ] **Medium widget:** up to 4 PR rows mirroring the popover (sections, order, dot, repo #num, title). **Large:** 12 rows. Tapping a row deep-links to that PR URL
 - [ ] Both sizes show "Open Stoplight to sign in" when `prs.json` is absent
 - [ ] Small widget shows the stoplight silhouette in the aggregate color above the three counts
 - [ ] Both sizes show data age in the corner if older than 5 minutes
@@ -281,6 +281,14 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - [ ] Notifications: merge commit turns red → "… failed after merge" (time-sensitive); pending → green → "Merged and green" in all-mode only; the open → merged transition itself never fires
 - [ ] Hidden PRs stay hidden in the Merged section for the window's duration
 - [ ] Unit tests cover the merged transition table and the query string format
+
+### US-023: Section order and widget parity
+**Description:** As a user, I want to arrange sections my way, and see the same list in the widget.
+
+**Acceptance Criteria:**
+- [ ] Drag a section header onto another to reorder; a 2pt accent line marks the drop target; order persists
+- [ ] Snapshot carries the popover's sections (id, title, PR ids) in order; medium (4 rows) and large (12 rows) widgets render them with the same headers, dots, purple merged checkmark, and pins
+- [ ] Small widget counts match the footer: merged rows without checks are excluded
 
 ## Functional Requirements
 
