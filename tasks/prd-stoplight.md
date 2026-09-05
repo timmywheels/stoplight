@@ -332,10 +332,19 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Description:** As a user, I don't want a merged PR to stay red after later merges fixed the base branch.
 
 **Acceptance Criteria:**
-- [ ] For every red merged PR, the poll also fetches the base branch's head commit checks (one aliased request for all distinct repo/branch pairs)
-- [ ] If the head has checks and they're all green, the merged PR is shown with the purple "landed" checkmark and a green "main is green now" tag, and stops counting toward dots and notifications
+- [ ] For every red merged PR, the poll also fetches the base branch's latest commit that ran checks (looks back 10 commits; one aliased request shared with followed branches)
+- [ ] If that commit is newer than the merge commit and green, the merged PR is shown with the purple "landed" checkmark and a green "main is green now" tag, and stops counting toward dots and notifications
 - [ ] If the head is red or still running, the merged PR stays red
 - [ ] Unit test: a superseded copy reports `.none`, keeps status merged, fires no transition
+
+### US-029: Follow a branch
+**Description:** As a user, I want to know whether main is green right now, and be told when it isn't.
+
+**Acceptance Criteria:**
+- [ ] Settings → Sources → Follow → Branches accepts `owner/repo@branch`
+- [ ] Each followed branch is one row in a "Branches" section: dot = state of the newest commit that ran checks, title = that commit's message, click opens the commit, run-summary button when it's Actions
+- [ ] Branch rows count toward the dots and widget and notify like open PRs (red → "failed", pending → green → "passed")
+- [ ] Right-click → Stop following; no Fix, Follow-author, or Hide-PR on branch rows
 
 ## Functional Requirements
 

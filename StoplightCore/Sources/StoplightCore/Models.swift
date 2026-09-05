@@ -180,7 +180,8 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
 
     public var state: CIState { Rollup.state(for: checks) }
     public var failingChecks: [CheckResult] { checks.filter { $0.state == .failure } }
-    public var shortRef: String { "\(repo) #\(number)" }
+    public var isBranch: Bool { number == 0 }
+    public var shortRef: String { isBranch ? "\(repo) @ \(headRefName)" : "\(repo) #\(number)" }
     /// GitHub's full checks summary for this PR (every job, every workflow).
     public var checksURL: URL { url.appendingPathComponent("checks") }
 
@@ -252,8 +253,8 @@ public protocol CIProvider: Sendable {
     func fetchPullRequests(refs: [PRRef]) async throws -> [PullRequest]
     /// US-013. login → profile display name. Logins without a name are omitted.
     func fetchDisplayNames(logins: [String]) async throws -> [String: String]
-    /// US-028. Checks on the head commit of each branch, keyed "owner/repo#branch". Unknown refs are omitted.
-    func fetchBranchHeadChecks(_ refs: [BranchRef]) async throws -> [String: [CheckResult]]
+    /// US-028/029. Latest commit with checks on each branch (falls back to the head), keyed by `BranchRef.key`.
+    func fetchBranchStatuses(_ refs: [BranchRef]) async throws -> [String: BranchStatus]
 }
 
 public struct BranchRef: Hashable, Sendable {
@@ -261,6 +262,35 @@ public struct BranchRef: Hashable, Sendable {
     public let branch: String
     public init(repo: String, branch: String) { self.repo = repo; self.branch = branch }
     public var key: String { "\(repo.lowercased())#\(branch)" }
+
+    /// "owner/repo@branch"
+    public init?(spec: String) {
+        let parts = spec.split(separator: "@", maxSplits: 1).map(String.init)
+        guard parts.count == 2, Filters.isValidRepo(parts[0]), Filters.isValidBranch(parts[1]) else { return nil }
+        self.init(repo: parts[0], branch: parts[1])
+    }
+    public var spec: String { "\(repo)@\(branch)" }
+}
+
+/// The latest CI verdict on a branch (US-029): the newest commit that actually ran checks.
+public struct BranchStatus: Sendable, Equatable {
+    public let ref: BranchRef
+    public let sha: String
+    public let message: String
+    public let url: URL
+    public let committedAt: Date
+    public let checks: [CheckResult]
+    public init(ref: BranchRef, sha: String, message: String, url: URL, committedAt: Date, checks: [CheckResult]) {
+        self.ref = ref; self.sha = sha; self.message = message; self.url = url; self.committedAt = committedAt; self.checks = checks
+    }
+    public var state: CIState { Rollup.state(for: checks) }
+
+    /// Rendered through the same row as PRs. `number == 0` marks a branch row.
+    public var asRow: PullRequest {
+        PullRequest(id: "branch:\(ref.key)", repo: ref.repo, number: 0, title: message, url: url, isDraft: false,
+                    updatedAt: committedAt, headSha: sha, checks: checks, author: "", status: .open,
+                    headRefName: ref.branch, baseRefName: "")
+    }
 }
 
 public extension CIProvider {
@@ -302,6 +332,10 @@ public enum Filters {
     /// A login, optionally with GitHub's "[bot]" suffix. For the Hide → Users list.
     public static func isValidAuthor(_ s: String) -> Bool {
         s.range(of: "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})(?:\\[bot\\])?$", options: .regularExpression) != nil
+    }
+
+    public static func isValidBranch(_ s: String) -> Bool {
+        s.range(of: "^[A-Za-z0-9._/-]{1,200}$", options: .regularExpression) != nil && !s.contains("..")
     }
 
     /// "owner/name"

@@ -482,7 +482,7 @@ struct PRRow: View {
     /// The expanded row's buttons, in Tab order. Fix appears only when it can run.
     private var buttons: [RowButton] {
         var b: [RowButton] = [
-            RowButton(symbol: "arrow.up.right", help: "Open on GitHub", tint: nil) { openURL(pr.url) },
+            RowButton(symbol: "arrow.up.right", help: pr.isBranch ? "Open commit on GitHub" : "Open on GitHub", tint: nil) { openURL(pr.url) },
         ]
         if let run = pr.actionsRunURL {
             b.append(RowButton(symbol: "list.bullet.rectangle", help: "Open the Actions run summary (⌘K)", tint: nil) { openURL(run) })
@@ -499,7 +499,7 @@ struct PRRow: View {
                 withAnimation(Self.motion) { model.togglePin(pr) }
             },
         ]
-        if pr.state == .failure && model.canFix(pr) {
+        if pr.state == .failure && model.canFix(pr) && !pr.isBranch {
             b.append(RowButton(symbol: "sparkles", help: "Fix with \(model.agentTitle): worktree, terminal, agent", tint: nil) {
                 model.fix(pr, runAgent: true)
             })
@@ -536,16 +536,22 @@ struct PRRow: View {
         if alias != nil { Button("Clear nickname") { model.prefs.setAlias("", for: pr.id) } }
         if watched { Button("Stop watching") { model.unwatch(pr) } }
         Divider()
-        if !isMine && !model.prefs.isFollowing(user: pr.author) {
+        if !isMine && !pr.isBranch && !model.prefs.isFollowing(user: pr.author) {
             Button("Follow @\(pr.author)") { model.follow(user: pr.author) }
         }
-        Button("Hide this PR") { model.hide(pr: pr) }
+        if pr.isBranch {
+            Button("Stop following \(pr.repo)@\(pr.headRefName)") {
+                model.prefs.unfollow("\(pr.repo)@\(pr.headRefName)", kind: .branches); model.sourcesChanged()
+            }
+        } else {
+            Button("Hide this PR") { model.hide(pr: pr) }
+        }
         if let run = pr.actionsRunURL { Button("Open Actions run") { openURL(run) } }
         if !pr.checks.isEmpty { Button("Open checks tab") { openURL(pr.checksURL) } }
         if pr.mergeQueue != nil, let q = URL(string: "https://github.com/\(pr.repo)/queue/\(pr.baseRefName)") {
             Button("Open merge queue") { openURL(q) }
         }
-        if !pr.headRefName.isEmpty && model.agentConfig != nil {
+        if !pr.headRefName.isEmpty && model.agentConfig != nil && !pr.isBranch {
             Divider()
             Button("Fix with \(model.agentTitle)") { model.fix(pr, runAgent: true) }
                 .disabled(!model.canFix(pr))

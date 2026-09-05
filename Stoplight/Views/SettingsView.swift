@@ -165,7 +165,9 @@ private struct SourcesTab: View {
                             normalize: { UserPrefs.normalize($0, kind: .repos, hideList: false) }, onChange: model.sourcesChanged)
                 TableEditor(title: "Orgs", items: $prefs.sources.followOrgs, placeholder: "org",
                             normalize: { UserPrefs.normalize($0, kind: .orgs, hideList: false) }, onChange: model.sourcesChanged)
-                Text("Every open PR from a followed user, repo, or org gets its own section in the popover.")
+                TableEditor(title: "Branches", items: $prefs.sources.followBranches, placeholder: "owner/repo@main",
+                            normalize: { UserPrefs.normalize($0, kind: .branches, hideList: false) }, onChange: model.sourcesChanged)
+                Text("Every open PR from a followed user, repo, or org gets its own section. A followed branch shows the latest CI verdict on that branch (e.g. is main green?) and notifies when it goes red.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Hide") {

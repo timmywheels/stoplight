@@ -34,6 +34,17 @@ final class PrefsTests: XCTestCase {
         XCTAssertTrue(q.contains("q1: search(query: \"is:pr is:open archived:false author:bob\""))
     }
 
+    func testBranchRefSpec() {
+        XCTAssertEqual(BranchRef(spec: "acme/api@main")?.key, "acme/api#main")
+        XCTAssertEqual(BranchRef(spec: "acme/api@release/2.0")?.branch, "release/2.0")
+        XCTAssertNil(BranchRef(spec: "acme/api"))
+        XCTAssertNil(BranchRef(spec: "acme/api@bad..ref"))
+        let row = BranchStatus(ref: BranchRef(spec: "acme/api@main")!, sha: "abc", message: "Fix", url: URL(string: "https://github.com/acme/api/commit/abc")!,
+                               committedAt: .now, checks: []).asRow
+        XCTAssertTrue(row.isBranch)
+        XCTAssertEqual(row.shortRef, "acme/api @ main")
+    }
+
     func testIdentifierValidation() {
         XCTAssertTrue(Filters.isValidLogin("timmywheels"))
         XCTAssertFalse(Filters.isValidLogin("-bad"))

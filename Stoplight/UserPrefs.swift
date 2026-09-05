@@ -10,7 +10,7 @@ import StoplightCore
 @Observable
 final class UserPrefs {
     enum SourceKind: String, CaseIterable, Identifiable {
-        case users, repos, orgs
+        case users, repos, orgs, branches
         var id: String { rawValue }
         var title: String { rawValue.capitalized }
         var placeholder: String {
@@ -18,6 +18,7 @@ final class UserPrefs {
             case .users: "username"
             case .repos: "owner/repo"
             case .orgs: "org"
+            case .branches: "owner/repo@branch"
             }
         }
     }
@@ -26,6 +27,8 @@ final class UserPrefs {
         var followUsers: [String] = []
         var followRepos: [String] = []
         var followOrgs: [String] = []
+        /// "owner/repo@branch" (US-029)
+        var followBranches: [String] = []
         var hiddenRepos: [String] = []
         var hiddenUsers: [String] = IgnoreRules.defaultHiddenUsers
         /// login (lowercased) → user-chosen label for the section header. Empty means use GitHub's name.
@@ -41,6 +44,7 @@ final class UserPrefs {
                 case .users: followUsers
                 case .repos: followRepos
                 case .orgs: followOrgs
+                case .branches: followBranches
                 }
             }
             set {
@@ -48,6 +52,7 @@ final class UserPrefs {
                 case .users: followUsers = newValue
                 case .repos: followRepos = newValue
                 case .orgs: followOrgs = newValue
+                case .branches: followBranches = newValue
                 }
             }
         }
@@ -59,6 +64,7 @@ final class UserPrefs {
             followUsers = try c.decodeIfPresent([String].self, forKey: .followUsers) ?? []
             followRepos = try c.decodeIfPresent([String].self, forKey: .followRepos) ?? []
             followOrgs = try c.decodeIfPresent([String].self, forKey: .followOrgs) ?? []
+            followBranches = try c.decodeIfPresent([String].self, forKey: .followBranches) ?? []
             hiddenRepos = try c.decodeIfPresent([String].self, forKey: .hiddenRepos)
                 ?? (try? decoder.container(keyedBy: LegacyKeys.self).decodeIfPresent([String].self, forKey: .ignoreRepos)) ?? []
             // Older blobs had a hideBots Bool; map it onto the default bot list.
@@ -177,6 +183,8 @@ final class UserPrefs {
         IgnoreRules(users: Set(sources.hiddenUsers), repos: Set(sources.hiddenRepos))
     }
 
+    var followedBranches: [BranchRef] { sources.followBranches.compactMap(BranchRef.init(spec:)) }
+
     /// Searches to run in addition to `.authored`, in display order.
     var followQueries: [PRQuery] {
         sources.followUsers.map(PRQuery.author) + sources.followRepos.map(PRQuery.repo) + sources.followOrgs.map(PRQuery.org)
@@ -196,6 +204,7 @@ final class UserPrefs {
         case .repos: Filters.isValidRepo(value)
         case .users: hideList ? Filters.isValidAuthor(value) : Filters.isValidLogin(value)
         case .orgs: Filters.isValidLogin(value)
+        case .branches: BranchRef(spec: value) != nil
         }
         return valid ? value : nil
     }

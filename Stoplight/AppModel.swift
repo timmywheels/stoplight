@@ -31,6 +31,8 @@ final class AppModel {
     private(set) var followed: [(query: PRQuery, prs: [PullRequest])] = []
     /// My PRs merged within `prefs.mergedDays` (US-022). Their `state` is the merge commit's checks.
     private(set) var merged: [PullRequest] = []
+    /// Followed branches' latest CI verdict, as rows (US-029).
+    private(set) var branches: [PullRequest] = []
     private(set) var lastRefresh: Date?
     private(set) var lastError: String?
     private(set) var auth: AuthState = .unknown
@@ -179,7 +181,7 @@ final class AppModel {
         var seen = Set<String>()
         var out: [PullRequest] = []
         let mergedWithChecks = merged.filter { !$0.checks.isEmpty }
-        for pr in mine + watched + followed.flatMap(\.prs) + mergedWithChecks where seen.insert(pr.id).inserted {
+        for pr in mine + watched + followed.flatMap(\.prs) + branches + mergedWithChecks where seen.insert(pr.id).inserted {
             out.append(pr)
         }
         let hidden = prefs.sources.hiddenPRs
@@ -221,6 +223,7 @@ final class AppModel {
             if case .author(let login) = f.query, let name = prefs.label(for: login) ?? displayName(for: login) { title = name }
             out.append(Section(id: f.query.title, title: title, prs: take(f.prs), query: f.query))
         }
+        out.append(Section(id: "Branches", title: "Branches", prs: take(branches)))
         // Merged rows aren't in `all` unless they have checks, so filter them directly here.
         let mergedFiltered = mergedRows.filter { pr in
             !claimed.contains(pr.id) && (filter.isEmpty || filter.contains(pr.state))
@@ -233,7 +236,7 @@ final class AppModel {
     var sectionIDs: [String] {
         applyOrder(["Pinned", "Mine", "Watching"].map { Section(id: $0, title: $0, prs: []) }
                    + followed.map { Section(id: $0.query.title, title: $0.query.title, prs: []) }
-                   + [Section(id: "Merged", title: "Merged", prs: [])]).map(\.id)
+                   + [Section(id: "Branches", title: "Branches", prs: []), Section(id: "Merged", title: "Merged", prs: [])]).map(\.id)
     }
 
     private func applyOrder(_ sections: [Section]) -> [Section] {
@@ -318,6 +321,7 @@ final class AppModel {
         watched = []
         followed = []
         merged = []
+        branches = []
         auth = .signedOut
         SharedStore.clear()
         server.update(Data("{}".utf8))
@@ -342,14 +346,16 @@ final class AppModel {
             mine = results.first ?? []
             followed = Array(zip(follow, results.dropFirst().prefix(follow.count)))
             var freshMerged = mergedQuery == nil ? [] : (results.last ?? [])
-            // US-028: a red merge commit that main has since moved past is history, not a problem.
-            let redRefs = Set(freshMerged.filter { $0.state == .failure }.map { BranchRef(repo: $0.repo, branch: $0.baseRefName) })
-            if !redRefs.isEmpty, let heads = try? await provider.fetchBranchHeadChecks(Array(redRefs)) {
-                freshMerged = freshMerged.map { pr in
-                    guard pr.state == .failure, let head = heads[BranchRef(repo: pr.repo, branch: pr.baseRefName).key],
-                          !head.isEmpty, Rollup.state(for: head) == .success else { return pr }
-                    return pr.superseded(note: "\(pr.baseRefName) is green now")
-                }
+            // One branch request covers both: followed branches (US-029) and the base branches behind red merges (US-028).
+            let redRefs = freshMerged.filter { $0.state == .failure }.map { BranchRef(repo: $0.repo, branch: $0.baseRefName) }
+            let wanted = Array(Set(prefs.followedBranches + redRefs))
+            let statuses = wanted.isEmpty ? [:] : ((try? await provider.fetchBranchStatuses(wanted)) ?? [:])
+            branches = prefs.followedBranches.compactMap { statuses[$0.key]?.asRow }
+            // A red merge commit that the base branch has since moved past (and gone green) is history, not a problem.
+            freshMerged = freshMerged.map { pr in
+                guard pr.state == .failure, let head = statuses[BranchRef(repo: pr.repo, branch: pr.baseRefName).key],
+                      !head.checks.isEmpty, head.sha != pr.headSha, head.state == .success else { return pr }
+                return pr.superseded(note: "\(pr.baseRefName) is green now")
             }
             merged = freshMerged
             watched = freshWatched
@@ -441,7 +447,7 @@ final class AppModel {
 
     /// Pins and nicknames on PRs that no longer exist are dropped silently (US-012, US-019).
     private func prunePins() {
-        let live = Set((mine + watched + followed.flatMap(\.prs) + merged).map(\.id))
+        let live = Set((mine + watched + followed.flatMap(\.prs) + merged + branches).map(\.id))
         let stale = prefs.pinned.subtracting(live)
         if !stale.isEmpty { prefs.pinned.subtract(stale) }
         let staleAliases = Set(prefs.sources.prAliases.keys).subtracting(live)

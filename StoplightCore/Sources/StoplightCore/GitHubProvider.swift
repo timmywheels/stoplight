@@ -71,25 +71,31 @@ public struct GitHubProvider: CIProvider {
         return out
     }
 
-    public func fetchBranchHeadChecks(_ refs: [BranchRef]) async throws -> [String: [CheckResult]] {
+    public func fetchBranchStatuses(_ refs: [BranchRef]) async throws -> [String: BranchStatus] {
         guard !refs.isEmpty else { return [:] }
         let fields = refs.enumerated().compactMap { i, r -> String? in
             let parts = r.repo.split(separator: "/", maxSplits: 1).map(String.init)
-            guard parts.count == 2, Filters.isValidRepo(r.repo), r.branch.range(of: "^[A-Za-z0-9._/-]+$", options: .regularExpression) != nil else { return nil }
-            return "b\(i): repository(owner: \"\(parts[0])\", name: \"\(parts[1])\") { ref(qualifiedName: \"refs/heads/\(r.branch)\") { target { ... on Commit { ...CommitChecks } } } }"
+            guard parts.count == 2, Filters.isValidRepo(r.repo), Filters.isValidBranch(r.branch) else { return nil }
+            // Look back a few commits: the newest one may not have triggered CI (docs, merges of no-op branches).
+            return "b\(i): repository(owner: \"\(parts[0])\", name: \"\(parts[1])\") { ref(qualifiedName: \"refs/heads/\(r.branch)\") { target { ... on Commit { history(first: 10) { nodes { oid messageHeadline url committedDate ...CommitChecks } } } } } }"
         }
         guard !fields.isEmpty else { return [:] }
         let query = "query {\n" + fields.joined(separator: "\n") + "\n}\n" + Self.commitChecksFragment
         let data = try await post(["query": query])
-        struct Target: Decodable { let statusCheckRollup: Node.RollupNode? }
+        struct C: Decodable { let oid: String; let messageHeadline: String; let url: URL; let committedDate: Date; let statusCheckRollup: Node.RollupNode? }
+        struct History: Decodable { let nodes: [C] }
+        struct Target: Decodable { let history: History? }
         struct Ref: Decodable { let target: Target? }
         struct Repo: Decodable { let ref: Ref? }
         struct Env: Decodable { let data: [String: Repo?]? }
         let repos = try Self.decoder.decode(Env.self, from: data).data ?? [:]
-        var out: [String: [CheckResult]] = [:]
+        var out: [String: BranchStatus] = [:]
         for (i, r) in refs.enumerated() {
-            guard let nodes = repos["b\(i)"]??.ref?.target?.statusCheckRollup?.contexts.nodes else { continue }
-            out[r.key] = nodes.compactMap(Self.mapCheck)
+            guard let commits = repos["b\(i)"]??.ref?.target?.history?.nodes, let head = commits.first else { continue }
+            let withChecks = commits.first { !($0.statusCheckRollup?.contexts.nodes.isEmpty ?? true) } ?? head
+            let checks = (withChecks.statusCheckRollup?.contexts.nodes ?? []).compactMap(Self.mapCheck)
+            out[r.key] = BranchStatus(ref: r, sha: withChecks.oid, message: withChecks.messageHeadline, url: withChecks.url,
+                                      committedAt: withChecks.committedDate, checks: checks)
         }
         return out
     }
