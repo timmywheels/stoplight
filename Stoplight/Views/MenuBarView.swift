@@ -138,6 +138,17 @@ struct MenuBarView: View {
     }
 
     private var footer: some View {
+        // Narrow panel: drop the timestamp first, then the counts' labels never compress (fixedSize).
+        ViewThatFits(in: .horizontal) {
+            footerRow(showTime: true)
+            footerRow(showTime: false)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .padding(.leading, 12).padding(.trailing, 6).padding(.top, 4).padding(.bottom, 4)
+    }
+
+    private func footerRow(showTime: Bool) -> some View {
         HStack(spacing: 4) {
             // US-018: status filters. Click a dot to show only that state; click again to clear. Multi-select.
             if case .signedIn = model.auth, !model.isEmpty {
@@ -148,22 +159,30 @@ struct MenuBarView: View {
                                   selected: model.statusFilter.contains(state)) { model.toggleFilter(state) }
                     }
                 }
+                .fixedSize()
             }
-            if let err = model.lastError {
-                Label("Stale, retrying", systemImage: "wifi.exclamationmark")
-                    .font(.caption).foregroundStyle(.orange).help(err)
-            } else if let t = model.lastRefresh {
-                Text("\(t, style: .relative) ago").font(.caption).foregroundStyle(.tertiary)
-                    .help("Last refreshed")
+            if showTime {
+                if let err = model.lastError {
+                    Label("Stale, retrying", systemImage: "wifi.exclamationmark")
+                        .font(.caption).foregroundStyle(.orange).help(err).lineLimit(1).fixedSize()
+                } else if let t = model.lastRefresh {
+                    Text("\(t, style: .relative) ago").font(.caption).foregroundStyle(.tertiary).lineLimit(1).fixedSize()
+                        .help("Last refreshed")
+                }
+            } else if model.lastError != nil {
+                Image(systemName: "wifi.exclamationmark").font(.caption).foregroundStyle(.orange).help(model.lastError ?? "")
             }
-            Spacer()
+            Spacer(minLength: 8)
             if model.updater.updateAvailable, let v = model.updater.latest?.version {
                 Button {
                     Task { await model.updater.install() }
                 } label: {
-                    Label(model.updater.state == .downloading || model.updater.state == .installing ? "Updating…" : "Update to \(v)",
-                          systemImage: "arrow.down.circle")
-                        .font(.caption).labelStyle(.titleAndIcon)
+                    let busy = model.updater.state == .downloading || model.updater.state == .installing
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.down.circle")
+                        if showTime { Text(busy ? "Updating…" : "Update to \(v)") }
+                    }
+                    .font(.caption).fixedSize()
                 }
                 .buttonStyle(.plain).foregroundStyle(Color.accentColor)
                 .disabled(model.updater.state == .downloading || model.updater.state == .installing)
@@ -183,15 +202,14 @@ struct MenuBarView: View {
             Button { Task { await model.refresh() } } label: { Image(systemName: "arrow.clockwise").frame(width: 22, height: 22) }
                 .keyboardShortcut("r").help("Refresh (⌘R)")
                 .disabled(model.isRefreshing)
-            Button { showSettings() } label: { Image(systemName: "gearshape") }
+            Button { withAnimation(.snappy(duration: 0.2, extraBounce: 0)) { model.showHotkeys.toggle() } } label: { Image(systemName: "keyboard").frame(width: 22, height: 22) }
+                .help("Keyboard shortcuts (⌘/)")
+            Button { showSettings() } label: { Image(systemName: "gearshape").frame(width: 22, height: 22) }
                 .keyboardShortcut(",").help("Settings (⌘,)")
             // ⌘Q still quits while the popover is open; the visible Quit button lives in Settings.
             Button("Quit") { NSApp.terminate(nil) }
                 .keyboardShortcut("q").hidden().frame(width: 0, height: 0)
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(.secondary)
-        .padding(.leading, 12).padding(.trailing, 6).padding(.top, 4).padding(.bottom, 4)
     }
 }
 
@@ -595,7 +613,7 @@ struct FilterDot: View {
         Button(action: toggle) {
             HStack(spacing: 4) {
                 StatusDot(state: state)
-                Text("\(count)").font(.caption).monospacedDigit()
+                Text("\(count)").font(.caption).monospacedDigit().fixedSize()
                     .foregroundStyle(selected ? .primary : .secondary)
             }
             .padding(.horizontal, 5).padding(.vertical, 2)
