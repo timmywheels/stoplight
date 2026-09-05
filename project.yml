@@ -32,6 +32,9 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSUIElement: true
+        CFBundleURLTypes:
+          - CFBundleURLName: com.timwheeler.stoplight
+            CFBundleURLSchemes: [stoplight]
         LSApplicationCategoryType: public.app-category.developer-tools
         NSHumanReadableCopyright: ""
     entitlements:

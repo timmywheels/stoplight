@@ -23,4 +23,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.start()  // polling + snapshot server, at launch, not on first click
         statusPanel = StatusPanelController(model: model)
     }
+
+    /// stoplight://open            → show the panel (small widget)
+    /// stoplight://pr/<PR node id> → show the panel with that PR selected and expanded
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls where url.scheme == "stoplight" {
+            let model = AppModel.shared
+            if url.host == "pr", let id = url.pathComponents.dropFirst().first {
+                model.selectedID = id
+                model.expandedID = id
+            }
+            model.openPanel?()
+        }
+    }
 }

@@ -139,7 +139,7 @@ struct ListView: View {
                     Text(row.section.title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
                         .padding(.top, i == 0 ? 0 : 4)
                 }
-                Link(destination: row.pr.url) {
+                Link(destination: URL(string: "stoplight://pr/\(row.pr.id)") ?? row.pr.url) {
                     HStack(spacing: 8) {
                         if row.pr.status == .merged && row.pr.checks.isEmpty {
                             Image(systemName: "checkmark.circle.fill").font(.caption2).foregroundStyle(.purple).frame(width: 8)
