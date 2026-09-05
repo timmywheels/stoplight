@@ -93,6 +93,7 @@ final class UserPrefs {
         static let mergedDays = "mergedDays"
         static let sectionOrder = "sectionOrder"
         static let tourSeen = "tourSeen"
+        static let rowActions = "rowActions"
         static let agent = "agent"
         static let agentCustom = "agentCustomCommand"
         static let terminal = "terminal"
@@ -119,6 +120,9 @@ final class UserPrefs {
     var scanRoot: String { didSet { defaults.set(scanRoot, forKey: Key.scanRoot) } }
     /// "owner/name" (lowercased) → local clone path.
     var repoPaths: [String: String] { didSet { defaults.set(repoPaths, forKey: Key.repoPaths) } }
+
+    /// Which circular buttons an expanded row shows, in order (US-031). Local only.
+    var rowActions: [RowAction] { didSet { defaults.set(rowActions.map(\.rawValue), forKey: Key.rowActions) } }
 
     /// First-run tour dismissed (US-024). Local only.
     var tourSeen: Bool { didSet { defaults.set(tourSeen, forKey: Key.tourSeen) } }
@@ -159,6 +163,7 @@ final class UserPrefs {
         mergedDays = defaults.object(forKey: Key.mergedDays) == nil ? 1 : defaults.integer(forKey: Key.mergedDays)
         sectionOrder = defaults.stringArray(forKey: Key.sectionOrder) ?? []
         tourSeen = defaults.bool(forKey: Key.tourSeen)
+        rowActions = (defaults.stringArray(forKey: Key.rowActions)?.compactMap(RowAction.init(rawValue:))) ?? RowAction.defaultOrder
         agent = defaults.string(forKey: Key.agent) ?? ""
         agentCustomCommand = defaults.string(forKey: Key.agentCustom) ?? "my-agent {prompt}"
         terminal = defaults.string(forKey: Key.terminal) ?? "terminal"

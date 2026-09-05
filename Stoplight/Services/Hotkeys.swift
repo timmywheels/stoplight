@@ -6,7 +6,7 @@ import StoplightCore
 enum Hotkey: CaseIterable {
     case toggleGlobal
     case moveDown, moveUp, open, expand, collapse, close, nextButton, prevButton
-    case copyURL, share, copyBranch, pin, fix, hide, checks
+    case copyURL, share, copyBranch, copyHash, pin, fix, hide, checks
     case filterRed, filterYellow, filterGreen, clearFilters
     case toggleSections, refresh, watch, settings, showHotkeys
 
@@ -26,6 +26,7 @@ enum Hotkey: CaseIterable {
         case .copyURL: Combo(key: "c", symbol: "C", mods: [.command])
         case .share: Combo(key: "c", symbol: "C", mods: [.shift, .command])
         case .copyBranch: Combo(key: "b", symbol: "B", mods: [.command])
+        case .copyHash: Combo(key: "b", symbol: "B", mods: [.shift, .command])
         case .pin: Combo(key: "p", symbol: "P", mods: [.command])
         case .fix: Combo(key: "f", symbol: "F", mods: [.command])
         case .hide: Combo(key: "h", symbol: "H", mods: [.command])
@@ -56,6 +57,7 @@ enum Hotkey: CaseIterable {
         case .copyURL: "Copy URL"
         case .share: "Share (title as a link)"
         case .copyBranch: "Copy branch name"
+        case .copyHash: "Copy commit hash"
         case .pin: "Pin or unpin"
         case .fix: "Fix with your agent"
         case .hide: "Hide this PR"
@@ -85,7 +87,7 @@ enum Hotkey: CaseIterable {
     static let groups: [(String, [Hotkey])] = [
         ("Anywhere", [.toggleGlobal]),
         ("Navigate", [.moveDown, .moveUp, .expand, .nextButton, .prevButton, .collapse, .close]),
-        ("Selected PR", [.open, .checks, .copyURL, .share, .copyBranch, .pin, .fix, .hide]),
+        ("Selected PR", [.open, .checks, .copyURL, .share, .copyBranch, .copyHash, .pin, .fix, .hide]),
         ("Filter", [.filterRed, .filterYellow, .filterGreen, .clearFilters]),
         ("Panel", [.toggleSections, .refresh, .watch, .settings, .showHotkeys]),
     ]
@@ -143,6 +145,8 @@ final class GlobalHotkey: @unchecked Sendable {
 enum PRActions {
     static func copyURL(_ pr: PullRequest) { copy(pr.url.absoluteString) }
     static func copyBranch(_ pr: PullRequest) { copy(pr.headRefName) }
+    /// Full 40-char SHA of the PR's head commit (for branch rows, the commit shown).
+    static func copyHash(_ pr: PullRequest) { copy(pr.headSha) }
 
     static func copy(_ value: String) {
         NSPasteboard.general.clearContents()

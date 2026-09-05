@@ -509,32 +509,33 @@ struct PRRow: View {
 
     private struct RowButton { let symbol: String; let help: String; let tint: Color?; let action: () -> Void }
 
-    /// The expanded row's buttons, in Tab order. Fix appears only when it can run.
+    /// The expanded row's buttons, in the user's order (Settings → General → Row buttons), skipping ones that don't apply.
     private var buttons: [RowButton] {
-        var b: [RowButton] = [
-            RowButton(symbol: "arrow.up.right", help: pr.isBranch ? "Open commit on GitHub" : "Open on GitHub", tint: nil) { openURL(pr.url) },
-        ]
-        if let run = pr.actionsRunURL {
-            b.append(RowButton(symbol: "list.bullet.rectangle", help: "Open the Actions run summary (⌘K)", tint: nil) { openURL(run) })
-        }
-        b += [
-            RowButton(symbol: copied == "url" ? "checkmark" : "doc.on.doc", help: "Copy URL", tint: copied == "url" ? .green : nil) {
-                flash("url") { copy(pr.url.absoluteString) }
-            },
-            RowButton(symbol: copied == "share" ? "checkmark" : "square.and.arrow.up",
-                      help: "Share: title as a link (Slack hyperlink, Markdown elsewhere)", tint: copied == "share" ? .green : nil) {
-                flash("share") { copyRichLink() }
-            },
-            RowButton(symbol: pinned ? "pin.fill" : "pin", help: pinned ? "Unpin" : "Pin", tint: pinned ? .primary : nil) {
+        model.prefs.rowActions.filter { $0.isAvailable(for: pr, model: model) }.map { a in
+            switch a {
+            case .open: RowButton(symbol: a.symbol, help: pr.isBranch ? "Open commit on GitHub" : a.title, tint: nil) { openURL(pr.url) }
+            case .run: RowButton(symbol: a.symbol, help: "\(a.title) (⌘K)", tint: nil) { if let u = pr.actionsRunURL { openURL(u) } }
+            case .checks: RowButton(symbol: a.symbol, help: a.title, tint: nil) { openURL(pr.checksURL) }
+            case .copyURL: RowButton(symbol: copied == a.id ? "checkmark" : a.symbol, help: "\(a.title) (⌘C)", tint: copied == a.id ? .green : nil) {
+                flash(a.id) { PRActions.copyURL(pr) }
+            }
+            case .share: RowButton(symbol: copied == a.id ? "checkmark" : a.symbol, help: "\(a.title) (⇧⌘C)", tint: copied == a.id ? .green : nil) {
+                flash(a.id) { PRActions.share(pr) }
+            }
+            case .copyBranch: RowButton(symbol: copied == a.id ? "checkmark" : a.symbol, help: "\(a.title) (⌘B)", tint: copied == a.id ? .green : nil) {
+                flash(a.id) { PRActions.copyBranch(pr) }
+            }
+            case .copyHash: RowButton(symbol: copied == a.id ? "checkmark" : a.symbol, help: "Copy commit hash \(pr.headSha.prefix(7)) (⇧⌘B)", tint: copied == a.id ? .green : nil) {
+                flash(a.id) { PRActions.copyHash(pr) }
+            }
+            case .pin: RowButton(symbol: pinned ? "pin.fill" : "pin", help: pinned ? "Unpin" : "Pin", tint: pinned ? .primary : nil) {
                 withAnimation(Self.motion) { model.togglePin(pr) }
-            },
-        ]
-        if pr.state == .failure && model.canFix(pr) && !pr.isBranch {
-            b.append(RowButton(symbol: "sparkles", help: "Fix with \(model.agentTitle): worktree, terminal, agent", tint: nil) {
+            }
+            case .fix: RowButton(symbol: a.symbol, help: "Fix with \(model.agentTitle): worktree, terminal, agent", tint: nil) {
                 model.fix(pr, runAgent: true)
-            })
+            }
+            }
         }
-        return b
     }
 
     private func circle(_ symbol: String, help: String, tint: Color? = nil, focused: Bool = false, action: @escaping () -> Void) -> some View {
@@ -592,6 +593,7 @@ struct PRRow: View {
         Button("Share (rich link)") { copyRichLink() }
         Button("Copy URL") { copy(pr.url.absoluteString) }
         if !pr.headRefName.isEmpty { Button("Copy branch name") { copy(pr.headRefName) } }
+        Button("Copy commit hash (\(pr.headSha.prefix(7)))") { PRActions.copyHash(pr) }
         if let stack, stack.count > 1 {
             Button("Copy stack (\(stack.count) PRs) as Markdown") { copy(Stacks.markdown(stack)) }
         }

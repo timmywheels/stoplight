@@ -147,6 +147,7 @@ final class AppModel {
         case .copyURL: if let pr = selectedPR { PRActions.copyURL(pr) } else { return false }
         case .share: if let pr = selectedPR { PRActions.share(pr) } else { return false }
         case .copyBranch: if let pr = selectedPR { PRActions.copyBranch(pr) } else { return false }
+        case .copyHash: if let pr = selectedPR { PRActions.copyHash(pr) } else { return false }
         case .pin: if let pr = selectedPR { togglePin(pr) } else { return false }
         case .fix: if let pr = selectedPR, canFix(pr) { fix(pr, runAgent: true) } else { return false }
         case .hide: if let pr = selectedPR { hide(pr: pr) } else { return false }

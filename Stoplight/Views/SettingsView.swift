@@ -45,6 +45,11 @@ private struct GeneralTab: View {
                 }
                 .pickerStyle(.radioGroup)
             }
+            Section("Row buttons") {
+                RowActionsEditor(prefs: prefs)
+                Text("The circles in an expanded PR. Check to show, drag to reorder. Buttons that don't apply to a row (no Actions run, nothing to fix) hide themselves.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("Merged") {
                 Picker("Show recently merged", selection: $prefs.mergedDays) {
                     Text("Off").tag(0)
@@ -139,6 +144,46 @@ private extension GeneralTab {
         case .idle:
             Button("Check for Updates") { Task { await u.check() } }
         }
+    }
+}
+
+/// Check to include, drag to reorder (US-031). Unchecked actions sit at the bottom in their canonical order.
+private struct RowActionsEditor: View {
+    @Bindable var prefs: UserPrefs
+
+    private var rows: [RowAction] {
+        prefs.rowActions + RowAction.allCases.filter { !prefs.rowActions.contains($0) }
+    }
+
+    var body: some View {
+        List {
+            ForEach(rows) { a in
+                let on = prefs.rowActions.contains(a)
+                HStack(spacing: 8) {
+                    Toggle(isOn: Binding(get: { on }, set: { set(a, enabled: $0) })) { EmptyView() }.labelsHidden()
+                    Image(systemName: a.symbol).frame(width: 18).foregroundStyle(on ? .primary : .secondary)
+                    Text(a.title).foregroundStyle(on ? .primary : .secondary)
+                    Spacer()
+                    if on { Image(systemName: "line.3.horizontal").foregroundStyle(.quaternary) }
+                }
+                .moveDisabled(!on)
+            }
+            .onMove { from, to in
+                var enabled = prefs.rowActions
+                enabled.move(fromOffsets: from, toOffset: min(to, enabled.count))
+                prefs.rowActions = enabled
+            }
+        }
+        .listStyle(.bordered)
+        .alternatingRowBackgrounds()
+        .frame(height: CGFloat(RowAction.allCases.count) * 24 + 2)
+    }
+
+    private func set(_ a: RowAction, enabled: Bool) {
+        var list = prefs.rowActions
+        list.removeAll { $0 == a }
+        if enabled { list.append(a) }
+        prefs.rowActions = list
     }
 }
 

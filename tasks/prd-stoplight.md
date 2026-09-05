@@ -357,6 +357,16 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - [ ] When the resolved branch changes, a quiet notification: "New release branch in owner/repo: Now following rc/090626-1 (was rc/090526-2)"
 - [ ] Merged PRs into the RC get the same "green now" treatment via their base branch
 
+### US-031: Configurable row buttons
+**Description:** As a user, I want to choose which circles an expanded PR shows, and in what order.
+
+**Acceptance Criteria:**
+- [ ] Settings → General → Row buttons: every action with a checkbox; checked ones drag to reorder; unchecked ones sit below
+- [ ] Actions: Open, Actions run summary, Checks tab, Copy URL, Share, Copy branch name, Copy commit hash, Pin, Fix with your agent
+- [ ] Default order: Open, Run, Copy URL, Share, Copy hash, Pin, Fix
+- [ ] A button hides itself on rows where it doesn't apply
+- [ ] Copy commit hash copies the full head SHA; ⇧⌘B; also in the right-click menu with the short hash shown
+
 ## Functional Requirements
 
 - FR-1: The app runs as a menu bar accessory only (`LSUIElement = true`), no Dock icon, no main window
