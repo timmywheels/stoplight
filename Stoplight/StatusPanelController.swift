@@ -202,7 +202,7 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
         panel.minSize = Self.minSize
         panel.delegate = self
 
-        let host = NSHostingView(rootView: PanelRoot(model: model, close: { [weak self] in self?.forceClose() }))
+        let host = MovableHostingView(rootView: PanelRoot(model: model, close: { [weak self] in self?.forceClose() }))
         host.translatesAutoresizingMaskIntoConstraints = false
         host.safeAreaRegions = []  // no inset for the hidden title bar
         host.sizingOptions = []    // the user sizes the panel; content never resizes the window
@@ -272,6 +272,12 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
         model.pinnedPanel = false
         close()
     }
+}
+
+/// SwiftUI's hosting view refuses window drags by default. Say yes: any area that no control claims
+/// (the grab handle, header gaps, the footer background) drags the panel.
+private final class MovableHostingView<Content: View>: NSHostingView<Content> {
+    override var mouseDownCanMoveWindow: Bool { true }
 }
 
 /// Wraps the popover content so Escape closes the panel and the view fills whatever size the user picked.

@@ -17,6 +17,11 @@ struct MenuBarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Grab handle: the obvious place to drag the panel around (US-027).
+            Capsule().fill(.quaternary).frame(width: 36, height: 4)
+                .padding(.top, 6).padding(.bottom, 2)
+                .frame(maxWidth: .infinity)
+                .help("Drag to move")
             ZStack {
                 content
                 if showTour {
@@ -61,7 +66,7 @@ struct MenuBarView: View {
                 // The panel has a user-chosen size; the list fills it and scrolls. Headers carry 8pt of their own; 4 more makes 12, matching the sides.
                 ScrollViewReader { proxy in
                     ScrollView {
-                        list.padding(.top, 4)
+                        list
                             .background(GeometryReader { g in
                                 Color.clear.onChange(of: g.size.height, initial: true) { _, h in model.contentHeight = h }
                             })
