@@ -328,6 +328,15 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - [ ] Footer pin toggles pinned mode: floating level, no close on click-outside or focus loss, position kept; Esc unpins and closes
 - [ ] Description in an expanded row is capped at 3 lines and never overlaps the buttons
 
+### US-028: Superseded merges
+**Description:** As a user, I don't want a merged PR to stay red after later merges fixed the base branch.
+
+**Acceptance Criteria:**
+- [ ] For every red merged PR, the poll also fetches the base branch's head commit checks (one aliased request for all distinct repo/branch pairs)
+- [ ] If the head has checks and they're all green, the merged PR is shown with the purple "landed" checkmark and a green "main is green now" tag, and stops counting toward dots and notifications
+- [ ] If the head is red or still running, the merged PR stays red
+- [ ] Unit test: a superseded copy reports `.none`, keeps status merged, fires no transition
+
 ## Functional Requirements
 
 - FR-1: The app runs as a menu bar accessory only (`LSUIElement = true`), no Dock icon, no main window

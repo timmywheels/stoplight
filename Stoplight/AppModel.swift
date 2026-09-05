@@ -341,7 +341,17 @@ final class AppModel {
             let previous = all
             mine = results.first ?? []
             followed = Array(zip(follow, results.dropFirst().prefix(follow.count)))
-            merged = mergedQuery == nil ? [] : (results.last ?? [])
+            var freshMerged = mergedQuery == nil ? [] : (results.last ?? [])
+            // US-028: a red merge commit that main has since moved past is history, not a problem.
+            let redRefs = Set(freshMerged.filter { $0.state == .failure }.map { BranchRef(repo: $0.repo, branch: $0.baseRefName) })
+            if !redRefs.isEmpty, let heads = try? await provider.fetchBranchHeadChecks(Array(redRefs)) {
+                freshMerged = freshMerged.map { pr in
+                    guard pr.state == .failure, let head = heads[BranchRef(repo: pr.repo, branch: pr.baseRefName).key],
+                          !head.isEmpty, Rollup.state(for: head) == .success else { return pr }
+                    return pr.superseded(note: "\(pr.baseRefName) is green now")
+                }
+            }
+            merged = freshMerged
             watched = freshWatched
             lastRefresh = .now
             lastError = nil

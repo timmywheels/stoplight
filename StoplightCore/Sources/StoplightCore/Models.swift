@@ -121,12 +121,14 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
     public let mergeQueue: MergeQueueInfo?
     /// Set for merged PRs (US-022). For those, `checks` are the merge commit's checks on the base branch.
     public let mergedAt: Date?
+    /// Short, user-facing context shown as a tag, e.g. "main is green now" (US-028).
+    public let note: String?
 
     public init(id: String, repo: String, number: Int, title: String, url: URL,
                 isDraft: Bool, updatedAt: Date, headSha: String, checks: [CheckResult],
                 author: String = "", status: PRStatus = .open, summary: String = "",
                 headRefName: String = "", baseRefName: String = "", mergeQueue: MergeQueueInfo? = nil,
-                mergedAt: Date? = nil) {
+                mergedAt: Date? = nil, note: String? = nil) {
         self.id = id
         self.repo = repo
         self.number = number
@@ -143,6 +145,7 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
         self.baseRefName = baseRefName
         self.mergeQueue = mergeQueue
         self.mergedAt = mergedAt
+        self.note = note
     }
 
     // Tolerant decoding so an older prs.json still loads (author/status added in US-011).
@@ -164,6 +167,15 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
         baseRefName = try c.decodeIfPresent(String.self, forKey: .baseRefName) ?? ""
         mergeQueue = try c.decodeIfPresent(MergeQueueInfo.self, forKey: .mergeQueue)
         mergedAt = try c.decodeIfPresent(Date.self, forKey: .mergedAt)
+        note = try c.decodeIfPresent(String.self, forKey: .note)
+    }
+
+    /// A merged PR whose red merge commit has since been fixed on the base branch: drop its checks so it
+    /// reads as "landed", and say why (US-028).
+    public func superseded(note: String) -> PullRequest {
+        PullRequest(id: id, repo: repo, number: number, title: title, url: url, isDraft: isDraft, updatedAt: updatedAt,
+                    headSha: headSha, checks: [], author: author, status: status, summary: summary,
+                    headRefName: headRefName, baseRefName: baseRefName, mergeQueue: mergeQueue, mergedAt: mergedAt, note: note)
     }
 
     public var state: CIState { Rollup.state(for: checks) }
@@ -240,6 +252,15 @@ public protocol CIProvider: Sendable {
     func fetchPullRequests(refs: [PRRef]) async throws -> [PullRequest]
     /// US-013. login → profile display name. Logins without a name are omitted.
     func fetchDisplayNames(logins: [String]) async throws -> [String: String]
+    /// US-028. Checks on the head commit of each branch, keyed "owner/repo#branch". Unknown refs are omitted.
+    func fetchBranchHeadChecks(_ refs: [BranchRef]) async throws -> [String: [CheckResult]]
+}
+
+public struct BranchRef: Hashable, Sendable {
+    public let repo: String   // "owner/name"
+    public let branch: String
+    public init(repo: String, branch: String) { self.repo = repo; self.branch = branch }
+    public var key: String { "\(repo.lowercased())#\(branch)" }
 }
 
 public extension CIProvider {

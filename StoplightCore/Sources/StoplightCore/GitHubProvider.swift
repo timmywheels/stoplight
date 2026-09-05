@@ -71,6 +71,29 @@ public struct GitHubProvider: CIProvider {
         return out
     }
 
+    public func fetchBranchHeadChecks(_ refs: [BranchRef]) async throws -> [String: [CheckResult]] {
+        guard !refs.isEmpty else { return [:] }
+        let fields = refs.enumerated().compactMap { i, r -> String? in
+            let parts = r.repo.split(separator: "/", maxSplits: 1).map(String.init)
+            guard parts.count == 2, Filters.isValidRepo(r.repo), r.branch.range(of: "^[A-Za-z0-9._/-]+$", options: .regularExpression) != nil else { return nil }
+            return "b\(i): repository(owner: \"\(parts[0])\", name: \"\(parts[1])\") { ref(qualifiedName: \"refs/heads/\(r.branch)\") { target { ... on Commit { ...CommitChecks } } } }"
+        }
+        guard !fields.isEmpty else { return [:] }
+        let query = "query {\n" + fields.joined(separator: "\n") + "\n}\n" + Self.commitChecksFragment
+        let data = try await post(["query": query])
+        struct Target: Decodable { let statusCheckRollup: Node.RollupNode? }
+        struct Ref: Decodable { let target: Target? }
+        struct Repo: Decodable { let ref: Ref? }
+        struct Env: Decodable { let data: [String: Repo?]? }
+        let repos = try Self.decoder.decode(Env.self, from: data).data ?? [:]
+        var out: [String: [CheckResult]] = [:]
+        for (i, r) in refs.enumerated() {
+            guard let nodes = repos["b\(i)"]??.ref?.target?.statusCheckRollup?.contexts.nodes else { continue }
+            out[r.key] = nodes.compactMap(Self.mapCheck)
+        }
+        return out
+    }
+
     /// Validate the token and return the login (US-001).
     public func viewerLogin() async throws -> String {
         let data = try await post(["query": "{ viewer { login } }"])
@@ -131,6 +154,10 @@ public struct GitHubProvider: CIProvider {
       mergeCommit { ...CommitChecks }
       commits(last: 1) { nodes { commit { ...CommitChecks } } }
     }
+    \(commitChecksFragment)
+    """
+
+    static let commitChecksFragment = """
     fragment CommitChecks on Commit {
       statusCheckRollup {
         state

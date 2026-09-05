@@ -74,6 +74,16 @@ final class TransitionsTests: XCTestCase {
         XCTAssertEqual(kinds([pr(state: .failure)], [merged(.failure)]), [])
     }
 
+    func testSupersededMergedPRReadsAsLanded() {
+        let red = pr(state: .failure, status: .merged)
+        let fixed = red.superseded(note: "main is green now")
+        XCTAssertEqual(fixed.state, .none)
+        XCTAssertEqual(fixed.note, "main is green now")
+        XCTAssertEqual(fixed.status, .merged)
+        // No deploy-failed event once superseded, and none when it goes back the other way either.
+        XCTAssertEqual(kinds([red], [fixed]), [])
+    }
+
     func testMergedQueryFormat() {
         let q = PRQuery.merged(withinDays: 1, now: Date(timeIntervalSince1970: 1_800_000_000))  // 2027-01-15 UTC
         XCTAssertEqual(q.githubSearch, "is:pr is:merged author:@me merged:>=2027-01-14 sort:updated-desc")
