@@ -59,7 +59,7 @@ enum Hotkey: CaseIterable {
         case .pin: "Pin or unpin"
         case .fix: "Fix with your agent"
         case .hide: "Hide this PR"
-        case .checks: "Open the full checks summary"
+        case .checks: "Open the Actions run summary"
         case .filterRed: "Toggle red filter"
         case .filterYellow: "Toggle yellow filter"
         case .filterGreen: "Toggle green filter"

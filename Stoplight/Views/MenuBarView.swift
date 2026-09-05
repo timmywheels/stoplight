@@ -425,7 +425,7 @@ struct PRRow: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .help("Open the full checks summary on GitHub (⌘K)")
+                    .help("Open the checks tab on GitHub")
                 }
             }
             HStack(spacing: 10) {
@@ -462,6 +462,11 @@ struct PRRow: View {
     private var buttons: [RowButton] {
         var b: [RowButton] = [
             RowButton(symbol: "arrow.up.right", help: "Open on GitHub", tint: nil) { openURL(pr.url) },
+        ]
+        if let run = pr.actionsRunURL {
+            b.append(RowButton(symbol: "list.bullet.rectangle", help: "Open the Actions run summary (⌘K)", tint: nil) { openURL(run) })
+        }
+        b += [
             RowButton(symbol: copied == "url" ? "checkmark" : "doc.on.doc", help: "Copy URL", tint: copied == "url" ? .green : nil) {
                 flash("url") { copy(pr.url.absoluteString) }
             },
@@ -514,7 +519,8 @@ struct PRRow: View {
             Button("Follow @\(pr.author)") { model.follow(user: pr.author) }
         }
         Button("Hide this PR") { model.hide(pr: pr) }
-        if !pr.checks.isEmpty { Button("Open checks summary") { openURL(pr.checksURL) } }
+        if let run = pr.actionsRunURL { Button("Open Actions run") { openURL(run) } }
+        if !pr.checks.isEmpty { Button("Open checks tab") { openURL(pr.checksURL) } }
         if pr.mergeQueue != nil, let q = URL(string: "https://github.com/\(pr.repo)/queue/\(pr.baseRefName)") {
             Button("Open merge queue") { openURL(q) }
         }

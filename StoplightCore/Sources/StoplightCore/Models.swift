@@ -171,6 +171,17 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
     public var shortRef: String { "\(repo) #\(number)" }
     /// GitHub's full checks summary for this PR (every job, every workflow).
     public var checksURL: URL { url.appendingPathComponent("checks") }
+
+    /// The Actions run summary page (…/actions/runs/<id>) behind this PR's checks: the run holding the
+    /// first failing job, else the first job. nil when checks aren't GitHub Actions.
+    public var actionsRunURL: URL? {
+        for check in failingChecks + checks {
+            guard let u = check.url?.absoluteString,
+                  let r = u.range(of: "/actions/runs/[0-9]+", options: .regularExpression) else { continue }
+            return URL(string: String(u[..<r.upperBound]))
+        }
+        return nil
+    }
     /// Base looks like a feature branch rather than a trunk.
     public var hasNonTrunkBase: Bool {
         !baseRefName.isEmpty && !["main", "master", "develop", "dev", "trunk", "release"].contains(baseRefName.lowercased())

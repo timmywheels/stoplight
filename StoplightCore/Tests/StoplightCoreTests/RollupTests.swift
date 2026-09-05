@@ -64,6 +64,14 @@ final class RollupTests: XCTestCase {
         XCTAssertEqual(GitHubProvider.statusContextState("EXPECTED"), .pending)
     }
 
+    func testActionsRunURLFromJobURL() {
+        let ok = CheckResult(name: "lint", state: .success, url: URL(string: "https://github.com/o/r/actions/runs/111/job/1"))
+        let bad = CheckResult(name: "e2e", state: .failure, url: URL(string: "https://github.com/o/r/actions/runs/222/job/9?pr=5"))
+        XCTAssertEqual(pr(checks: [ok, bad]).actionsRunURL?.absoluteString, "https://github.com/o/r/actions/runs/222")
+        XCTAssertEqual(pr(checks: [ok]).actionsRunURL?.absoluteString, "https://github.com/o/r/actions/runs/111")
+        XCTAssertNil(pr(checks: [CheckResult(name: "ci", state: .success, url: URL(string: "https://ci.example.com/b/1"))]).actionsRunURL)
+    }
+
     private func pr(id: String = "x", draft: Bool = false, updated: Date = .now, checks: [CheckResult]) -> PullRequest {
         PullRequest(id: id, repo: "o/r", number: 1, title: "t", url: URL(string: "https://github.com/o/r/pull/1")!,
                     isDraft: draft, updatedAt: updated, headSha: "abc", checks: checks)

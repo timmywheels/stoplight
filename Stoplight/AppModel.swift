@@ -128,7 +128,9 @@ final class AppModel {
         case .pin: if let pr = selectedPR { togglePin(pr) } else { return false }
         case .fix: if let pr = selectedPR, canFix(pr) { fix(pr, runAgent: true) } else { return false }
         case .hide: if let pr = selectedPR { hide(pr: pr) } else { return false }
-        case .checks: if let pr = selectedPR, !pr.checks.isEmpty { NSWorkspace.shared.open(pr.checksURL) } else { return false }
+        case .checks:
+            guard let pr = selectedPR, !pr.checks.isEmpty else { return false }
+            NSWorkspace.shared.open(pr.actionsRunURL ?? pr.checksURL)
         case .filterRed: toggleFilter(.failure)
         case .filterYellow: toggleFilter(.pending)
         case .filterGreen: toggleFilter(.success)
