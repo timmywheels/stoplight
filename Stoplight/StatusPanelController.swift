@@ -20,7 +20,10 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
 
     private static let sizeKey = "panelSize"
     private static let defaultSize = NSSize(width: 380, height: 520)
-    private static let minSize = NSSize(width: 320, height: 240)
+    private static let minSize = NSSize(width: 320, height: 160)
+    /// Set once the user drags the panel; we then stop snapping it under the dots until it's closed unpinned.
+    private var userMoved = false
+    private var fitting = false
 
     init(model: AppModel) {
         self.model = model
@@ -32,8 +35,53 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
         observeGlyph()
+        observeContent()
         model.openPanel = { [weak self] in self?.open() }
         globalHotkey = GlobalHotkey { [weak self] in self?.toggle() }
+    }
+
+    /// Shrink to fit when sections collapse; grow back up to the user's chosen height when they expand (US-027).
+    private func observeContent() {
+        withObservationTracking {
+            _ = model.contentHeight
+            _ = model.pinnedPanel
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                self.fitToContent()
+                self.applyPinState()
+                self.observeContent()
+            }
+        }
+    }
+
+    /// Chrome = everything that isn't the scrolling list (footer, dividers). Measured once the panel exists.
+    private var chromeHeight: CGFloat = 46
+
+    private func fitToContent() {
+        guard let panel, panel.isVisible, !panel.inLiveResize, model.contentHeight > 0 else { return }
+        let maxH = savedSize().height
+        let wanted = max(Self.minSize.height, min(maxH, model.contentHeight + chromeHeight))
+        guard abs(wanted - panel.frame.height) > 1 else { return }
+        fitting = true
+        var f = panel.frame
+        f.origin.y += f.height - wanted   // keep the top edge where it is
+        f.size.height = wanted
+        panel.setFrame(f, display: true, animate: true)
+        fitting = false
+    }
+
+    private func applyPinState() {
+        guard let panel else { return }
+        panel.level = model.pinnedPanel ? .floating : .popUpMenu
+        if model.pinnedPanel, let m = clickOutsideMonitor { NSEvent.removeMonitor(m); clickOutsideMonitor = nil }
+        if !model.pinnedPanel, panel.isVisible, clickOutsideMonitor == nil { installClickOutside() }
+    }
+
+    private func installClickOutside() {
+        clickOutsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            Task { @MainActor in self?.close() }
+        }
     }
 
     /// Left click toggles the panel; right click shows a small utility menu.
@@ -108,25 +156,26 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
     func open() {
         let panel = self.panel ?? makePanel()
         self.panel = panel
-        position(panel)
+        if !userMoved { position(panel) }
         panel.makeKeyAndOrderFront(nil)
         statusItem.button?.highlight(true)
-        clickOutsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            Task { @MainActor in self?.close() }
-        }
+        fitToContent()
+        if !model.pinnedPanel { installClickOutside() }
         // Keyboard: dispatch through the Hotkey table while the panel is key. Text fields keep their keys.
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, let panel = self.panel, event.window === panel else { return event }
             if panel.firstResponder is NSTextView, event.keyCode != 53 { return event }
             guard let key = Hotkey.match(event) else { return event }
-            if key == .close { self.close(); return nil }
+            if key == .close { self.forceClose(); return nil }
             return MainActor.assumeIsolated { self.model.handle(key) } ? nil : event
         }
     }
 
     func close() {
+        if model.pinnedPanel { return }  // pinned panels only close via the pin button or Esc twice
         panel?.orderOut(nil)
         statusItem.button?.highlight(false)
+        userMoved = false
         if let m = clickOutsideMonitor { NSEvent.removeMonitor(m); clickOutsideMonitor = nil }
         if let m = keyMonitor { NSEvent.removeMonitor(m); keyMonitor = nil }
     }
@@ -141,8 +190,9 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
         panel.standardWindowButton(.closeButton)?.isHidden = true
         panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
         panel.standardWindowButton(.zoomButton)?.isHidden = true
-        panel.isMovableByWindowBackground = false
-        panel.isMovable = false
+        // Drag anywhere that isn't a control (headers' empty space, the footer, gaps) to move it (US-027).
+        panel.isMovableByWindowBackground = true
+        panel.isMovable = true
         panel.level = .popUpMenu
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         panel.hidesOnDeactivate = false
@@ -152,7 +202,7 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
         panel.minSize = Self.minSize
         panel.delegate = self
 
-        let host = NSHostingView(rootView: PanelRoot(model: model, close: { [weak self] in self?.close() }))
+        let host = NSHostingView(rootView: PanelRoot(model: model, close: { [weak self] in self?.forceClose() }))
         host.translatesAutoresizingMaskIntoConstraints = false
         host.safeAreaRegions = []  // no inset for the hidden title bar
         host.sizingOptions = []    // the user sizes the panel; content never resizes the window
@@ -201,13 +251,26 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
 
     func windowDidEndLiveResize(_ notification: Notification) {
         guard let panel else { return }
+        // The user's size is the ceiling: width always, height as the max the list may grow to.
         UserDefaults.standard.set(NSStringFromSize(panel.frame.size), forKey: Self.sizeKey)
-        position(panel)  // keep the top edge glued to the menu bar after a resize from the bottom
+        if !userMoved { position(panel) }
+        fitToContent()
+    }
+
+    func windowDidMove(_ notification: Notification) {
+        guard !fitting, let panel, panel.isVisible else { return }
+        userMoved = true
     }
 
     func windowDidResignKey(_ notification: Notification) {
-        // Clicking another app's window: behave like a menu and go away.
-        if NSApp.keyWindow == nil || NSApp.keyWindow !== panel { close() }
+        // Clicking another app's window: behave like a menu and go away, unless pinned.
+        if !model.pinnedPanel && (NSApp.keyWindow == nil || NSApp.keyWindow !== panel) { close() }
+    }
+
+    /// Esc on a pinned panel unpins and closes.
+    func forceClose() {
+        model.pinnedPanel = false
+        close()
     }
 }
 

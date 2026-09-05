@@ -50,7 +50,7 @@ enum Hotkey: CaseIterable {
         case .open: "Open selected PR on GitHub"
         case .expand: "Expand or collapse selected PR"
         case .collapse: "Collapse selected PR"
-        case .close: "Close the panel"
+        case .close: "Close the panel (unpins it first)"
         case .nextButton: "Next button in the expanded PR (↩ presses it)"
         case .prevButton: "Previous button"
         case .copyURL: "Copy URL"

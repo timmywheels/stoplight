@@ -10,6 +10,10 @@ final class AppModel {
 
     /// Set by the status panel controller so views (Settings) can pop the panel open.
     var openPanel: (() -> Void)?
+    /// Natural height of the list content, reported by the view so the panel can shrink to fit (US-027).
+    var contentHeight: CGFloat = 0
+    /// Pinned: stays open above other windows, ignores click-outside, keeps wherever you dragged it.
+    var pinnedPanel = false
 
     enum AuthState: Equatable {
         case unknown

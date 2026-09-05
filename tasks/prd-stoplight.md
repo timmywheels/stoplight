@@ -319,6 +319,15 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - [ ] ⌘/ (also right-click → Keyboard Shortcuts, and a keyboard glyph in the footer) shows a sheet generated from the single `Hotkey` table
 - [ ] Text fields keep their keys; only Esc is intercepted while typing
 
+### US-027: Panel fit, move, pin
+**Description:** As a user, I want the panel to take only the space its content needs, to drag it where I like, and to pin it open while I work.
+
+**Acceptance Criteria:**
+- [ ] Panel height tracks the list's natural height (collapsed sections shrink it), capped at the height the user last dragged it to; width is always the user's
+- [ ] Drag any non-control area to move the panel; once moved it stays put until closed
+- [ ] Footer pin toggles pinned mode: floating level, no close on click-outside or focus loss, position kept; Esc unpins and closes
+- [ ] Description in an expanded row is capped at 3 lines and never overlaps the buttons
+
 ## Functional Requirements
 
 - FR-1: The app runs as a menu bar accessory only (`LSUIElement = true`), no Dock icon, no main window

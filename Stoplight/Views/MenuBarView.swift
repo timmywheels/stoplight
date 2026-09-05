@@ -60,7 +60,12 @@ struct MenuBarView: View {
             } else {
                 // The panel has a user-chosen size; the list fills it and scrolls. Headers carry 8pt of their own; 4 more makes 12, matching the sides.
                 ScrollViewReader { proxy in
-                    ScrollView { list.padding(.top, 4) }
+                    ScrollView {
+                        list.padding(.top, 4)
+                            .background(GeometryReader { g in
+                                Color.clear.onChange(of: g.size.height, initial: true) { _, h in model.contentHeight = h }
+                            })
+                    }
                         .onChange(of: model.selectedID) { _, id in
                             if let id { withAnimation(.snappy(duration: 0.15)) { proxy.scrollTo(id, anchor: .center) } }
                         }
@@ -124,6 +129,7 @@ struct MenuBarView: View {
 
     private func centered(_ text: String) -> some View {
         Text(text).foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onAppear { model.contentHeight = 120 }
     }
 
     private var footer: some View {
@@ -158,6 +164,11 @@ struct MenuBarView: View {
                 .disabled(model.updater.state == .downloading || model.updater.state == .installing)
                 .help("Download, verify, and relaunch")
             }
+            Button { model.pinnedPanel.toggle() } label: {
+                Image(systemName: model.pinnedPanel ? "pin.fill" : "pin").frame(width: 22, height: 22)
+                    .foregroundStyle(model.pinnedPanel ? Color.accentColor : .secondary)
+            }
+            .help(model.pinnedPanel ? "Unpin: close on click outside again" : "Pin: stay open above other windows")
             Button {
                 showWatchField.toggle()
                 if showWatchField { watchFieldFocused = true }
@@ -405,7 +416,10 @@ struct PRRow: View {
                 Text(pr.title).font(.caption.weight(.medium)).lineLimit(2)
             }
             if !pr.summary.isEmpty {
-                Text(pr.summary).font(.caption).foregroundStyle(.secondary).lineLimit(2).textSelection(.enabled)
+                Text(pr.summary).font(.caption).foregroundStyle(.secondary)
+                    .lineLimit(3).truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if !pr.checks.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
@@ -480,7 +494,7 @@ struct PRRow: View {
             },
         ]
         if pr.state == .failure && model.canFix(pr) {
-            b.append(RowButton(symbol: "terminal", help: "Fix with \(model.agentTitle): worktree, terminal, agent", tint: nil) {
+            b.append(RowButton(symbol: "sparkles", help: "Fix with \(model.agentTitle): worktree, terminal, agent", tint: nil) {
                 model.fix(pr, runAgent: true)
             })
         }
