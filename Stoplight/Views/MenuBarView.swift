@@ -235,11 +235,9 @@ struct PRRow: View {
     /// All rows of this PR's stack, bottom-up. nil when not stacked.
     var stack: [StackRow]? = nil
     @Environment(\.openURL) private var openURL
-    @State private var expanded = false
     @State private var hovering = false
-    @State private var copied: String?  // which glyph just copied, for the 1s checkmark
+    @State private var copied: String?  // which button just copied, for the 1s checkmark
     @State private var editingAlias = false
-    @State private var showDescription = false
     @State private var aliasDraft = ""
     @FocusState private var aliasFocused: Bool
 
@@ -247,142 +245,162 @@ struct PRRow: View {
     private var watched: Bool { model.isWatched(pr) }
     private var isMine: Bool { model.isMine(pr) }
     private var alias: String? { model.prefs.alias(for: pr.id) }
+    private var expanded: Bool { model.expandedID == pr.id }
+    private static let motion = Animation.snappy(duration: 0.2, extraBounce: 0)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Button { if !editingAlias { openURL(pr.url) } } label: {
-                HStack(spacing: 10) {
-                    if depth > 0 {
-                        // Stack connector: this PR is based on the row above.
-                        Image(systemName: "arrow.turn.down.right")
-                            .font(.caption2).foregroundStyle(.tertiary)
-                            .padding(.leading, CGFloat(depth - 1) * 14)
+            header
+            if expanded {
+                expansion
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .clipped()
+        .background(hovering || expanded ? AnyShapeStyle(.quaternary.opacity(0.5)) : AnyShapeStyle(.clear))
+        .onHover { hovering = $0 }
+        .contextMenu { menu }
+    }
+
+    // MARK: Header row. Click expands; double-click or ⌘-click opens.
+
+    private var header: some View {
+        HStack(spacing: 10) {
+            if depth > 0 {
+                // Stack connector: this PR is based on the row above.
+                Image(systemName: "arrow.turn.down.right")
+                    .font(.caption2).foregroundStyle(.tertiary)
+                    .padding(.leading, CGFloat(depth - 1) * 14)
+            }
+            StatusDot(state: pr.state, hollow: pr.isDraft)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(section?.refLabel(for: pr) ?? pr.shortRef)
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    if !isMine && !(section?.hidesAuthor ?? false) {
+                        Text("· @\(pr.author)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
-                    StatusDot(state: pr.state, hollow: pr.isDraft)
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 6) {
-                            Text(section?.refLabel(for: pr) ?? pr.shortRef)
-                                .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                            if !isMine && !(section?.hidesAuthor ?? false) {
-                                Text("· @\(pr.author)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                            }
-                            if pr.isDraft { tag("Draft") }
-                            if pr.status == .merged { tag("Merged", color: .purple) }
-                            if pr.status == .closed { tag("Closed", color: .red) }
-                            if let q = pr.mergeQueue {
-                                tag(q.isBlocked ? "Queue: blocked" : "Queue #\(q.position)", color: q.isBlocked ? .red : .blue)
-                            }
-                            if depth == 0, stack == nil, pr.hasNonTrunkBase {
-                                // Based on a branch we can't see: part of a stack whose bottom isn't in view.
-                                tag("on \(pr.baseRefName)")
-                            }
-                            if pinned { Image(systemName: "pin.fill").font(.caption2).foregroundStyle(.secondary) }
-                        }
-                        if editingAlias {
-                            TextField(pr.title, text: $aliasDraft)
-                                .textFieldStyle(.plain)
-                                .focused($aliasFocused)
-                                .onSubmit { model.prefs.setAlias(aliasDraft, for: pr.id); editingAlias = false }
-                                .onExitCommand { editingAlias = false }
-                                .onChange(of: aliasFocused) { _, f in if !f { editingAlias = false } }
-                        } else {
-                            Text(model.displayTitle(pr)).lineLimit(1).truncationMode(.tail)
-                                .help(infoText)
-                        }
+                    if pr.isDraft { tag("Draft") }
+                    if pr.status == .merged { tag("Merged", color: .purple) }
+                    if pr.status == .closed { tag("Closed", color: .red) }
+                    if let q = pr.mergeQueue {
+                        tag(q.isBlocked ? "Queue: blocked" : "Queue #\(q.position)", color: q.isBlocked ? .red : .blue)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    Text(pr.updatedAt.compactAgo).font(.caption).foregroundStyle(.tertiary).monospacedDigit()
-                    if pr.state == .failure {
-                        Button { expanded.toggle() } label: {
-                            Image(systemName: "chevron.right").rotationEffect(.degrees(expanded ? 90 : 0))
-                                .font(.caption).foregroundStyle(.secondary).frame(width: 10)
+                    if depth == 0, stack == nil, pr.hasNonTrunkBase {
+                        // Based on a branch we can't see: part of a stack whose bottom isn't in view.
+                        tag("on \(pr.baseRefName)")
+                    }
+                    if pinned { Image(systemName: "pin.fill").font(.caption2).foregroundStyle(.secondary) }
+                }
+                if editingAlias {
+                    TextField(pr.title, text: $aliasDraft)
+                        .textFieldStyle(.plain)
+                        .focused($aliasFocused)
+                        .onSubmit { model.prefs.setAlias(aliasDraft, for: pr.id); editingAlias = false }
+                        .onExitCommand { editingAlias = false }
+                        .onChange(of: aliasFocused) { _, f in if !f { editingAlias = false } }
+                } else {
+                    Text(model.displayTitle(pr)).lineLimit(1).truncationMode(.tail)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Text(pr.updatedAt.compactAgo).font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .gesture(
+            TapGesture(count: 2).onEnded { openURL(pr.url) }
+                .exclusively(before: TapGesture().onEnded {
+                    guard !editingAlias else { return }
+                    if NSEvent.modifierFlags.contains(.command) { openURL(pr.url); return }
+                    withAnimation(Self.motion) { model.toggleExpanded(pr.id) }
+                })
+        )
+    }
+
+    // MARK: Expansion (US-021)
+
+    private var expansion: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if alias != nil {
+                Text(pr.title).font(.caption.weight(.medium)).lineLimit(2)
+            }
+            if !pr.summary.isEmpty {
+                Text(pr.summary).font(.caption).foregroundStyle(.secondary).lineLimit(2).textSelection(.enabled)
+            }
+            if !pr.failingChecks.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(pr.failingChecks) { check in
+                        Button { if let u = check.url { openURL(u) } } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "xmark.circle.fill").foregroundStyle(.red).font(.caption)
+                                Text(check.name).font(.caption).lineLimit(1)
+                            }
                         }
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, 12).padding(.vertical, 8)
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            // Hover toolbar floats over the trailing edge instead of reserving width (US-005: titles get the room).
-            // Two actions only: open, and copy a pasteable link. Everything else is in the right-click menu.
-            .overlay(alignment: .trailing) {
-                if hovering && !editingAlias {
-                    HStack(spacing: 12) {
-                        Button { openURL(pr.url) } label: {
-                            Image(systemName: "arrow.up.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain).help("Open on GitHub")
-                        copyGlyph("doc.on.doc", help: "Copy URL") { copy(pr.url.absoluteString) }
-                        copyGlyph("square.and.arrow.up", help: "Share: copies a rich link (hyperlink in Slack, Markdown in GitHub)") { copyRichLink() }
-                    }
-                    .padding(.horizontal, 10).padding(.vertical, 6)
-                    .background(.regularMaterial, in: Capsule())
-                    .padding(.trailing, 10)
-                    .transition(.opacity)
+            HStack(spacing: 10) {
+                circle("arrow.up.right", help: "Open on GitHub") { openURL(pr.url) }
+                circle(copied == "url" ? "checkmark" : "doc.on.doc", help: "Copy URL", tint: copied == "url" ? .green : nil) {
+                    flash("url") { copy(pr.url.absoluteString) }
                 }
-            }
-            .onHover { hovering = $0 }
-            .contextMenu {
-                Button(pinned ? "Unpin" : "Pin") { model.togglePin(pr) }
-                Button(showDescription ? "Hide description" : "Show description") { showDescription.toggle() }
-                Button(alias == nil ? "Nickname…" : "Edit nickname…") { startEditingAlias() }
-                if alias != nil { Button("Clear nickname") { model.prefs.setAlias("", for: pr.id) } }
-                if watched {
-                    Button("Stop watching") { model.unwatch(pr) }
+                circle(copied == "share" ? "checkmark" : "square.and.arrow.up",
+                       help: "Share: title as a link (Slack hyperlink, Markdown elsewhere)", tint: copied == "share" ? .green : nil) {
+                    flash("share") { copyRichLink() }
                 }
-                Divider()
-                if !isMine && !model.prefs.isFollowing(user: pr.author) {
-                    Button("Follow @\(pr.author)") { model.follow(user: pr.author) }
+                circle(pinned ? "pin.fill" : "pin", help: pinned ? "Unpin" : "Pin", tint: pinned ? .primary : nil) {
+                    withAnimation(Self.motion) { model.togglePin(pr) }
                 }
-                Button("Hide this PR") { model.hide(pr: pr) }
-                if pr.mergeQueue != nil,
-                   let q = URL(string: "https://github.com/\(pr.repo)/queue/\(pr.baseRefName)") {
-                    Button("Open merge queue") { openURL(q) }
-                }
-                Divider()
-                Button("Share (rich link)") { copyRichLink() }
-                Button("Copy URL") { copy(pr.url.absoluteString) }
-                if !pr.headRefName.isEmpty { Button("Copy branch name") { copy(pr.headRefName) } }
-                if let stack, stack.count > 1 {
-                    Button("Copy stack (\(stack.count) PRs) as Markdown") { copy(Stacks.markdown(stack)) }
-                }
-            }
-
-            if showDescription {
-                VStack(alignment: .leading, spacing: 4) {
-                    if alias != nil { Text(pr.title).font(.caption.weight(.medium)) }
-                    Text(pr.summary.isEmpty ? "No description." : pr.summary)
-                        .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
-                }
-                .padding(.leading, 34).padding(.trailing, 12).padding(.bottom, 8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            if expanded {
-                ForEach(pr.failingChecks) { check in
-                    Button { if let u = check.url { openURL(u) } } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "xmark.circle.fill").foregroundStyle(.red).font(.caption)
-                            Text(check.name).font(.caption).lineLimit(1)
-                            Spacer()
-                        }
-                        .padding(.leading, 34).padding(.trailing, 12).padding(.vertical, 4)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.bottom, 6)
+                Spacer()
             }
         }
+        .padding(.leading, 34 + CGFloat(depth) * 14).padding(.trailing, 12).padding(.bottom, 10)
     }
 
-    /// Tooltip: real title when nicknamed, then the description.
-    private var infoText: String {
-        var parts: [String] = []
-        if alias != nil { parts.append(pr.title) }
-        if !pr.summary.isEmpty { parts.append(pr.summary) }
-        return parts.isEmpty ? pr.title : parts.joined(separator: "\n\n")
+    private func circle(_ symbol: String, help: String, tint: Color? = nil, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(tint ?? .secondary)
+                .frame(width: 32, height: 32)
+                .background(.quaternary, in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+    }
+
+    private func flash(_ key: String, _ action: () -> Void) {
+        action()
+        copied = key
+        Task { try? await Task.sleep(for: .seconds(1)); if copied == key { copied = nil } }
+    }
+
+    // MARK: Context menu: the rarer actions
+
+    @ViewBuilder
+    private var menu: some View {
+        Button(pinned ? "Unpin" : "Pin") { withAnimation(Self.motion) { model.togglePin(pr) } }
+        Button(alias == nil ? "Nickname…" : "Edit nickname…") { startEditingAlias() }
+        if alias != nil { Button("Clear nickname") { model.prefs.setAlias("", for: pr.id) } }
+        if watched { Button("Stop watching") { model.unwatch(pr) } }
+        Divider()
+        if !isMine && !model.prefs.isFollowing(user: pr.author) {
+            Button("Follow @\(pr.author)") { model.follow(user: pr.author) }
+        }
+        Button("Hide this PR") { model.hide(pr: pr) }
+        if pr.mergeQueue != nil, let q = URL(string: "https://github.com/\(pr.repo)/queue/\(pr.baseRefName)") {
+            Button("Open merge queue") { openURL(q) }
+        }
+        Divider()
+        Button("Share (rich link)") { copyRichLink() }
+        Button("Copy URL") { copy(pr.url.absoluteString) }
+        if !pr.headRefName.isEmpty { Button("Copy branch name") { copy(pr.headRefName) } }
+        if let stack, stack.count > 1 {
+            Button("Copy stack (\(stack.count) PRs) as Markdown") { copy(Stacks.markdown(stack)) }
+        }
     }
 
     private func startEditingAlias() {
@@ -394,20 +412,6 @@ struct PRRow: View {
     private func copy(_ value: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(value, forType: .string)
-    }
-
-    /// Toolbar glyph that runs a copy action and shows a checkmark for a second.
-    private func copyGlyph(_ symbol: String, help: String, action: @escaping () -> Void) -> some View {
-        Button {
-            action()
-            copied = symbol
-            Task { try? await Task.sleep(for: .seconds(1)); if copied == symbol { copied = nil } }
-        } label: {
-            Image(systemName: copied == symbol ? "checkmark" : symbol)
-                .font(.caption).foregroundStyle(copied == symbol ? .green : .secondary)
-        }
-        .buttonStyle(.plain)
-        .help(help)
     }
 
     /// One clipboard entry, two flavors: HTML (Slack, Notion, Docs paste a real hyperlink) and

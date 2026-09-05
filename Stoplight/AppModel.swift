@@ -62,6 +62,10 @@ final class AppModel {
         }
     }
 
+    /// The one expanded row (US-021). Accordion: expanding another collapses this one. Session-only.
+    var expandedID: String?
+    func toggleExpanded(_ id: String) { expandedID = expandedID == id ? nil : id }
+
     /// Popover status filter (US-018). Empty = show everything. Session-only, not persisted.
     var statusFilter: Set<CIState> = []
     func toggleFilter(_ state: CIState) {

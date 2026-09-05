@@ -78,7 +78,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - [ ] Rows sorted: `failure` first, then `pending`, then `success`, then `none`; within a group, most recently updated first
 - [ ] Draft PRs show a "Draft" tag and a hollow dot
 - [ ] Clicking a row opens the PR URL in the default browser and closes the popover
-- [ ] Rows in `failure` state have a disclosure chevron; expanding lists each failing check by name, clicking one opens its `detailsUrl`
+- [ ] Expanding a `failure` row (US-021) lists each failing check by name; clicking one opens its `detailsUrl`
 - [ ] Empty state: "No open PRs" centered, gray
 - [ ] Footer: last-refreshed time, Refresh (⌘R), Settings (⌘,), Quit (⌘Q)
 - [ ] Entire UI uses system fonts and semantic colors, no custom typography
@@ -217,7 +217,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Description:** As a user, I want the PR link and branch name one click away.
 
 **Acceptance Criteria:**
-- [ ] Hovering a row reveals three glyphs floating over the trailing edge: ↗ opens the PR, ⧉ copies the URL, share copies a rich link
+- [ ] Superseded by US-021: actions live in the expanded row
 - [ ] The shared link carries two flavors on the pasteboard: HTML `<a>` (Slack, Notion, Docs paste a hyperlink) and Markdown `[title](url)` as plain text (GitHub, Linear). Link text is the PR title only
 - [ ] The copy glyph turns into a green checkmark for one second
 - [ ] Right-click menu has Share (rich link), Copy URL, Copy branch name, Copy stack as Markdown
@@ -254,6 +254,18 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - [ ] Any failed step aborts before touching the installed app and shows the reason in Settings
 - [ ] Settings shows Up to date / Check Again / Retry states
 - [ ] No third-party framework; loopback-free, no server beyond GitHub
+
+### US-021: Expanding rows
+**Description:** As a user, I want every action on a PR discoverable with one click, without a wall of buttons on every row.
+
+**Acceptance Criteria:**
+- [ ] Single click on a row expands it; one row is expanded at a time (accordion); clicking again collapses
+- [ ] Double-click or ⌘-click opens the PR directly
+- [ ] Expansion shows, top to bottom: real title (if nicknamed), description (2 lines), failing checks as links, then four 32pt circular buttons: Open, Copy URL, Share, Pin
+- [ ] Copy and Share flash a checkmark for one second
+- [ ] Motion: a single 200ms snappy curve with no bounce; content fades and slides 8pt from under the header; nothing but row height moves
+- [ ] Hovered or expanded rows get a faint background
+- [ ] The hover toolbar and the failing-checks chevron are removed; rarer actions stay on right-click
 
 ## Functional Requirements
 
