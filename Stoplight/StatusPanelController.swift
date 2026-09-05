@@ -15,6 +15,8 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
     private let statusItem: NSStatusItem
     private var panel: NSPanel?
     private var clickOutsideMonitor: Any?
+    private var keyMonitor: Any?
+    private var globalHotkey: GlobalHotkey?
 
     private static let sizeKey = "panelSize"
     private static let defaultSize = NSSize(width: 380, height: 520)
@@ -31,6 +33,7 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
         }
         observeGlyph()
         model.openPanel = { [weak self] in self?.open() }
+        globalHotkey = GlobalHotkey { [weak self] in self?.toggle() }
     }
 
     /// Left click toggles the panel; right click shows a small utility menu.
@@ -42,6 +45,8 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
         close()
         let menu = NSMenu()
         menu.addItem(withTitle: "Show Tour", action: #selector(showTour), keyEquivalent: "").target = self
+        let hk = menu.addItem(withTitle: "Keyboard Shortcuts", action: #selector(showHotkeys), keyEquivalent: "/")
+        hk.target = self
         menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",").target = self
         menu.addItem(.separator())
         let login = menu.addItem(withTitle: "Open at Login", action: #selector(toggleLogin), keyEquivalent: "")
@@ -57,6 +62,11 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
 
     @objc private func showTour() {
         model.prefs.tourSeen = false
+        open()
+    }
+
+    @objc private func showHotkeys() {
+        model.showHotkeys = true
         open()
     }
 
@@ -104,12 +114,21 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
         clickOutsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             Task { @MainActor in self?.close() }
         }
+        // Keyboard: dispatch through the Hotkey table while the panel is key. Text fields keep their keys.
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, let panel = self.panel, event.window === panel else { return event }
+            if panel.firstResponder is NSTextView, event.keyCode != 53 { return event }
+            guard let key = Hotkey.match(event) else { return event }
+            if key == .close { self.close(); return nil }
+            return MainActor.assumeIsolated { self.model.handle(key) } ? nil : event
+        }
     }
 
     func close() {
         panel?.orderOut(nil)
         statusItem.button?.highlight(false)
         if let m = clickOutsideMonitor { NSEvent.removeMonitor(m); clickOutsideMonitor = nil }
+        if let m = keyMonitor { NSEvent.removeMonitor(m); keyMonitor = nil }
     }
 
     private func makePanel() -> NSPanel {

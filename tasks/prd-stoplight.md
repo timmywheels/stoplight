@@ -306,6 +306,17 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - [ ] Main checkout is never modified; errors surface inline in the expansion
 - [ ] Warp gets the folder opened and the command on the clipboard (no scripting API)
 
+### US-026: Keyboard
+**Description:** As a power user, I want to drive the whole thing without the mouse.
+
+**Acceptance Criteria:**
+- [ ] ⌥⌘S toggles the panel from any app (Carbon hotkey, no accessibility permission)
+- [ ] In the panel: ↑/↓ select, ↩ opens on GitHub, Space expands/collapses, ← collapses, Esc closes; selection is highlighted and scrolled into view
+- [ ] Selected PR: ⌘C copy URL, ⇧⌘C share, ⌘B copy branch, ⌘P pin, ⌘F fix with agent, ⌘H hide
+- [ ] ⌘1/2/3 toggle red/yellow/green filters, ⌘0 clears; ⇧⌘E collapses or expands all sections; ⌘R, ⌘N, ⌘, unchanged
+- [ ] ⌘/ (also right-click → Keyboard Shortcuts, and a keyboard glyph in the footer) shows a sheet generated from the single `Hotkey` table
+- [ ] Text fields keep their keys; only Esc is intercepted while typing
+
 ## Functional Requirements
 
 - FR-1: The app runs as a menu bar accessory only (`LSUIElement = true`), no Dock icon, no main window

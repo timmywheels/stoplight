@@ -15,7 +15,7 @@ struct TourView: View {
 
     private let slides: [Slide] = [
         Slide(title: "Stop refreshing GitHub",
-              body: "Stoplight watches every open PR you have. Red means go fix something. Yellow means keep working, it's still running. Green means ship it. One glance at the menu bar is the whole check.",
+              body: "Stoplight watches every open PR you have. Red means go fix something. Yellow means keep working, it's still running. Green means ship it. One glance at the menu bar is the whole check. ⌥⌘S opens the list from anywhere.",
               art: AnyView(HStack(spacing: 10) {
                   Circle().fill(.red).frame(width: 14, height: 14)
                   Circle().fill(.yellow).frame(width: 14, height: 14)
@@ -29,8 +29,8 @@ struct TourView: View {
                           .frame(width: 32, height: 32).background(.quaternary, in: Circle())
                   }
               })),
-        Slide(title: "Fix CI without leaving your chair",
-              body: "Pick your coding agent in Settings → Agent. Then on any red PR, one click checks out the branch in a fresh worktree, opens your terminal, and hands the failure to the agent.",
+        Slide(title: "Red PR? Send your agent",
+              body: "Pick a coding agent in Settings → Agent. On a failing PR, one click checks out the branch in a separate worktree, opens your terminal there, and starts the agent with the failure already explained.",
               art: AnyView(Image(systemName: "terminal").font(.system(size: 34)).foregroundStyle(.secondary))),
         Slide(title: "Make it yours",
               body: "Right-click to nickname a PR, hide the ones that just sit there, or copy a whole stack as Markdown to share. Collapse sections, drag them into your order.",

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import StoplightCore
@@ -70,6 +71,58 @@ final class AppModel {
     /// The one expanded row (US-021). Accordion: expanding another collapses this one. Session-only.
     var expandedID: String?
     func toggleExpanded(_ id: String) { expandedID = expandedID == id ? nil : id }
+
+    // MARK: Keyboard (US-026)
+
+    /// Keyboard selection. Session-only. Nil until the user touches the arrow keys.
+    var selectedID: String?
+    var showHotkeys = false
+
+    /// Row ids in display order, skipping collapsed sections.
+    var visibleRowIDs: [String] {
+        sections.flatMap { sec in prefs.collapsedSections.contains(sec.id) ? [] : Stacks.layout(sec.prs).map(\.id) }
+    }
+    var selectedPR: PullRequest? {
+        guard let id = selectedID else { return nil }
+        return (all + mergedRows).first { $0.id == id }
+    }
+
+    func moveSelection(_ delta: Int) {
+        let ids = visibleRowIDs
+        guard !ids.isEmpty else { return }
+        guard let cur = selectedID, let i = ids.firstIndex(of: cur) else {
+            selectedID = delta >= 0 ? ids.first : ids.last
+            return
+        }
+        selectedID = ids[max(0, min(ids.count - 1, i + delta))]
+    }
+
+    /// Returns true when the key was handled. Keys owned by SwiftUI shortcuts (⌘R, ⌘N, ⌘,) fall through.
+    func handle(_ key: Hotkey) -> Bool {
+        switch key {
+        case .moveDown: moveSelection(1)
+        case .moveUp: moveSelection(-1)
+        case .open: if let pr = selectedPR { NSWorkspace.shared.open(pr.url) } else { return false }
+        case .expand: if let id = selectedID { toggleExpanded(id) } else { moveSelection(1) }
+        case .collapse: if expandedID != nil { expandedID = nil } else { return false }
+        case .copyURL: if let pr = selectedPR { PRActions.copyURL(pr) } else { return false }
+        case .share: if let pr = selectedPR { PRActions.share(pr) } else { return false }
+        case .copyBranch: if let pr = selectedPR { PRActions.copyBranch(pr) } else { return false }
+        case .pin: if let pr = selectedPR { togglePin(pr) } else { return false }
+        case .fix: if let pr = selectedPR, canFix(pr) { fix(pr, runAgent: true) } else { return false }
+        case .hide: if let pr = selectedPR { hide(pr: pr) } else { return false }
+        case .filterRed: toggleFilter(.failure)
+        case .filterYellow: toggleFilter(.pending)
+        case .filterGreen: toggleFilter(.success)
+        case .clearFilters: statusFilter = []
+        case .toggleSections:
+            let ids = sections.map(\.id)
+            if prefs.collapsedSections.isSuperset(of: ids) { prefs.collapsedSections = [] } else { prefs.collapsedSections = Set(ids) }
+        case .showHotkeys: showHotkeys.toggle()
+        case .toggleGlobal, .close, .refresh, .watch, .settings: return false
+        }
+        return true
+    }
 
     /// Popover status filter (US-018). Empty = show everything. Session-only, not persisted.
     var statusFilter: Set<CIState> = []

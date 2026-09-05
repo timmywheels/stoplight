@@ -22,6 +22,9 @@ struct MenuBarView: View {
                 if showTour {
                     TourView { withAnimation(.snappy(duration: 0.2, extraBounce: 0)) { model.prefs.tourSeen = true } }
                         .transition(.opacity)
+                } else if model.showHotkeys {
+                    HotkeysView { withAnimation(.snappy(duration: 0.2, extraBounce: 0)) { model.showHotkeys = false } }
+                        .transition(.opacity)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -56,7 +59,12 @@ struct MenuBarView: View {
                 centered("No PRs match the filter")
             } else {
                 // The panel has a user-chosen size; the list fills it and scrolls. Headers carry 8pt of their own; 4 more makes 12, matching the sides.
-                ScrollView { list.padding(.top, 4) }
+                ScrollViewReader { proxy in
+                    ScrollView { list.padding(.top, 4) }
+                        .onChange(of: model.selectedID) { _, id in
+                            if let id { withAnimation(.snappy(duration: 0.15)) { proxy.scrollTo(id, anchor: .center) } }
+                        }
+                }
             }
         }
     }
@@ -167,7 +175,7 @@ struct MenuBarView: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.secondary)
-        .padding(.leading, 12).padding(.trailing, 14).padding(.vertical, 8)
+        .padding(.leading, 12).padding(.trailing, 12).padding(.top, 8).padding(.bottom, 6)
     }
 }
 
@@ -278,6 +286,7 @@ struct PRRow: View {
     private var isMine: Bool { model.isMine(pr) }
     private var alias: String? { model.prefs.alias(for: pr.id) }
     private var expanded: Bool { model.expandedID == pr.id }
+    private var selected: Bool { model.selectedID == pr.id }
     private static let motion = Animation.snappy(duration: 0.2, extraBounce: 0)
 
     var body: some View {
@@ -289,7 +298,9 @@ struct PRRow: View {
             }
         }
         .clipped()
-        .background(hovering || expanded ? AnyShapeStyle(.quaternary.opacity(0.5)) : AnyShapeStyle(.clear))
+        .background(selected ? AnyShapeStyle(Color.accentColor.opacity(0.18))
+                    : hovering || expanded ? AnyShapeStyle(.quaternary.opacity(0.5)) : AnyShapeStyle(.clear))
+        .id(pr.id)
         .onHover { hovering = $0 }
         .contextMenu { menu }
     }
@@ -347,9 +358,10 @@ struct PRRow: View {
         .contentShape(Rectangle())
         .gesture(
             // Click opens on GitHub. Double-click or ⌘-click expands the row.
-            TapGesture(count: 2).onEnded { toggleExpand() }
+            TapGesture(count: 2).onEnded { model.selectedID = pr.id; toggleExpand() }
                 .exclusively(before: TapGesture().onEnded {
                     guard !editingAlias else { return }
+                    model.selectedID = pr.id
                     if NSEvent.modifierFlags.contains(.command) { toggleExpand() } else { openURL(pr.url) }
                 })
         )
@@ -490,25 +502,8 @@ struct PRRow: View {
         DispatchQueue.main.async { aliasFocused = true }
     }
 
-    private func copy(_ value: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(value, forType: .string)
-    }
-
-    /// One clipboard entry, two flavors: HTML (Slack, Notion, Docs paste a real hyperlink) and
-    /// Markdown as the plain-text fallback (GitHub, Linear, terminals). Link text is just the PR title.
-    private func copyRichLink() {
-        let label = pr.title
-        let markdown = "[\(label)](\(pr.url.absoluteString))"
-        let escaped = label.replacingOccurrences(of: "&", with: "&amp;")
-            .replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")
-        let html = "<a href=\"\(pr.url.absoluteString)\">\(escaped)</a>"
-        let pb = NSPasteboard.general
-        pb.clearContents()
-        pb.declareTypes([.html, .string], owner: nil)
-        pb.setString(html, forType: .html)
-        pb.setString(markdown, forType: .string)
-    }
+    private func copy(_ value: String) { PRActions.copy(value) }
+    private func copyRichLink() { PRActions.share(pr) }
 
     private func tag(_ text: String, color: Color = .secondary) -> some View {
         Text(text).font(.caption2).foregroundStyle(color)
