@@ -88,7 +88,8 @@ enum AgentLauncher {
     private(set) static var installedAgents: Set<Agent> = []
     static func detectAgents() async {
         let names = Agent.allCases.compactMap(\.binary).joined(separator: " ")
-        let out = (try? await shell("for b in \(names); do command -v $b >/dev/null 2>&1 && echo $b; done")) ?? ""
+        // `; true` so a missing last binary doesn't make the whole script exit non-zero.
+        let out = (try? await shell("for b in \(names); do command -v $b >/dev/null 2>&1 && echo $b; done; true")) ?? ""
         let found = Set(out.split(separator: "\n").map(String.init))
         installedAgents = Set(Agent.allCases.filter { $0 == .custom || found.contains($0.binary ?? "") })
     }
