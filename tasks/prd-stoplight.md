@@ -260,8 +260,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Description:** As a user, I want every action on a PR discoverable with one click, without a wall of buttons on every row.
 
 **Acceptance Criteria:**
-- [ ] Single click on a row expands it; one row is expanded at a time (accordion); clicking again collapses
-- [ ] Double-click or ⌘-click opens the PR directly
+- [ ] Single click opens the PR on GitHub; double-click or ⌘-click expands the row; one row expanded at a time (accordion)
 - [ ] Expansion shows, top to bottom: real title (if nicknamed), description (2 lines), failing checks as links, then four 32pt circular buttons: Open, Copy URL, Share, Pin
 - [ ] Copy and Share flash a checkmark for one second
 - [ ] Motion: a single 200ms snappy curve with no bounce; content fades and slides 8pt from under the header; nothing but row height moves
@@ -293,9 +292,9 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Description:** As a new user, I want the non-obvious interactions shown to me once.
 
 **Acceptance Criteria:**
-- [ ] Four slides inside the panel, shown the first time it has data: the dots; click to expand / double-click to open; right-click, collapse, drag; Sources and the widget
+- [ ] Five slides inside the panel, shown the first time it has data: the dots; click to open / double-click to expand; fix with your agent; right-click, collapse, drag; Sources and the widget
 - [ ] Next / Done (Return) and Skip (Escape); page dots; 200ms fades
-- [ ] Marked seen in UserDefaults; Settings → General → "Show Again" replays it
+- [ ] Marked seen in UserDefaults; Settings → General → "Show Again" resets it and opens the panel
 
 ### US-025: Fix with your agent
 **Description:** As a user, I want one button on a red PR that puts my coding agent to work on the failure.

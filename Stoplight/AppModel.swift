@@ -7,6 +7,9 @@ import StoplightCore
 final class AppModel {
     static let shared = AppModel()
 
+    /// Set by the status panel controller so views (Settings) can pop the panel open.
+    var openPanel: (() -> Void)?
+
     enum AuthState: Equatable {
         case unknown
         case signedOut

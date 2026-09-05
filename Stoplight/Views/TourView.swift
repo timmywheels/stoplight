@@ -21,14 +21,18 @@ struct TourView: View {
                   Circle().fill(.yellow).frame(width: 14, height: 14)
                   Circle().fill(.green).frame(width: 14, height: 14)
               }.padding(.horizontal, 14).padding(.vertical, 10).background(Color(white: 0.22), in: Capsule()))),
-        Slide(title: "Everything about a PR, one click away",
-              body: "Click a PR to see its description, exactly which checks failed, and buttons to open, copy, share, or pin it. Double-click opens it on GitHub.",
+        Slide(title: "Everything about a PR, a double-click away",
+              body: "Click a PR to open it on GitHub. Double-click to expand it right here: description, exactly which checks failed, and buttons to open, copy, share, or pin.",
               art: AnyView(HStack(spacing: 10) {
                   ForEach(["arrow.up.right", "doc.on.doc", "square.and.arrow.up", "pin"], id: \.self) { name in
                       Image(systemName: name).font(.system(size: 13, weight: .medium)).foregroundStyle(.secondary)
                           .frame(width: 32, height: 32).background(.quaternary, in: Circle())
                   }
               })),
+        Slide(title: "Fix CI without leaving your chair",
+              body: "Pick your coding agent in Settings → Agent. Then on any red PR, one click checks out the branch in a fresh worktree, opens your terminal, and hands the failure to the agent.",
+              art: AnyView(Image(systemName: "wrench.and.screwdriver").font(.system(size: 30, weight: .medium)).foregroundStyle(.orange)
+                  .frame(width: 48, height: 48).background(.quaternary, in: Circle()))),
         Slide(title: "Make it yours",
               body: "Right-click to nickname a PR, hide the ones that just sit there, or copy a whole stack as Markdown to share. Collapse sections, drag them into your order.",
               art: AnyView(Image(systemName: "contextualmenu.and.cursorarrow").font(.system(size: 34)).foregroundStyle(.secondary))),

@@ -346,11 +346,11 @@ struct PRRow: View {
         .padding(.horizontal, 12).padding(.vertical, 8)
         .contentShape(Rectangle())
         .gesture(
-            // Click expands. Double-click or ⌘-click opens on GitHub.
-            TapGesture(count: 2).onEnded { openURL(pr.url) }
+            // Click opens on GitHub. Double-click or ⌘-click expands the row.
+            TapGesture(count: 2).onEnded { toggleExpand() }
                 .exclusively(before: TapGesture().onEnded {
                     guard !editingAlias else { return }
-                    if NSEvent.modifierFlags.contains(.command) { openURL(pr.url) } else { toggleExpand() }
+                    if NSEvent.modifierFlags.contains(.command) { toggleExpand() } else { openURL(pr.url) }
                 })
         )
         // Quick actions on hover. Attached AFTER the tap gesture so the buttons own their clicks.

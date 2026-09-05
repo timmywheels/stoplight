@@ -30,6 +30,7 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
         observeGlyph()
+        model.openPanel = { [weak self] in self?.open() }
     }
 
     /// Left click toggles the panel; right click shows a small utility menu.
