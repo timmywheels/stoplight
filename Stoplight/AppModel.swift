@@ -21,6 +21,8 @@ final class AppModel {
     private(set) var watched: [PullRequest] = []
     /// Followed users/repos/orgs, in `prefs.followQueries` order.
     private(set) var followed: [(query: PRQuery, prs: [PullRequest])] = []
+    /// My PRs merged within `prefs.mergedDays` (US-022). Their `state` is the merge commit's checks.
+    private(set) var merged: [PullRequest] = []
     private(set) var lastRefresh: Date?
     private(set) var lastError: String?
     private(set) var auth: AuthState = .unknown
@@ -81,14 +83,27 @@ final class AppModel {
     func displayName(for login: String) -> String? { displayNames[login.lowercased()] }
 
     /// Everything visible, deduped, ignore rules applied. Source of truth for dots, widget, notifications.
+    /// Merged PRs are included only while their merge commit has checks, so a red deploy lights the dots
+    /// and a plain "it landed" row never does.
     var all: [PullRequest] {
         var seen = Set<String>()
         var out: [PullRequest] = []
-        for pr in mine + watched + followed.flatMap(\.prs) where seen.insert(pr.id).inserted {
+        let mergedWithChecks = merged.filter { !$0.checks.isEmpty }
+        for pr in mine + watched + followed.flatMap(\.prs) + mergedWithChecks where seen.insert(pr.id).inserted {
             out.append(pr)
         }
         let hidden = prefs.sources.hiddenPRs
         return Filters.visible(out, ignore: prefs.ignoreRules).filter { hidden[$0.id] == nil }
+    }
+
+    /// The Merged section: every merged PR in the window, red first, then newest merge first.
+    var mergedRows: [PullRequest] {
+        let hidden = prefs.sources.hiddenPRs
+        let visible = Filters.visible(merged, ignore: prefs.ignoreRules).filter { hidden[$0.id] == nil }
+        return visible.sorted {
+            if $0.state != $1.state { return $0.state < $1.state }
+            return ($0.mergedAt ?? .distantPast) > ($1.mergedAt ?? .distantPast)
+        }
     }
 
     /// Popover sections in order: Pinned, Mine, Watching, then one per followed source.
@@ -116,6 +131,11 @@ final class AppModel {
             if case .author(let login) = f.query, let name = prefs.label(for: login) ?? displayName(for: login) { title = name }
             out.append(Section(id: f.query.title, title: title, prs: take(f.prs), query: f.query))
         }
+        // Merged rows aren't in `all` unless they have checks, so filter them directly here.
+        let mergedFiltered = mergedRows.filter { pr in
+            !claimed.contains(pr.id) && (filter.isEmpty || filter.contains(pr.state))
+        }
+        out.append(Section(id: "Merged", title: "Merged", prs: mergedFiltered))
         return out.filter { !$0.prs.isEmpty }
     }
     var isEmpty: Bool { all.isEmpty }
@@ -188,6 +208,7 @@ final class AppModel {
         mine = []
         watched = []
         followed = []
+        merged = []
         auth = .signedOut
         SharedStore.clear()
         server.update(Data("{}".utf8))
@@ -202,13 +223,16 @@ final class AppModel {
         defer { isRefreshing = false }
         do {
             let refs = prefs.watched
-            let queries = [PRQuery.authored] + prefs.followQueries
+            let follow = prefs.followQueries
+            let mergedQuery: PRQuery? = prefs.mergedDays > 0 ? .merged(withinDays: prefs.mergedDays) : nil
+            let queries = [PRQuery.authored] + follow + (mergedQuery.map { [$0] } ?? [])
             async let searchTask = provider.fetchPullRequests(queries: queries)
             async let watchedTask = provider.fetchPullRequests(refs: refs)
             let (results, freshWatched) = try await (searchTask, watchedTask)
             let previous = all
             mine = results.first ?? []
-            followed = Array(zip(queries.dropFirst(), results.dropFirst()))
+            followed = Array(zip(follow, results.dropFirst().prefix(follow.count)))
+            merged = mergedQuery == nil ? [] : (results.last ?? [])
             watched = freshWatched
             lastRefresh = .now
             lastError = nil
@@ -294,7 +318,7 @@ final class AppModel {
 
     /// Pins and nicknames on PRs that no longer exist are dropped silently (US-012, US-019).
     private func prunePins() {
-        let live = Set((mine + watched + followed.flatMap(\.prs)).map(\.id))
+        let live = Set((mine + watched + followed.flatMap(\.prs) + merged).map(\.id))
         let stale = prefs.pinned.subtracting(live)
         if !stale.isEmpty { prefs.pinned.subtract(stale) }
         let staleAliases = Set(prefs.sources.prAliases.keys).subtracting(live)

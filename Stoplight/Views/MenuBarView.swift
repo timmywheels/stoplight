@@ -272,7 +272,12 @@ struct PRRow: View {
                     .font(.caption2).foregroundStyle(.tertiary)
                     .padding(.leading, CGFloat(depth - 1) * 14)
             }
-            StatusDot(state: pr.state, hollow: pr.isDraft)
+            if pr.status == .merged && pr.checks.isEmpty {
+                // Landed, nothing ran on the merge commit: just say it merged.
+                Image(systemName: "checkmark.circle.fill").font(.caption).foregroundStyle(.purple).frame(width: 8)
+            } else {
+                StatusDot(state: pr.state, hollow: pr.isDraft)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(section?.refLabel(for: pr) ?? pr.shortRef)
@@ -281,7 +286,7 @@ struct PRRow: View {
                         Text("· @\(pr.author)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                     if pr.isDraft { tag("Draft") }
-                    if pr.status == .merged { tag("Merged", color: .purple) }
+                    if pr.status == .merged && section?.id != "Merged" { tag("Merged", color: .purple) }
                     if pr.status == .closed { tag("Closed", color: .red) }
                     if let q = pr.mergeQueue {
                         tag(q.isBlocked ? "Queue: blocked" : "Queue #\(q.position)", color: q.isBlocked ? .red : .blue)
@@ -304,7 +309,7 @@ struct PRRow: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Text(pr.updatedAt.compactAgo).font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+            Text((pr.mergedAt ?? pr.updatedAt).compactAgo).font(.caption).foregroundStyle(.tertiary).monospacedDigit()
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
         .contentShape(Rectangle())

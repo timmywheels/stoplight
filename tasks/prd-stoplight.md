@@ -269,6 +269,19 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 - [ ] Hovered or expanded rows get a faint background
 - [ ] The hover toolbar and the failing-checks chevron are removed; rarer actions stay on right-click
 
+### US-022: Recently merged
+**Description:** As a user, I want to see what I shipped recently, and when checks run on the merge commit (CD on main), whether the deploy is green.
+
+**Acceptance Criteria:**
+- [ ] One extra aliased search per poll: `is:pr is:merged author:@me merged:>=<day>`; window is Off / 24h / 7d in Settings → Popover, default 24h
+- [ ] "Merged" section at the bottom, collapsed by default; rows sorted red first then newest merge
+- [ ] A merged PR's `checks` are the merge commit's checks, not the branch's
+- [ ] Rows with no merge-commit checks show a purple checkmark instead of a dot and never count toward the dots, widget, or notifications
+- [ ] Merged PRs with checks join `all`, so a red merge commit lights the red dot
+- [ ] Notifications: merge commit turns red → "… failed after merge" (time-sensitive); pending → green → "Merged and green" in all-mode only; the open → merged transition itself never fires
+- [ ] Hidden PRs stay hidden in the Merged section for the window's duration
+- [ ] Unit tests cover the merged transition table and the query string format
+
 ## Functional Requirements
 
 - FR-1: The app runs as a menu bar accessory only (`LSUIElement = true`), no Dock icon, no main window

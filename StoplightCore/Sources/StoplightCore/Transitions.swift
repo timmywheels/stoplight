@@ -8,7 +8,7 @@ public enum NotificationMode: String, Codable, Sendable {
 
 /// Something worth telling the user about (US-006).
 public struct CIEvent: Equatable, Sendable, Identifiable {
-    public enum Kind: String, Sendable { case failed, passed, dequeued }
+    public enum Kind: String, Sendable { case failed, passed, dequeued, deployFailed, deployed }
 
     public let pr: PullRequest
     public let kind: Kind
@@ -27,6 +27,11 @@ public struct CIEvent: Equatable, Sendable, Identifiable {
             return "\(pr.title)\nAll checks passed"
         case .dequeued:
             return "\(pr.title)\nRemoved from the merge queue"
+        case .deployFailed:
+            if let first = pr.failingChecks.first { return "\(pr.title)\n\(first.name) failed after merge" }
+            return "\(pr.title)\nChecks failed after merge"
+        case .deployed:
+            return "\(pr.title)\nMerged and green"
         }
     }
     public var url: URL { pr.url }
@@ -40,6 +45,17 @@ public enum Transitions {
         guard mode != .off else { return [] }
         let prevByID = Dictionary(uniqueKeysWithValues: previous.map { ($0.id, $0) })
         var out: [CIEvent] = []
+
+        // Merged PRs (US-022): the merge commit's checks on the base branch.
+        for pr in current where pr.status == .merged {
+            guard let prev = prevByID[pr.id], prev.status == .merged else { continue }
+            switch (prev.state, pr.state) {
+            case (.failure, .failure): continue
+            case (_, .failure): out.append(CIEvent(pr: pr, kind: .deployFailed))
+            case (.pending, .success) where mode == .all: out.append(CIEvent(pr: pr, kind: .deployed))
+            default: continue
+            }
+        }
 
         for pr in current where !pr.isDraft && pr.status == .open {
             // Unknown before now (first launch, newly opened, newly watched): nothing to compare against.

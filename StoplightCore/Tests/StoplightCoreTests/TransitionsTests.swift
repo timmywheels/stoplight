@@ -65,6 +65,21 @@ final class TransitionsTests: XCTestCase {
         XCTAssertEqual(kinds([pr(state: .pending)], [pr(state: .failure)], mode: .off), [])
     }
 
+    func testMergedPRUsesMergeCommitTransitions() {
+        let merged = { (s: CheckState) in self.pr(state: s, status: .merged) }
+        XCTAssertEqual(kinds([merged(.pending)], [merged(.failure)]), [.deployFailed])
+        XCTAssertEqual(kinds([merged(.pending)], [merged(.success)]), [.deployed])
+        XCTAssertEqual(kinds([merged(.pending)], [merged(.success)], mode: .failOnly), [])
+        // Open → merged in one poll: no event (the branch's red isn't the deploy's red).
+        XCTAssertEqual(kinds([pr(state: .failure)], [merged(.failure)]), [])
+    }
+
+    func testMergedQueryFormat() {
+        let q = PRQuery.merged(withinDays: 1, now: Date(timeIntervalSince1970: 1_800_000_000))  // 2027-01-15 UTC
+        XCTAssertEqual(q.githubSearch, "is:pr is:merged author:@me merged:>=2027-01-14 sort:updated-desc")
+        XCTAssertEqual(q.title, "Merged")
+    }
+
     func testEventKeyAndBody() {
         let e = Transitions.events(previous: [pr(state: .pending)], current: [pr(state: .failure)], mode: .all)[0]
         XCTAssertEqual(e.key, "a|s1|failed")

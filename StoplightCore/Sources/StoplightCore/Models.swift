@@ -119,11 +119,14 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
     public let headRefName: String
     public let baseRefName: String
     public let mergeQueue: MergeQueueInfo?
+    /// Set for merged PRs (US-022). For those, `checks` are the merge commit's checks on the base branch.
+    public let mergedAt: Date?
 
     public init(id: String, repo: String, number: Int, title: String, url: URL,
                 isDraft: Bool, updatedAt: Date, headSha: String, checks: [CheckResult],
                 author: String = "", status: PRStatus = .open, summary: String = "",
-                headRefName: String = "", baseRefName: String = "", mergeQueue: MergeQueueInfo? = nil) {
+                headRefName: String = "", baseRefName: String = "", mergeQueue: MergeQueueInfo? = nil,
+                mergedAt: Date? = nil) {
         self.id = id
         self.repo = repo
         self.number = number
@@ -139,6 +142,7 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
         self.headRefName = headRefName
         self.baseRefName = baseRefName
         self.mergeQueue = mergeQueue
+        self.mergedAt = mergedAt
     }
 
     // Tolerant decoding so an older prs.json still loads (author/status added in US-011).
@@ -159,6 +163,7 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
         headRefName = try c.decodeIfPresent(String.self, forKey: .headRefName) ?? ""
         baseRefName = try c.decodeIfPresent(String.self, forKey: .baseRefName) ?? ""
         mergeQueue = try c.decodeIfPresent(MergeQueueInfo.self, forKey: .mergeQueue)
+        mergedAt = try c.decodeIfPresent(Date.self, forKey: .mergedAt)
     }
 
     public var state: CIState { Rollup.state(for: checks) }
@@ -181,6 +186,8 @@ public enum PRQuery: Hashable, Sendable {
     case author(String)
     case repo(String)   // "owner/name"
     case org(String)
+    /// My PRs merged on or after this day (US-022). Day granularity keeps the query string stable across polls.
+    case mergedSince(String)
 
     public var githubSearch: String {
         let base = "is:pr is:open archived:false"
@@ -189,6 +196,7 @@ public enum PRQuery: Hashable, Sendable {
         case .author(let u): return "\(base) author:\(u)"
         case .repo(let r): return "\(base) repo:\(r)"
         case .org(let o): return "\(base) org:\(o)"
+        case .mergedSince(let day): return "is:pr is:merged author:@me merged:>=\(day) sort:updated-desc"
         }
     }
 
@@ -199,7 +207,16 @@ public enum PRQuery: Hashable, Sendable {
         case .author(let u): "@\(u)"
         case .repo(let r): r
         case .org(let o): o
+        case .mergedSince: "Merged"
         }
+    }
+
+    /// Convenience: merged within the last `days` days.
+    public static func merged(withinDays days: Int, now: Date = .now) -> PRQuery {
+        let since = Calendar(identifier: .gregorian).date(byAdding: .day, value: -days, to: now) ?? now
+        let f = DateFormatter(); f.calendar = Calendar(identifier: .gregorian); f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC"); f.dateFormat = "yyyy-MM-dd"
+        return .mergedSince(f.string(from: since))
     }
 }
 

@@ -125,21 +125,20 @@ public struct GitHubProvider: CIProvider {
       bodyText
       headRefName
       baseRefName
+      mergedAt
       mergeQueueEntry { position state }
       repository { nameWithOwner }
-      commits(last: 1) {
-        nodes {
-          commit {
-            statusCheckRollup {
-              state
-              contexts(first: 100) {
-                nodes {
-                  __typename
-                  ... on CheckRun { name status conclusion detailsUrl }
-                  ... on StatusContext { context state targetUrl }
-                }
-              }
-            }
+      mergeCommit { ...CommitChecks }
+      commits(last: 1) { nodes { commit { ...CommitChecks } } }
+    }
+    fragment CommitChecks on Commit {
+      statusCheckRollup {
+        state
+        contexts(first: 100) {
+          nodes {
+            __typename
+            ... on CheckRun { name status conclusion detailsUrl }
+            ... on StatusContext { context state targetUrl }
           }
         }
       }
@@ -212,6 +211,8 @@ public struct GitHubProvider: CIProvider {
         let headRefName: String?
         let baseRefName: String?
         let mergeQueueEntry: MQ?
+        let mergedAt: Date?
+        let mergeCommit: Commit?
         let repository: Repo?
         struct MQ: Decodable { let position: Int?; let state: String? }
         let commits: Commits?
@@ -233,7 +234,8 @@ public struct GitHubProvider: CIProvider {
             author: n.author?.login ?? "ghost", status: status,
             summary: summarize(n.bodyText),
             headRefName: n.headRefName ?? "", baseRefName: n.baseRefName ?? "",
-            mergeQueue: n.mergeQueueEntry.map { MergeQueueInfo(position: $0.position ?? 0, state: $0.state ?? "QUEUED") }
+            mergeQueue: n.mergeQueueEntry.map { MergeQueueInfo(position: $0.position ?? 0, state: $0.state ?? "QUEUED") },
+            mergedAt: n.mergedAt
         )
     }
 

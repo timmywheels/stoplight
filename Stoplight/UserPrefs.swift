@@ -85,6 +85,7 @@ final class UserPrefs {
         static let housing = Prefs.housing
         static let collapsed = "collapsedSections"
         static let rowClick = "rowClick"
+        static let mergedDays = "mergedDays"
     }
 
     enum RowClick: String, CaseIterable, Identifiable {
@@ -101,6 +102,8 @@ final class UserPrefs {
     var housing: Bool { didSet { defaults.set(housing, forKey: Key.housing) } }
     /// What a single click on a row does (US-021). Local only.
     var rowClick: RowClick { didSet { defaults.set(rowClick.rawValue, forKey: Key.rowClick) } }
+    /// Recently-merged window in days (US-022). 0 = off. Local only.
+    var mergedDays: Int { didSet { defaults.set(mergedDays, forKey: Key.mergedDays) } }
     /// Popover section titles the user has collapsed. Local only.
     var collapsedSections: Set<String> { didSet { defaults.set(Array(collapsedSections).sorted(), forKey: Key.collapsed) } }
 
@@ -131,7 +134,9 @@ final class UserPrefs {
         pinned = Set(load(Key.pinned))
         showCount = defaults.bool(forKey: Key.showCount)
         housing = defaults.bool(forKey: Key.housing)
-        collapsedSections = Set(defaults.stringArray(forKey: Key.collapsed) ?? [])
+        // Merged starts collapsed: a one-line count until you ask for it.
+        collapsedSections = Set(defaults.stringArray(forKey: Key.collapsed) ?? ["Merged"])
+        mergedDays = defaults.object(forKey: Key.mergedDays) == nil ? 1 : defaults.integer(forKey: Key.mergedDays)
         rowClick = RowClick(rawValue: defaults.string(forKey: Key.rowClick) ?? "") ?? .expand
 
         if let cloud {
