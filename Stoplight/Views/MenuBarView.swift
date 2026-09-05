@@ -43,8 +43,8 @@ struct MenuBarView: View {
             } else if rowCount == 0 && !model.statusFilter.isEmpty {
                 centered("No PRs match the filter")
             } else {
-                // The panel has a user-chosen size; the list fills it and scrolls.
-                ScrollView { list }
+                // The panel has a user-chosen size; the list fills it and scrolls. Top inset matches the 12pt side padding.
+                ScrollView { list.padding(.top, 12) }
             }
         }
     }
