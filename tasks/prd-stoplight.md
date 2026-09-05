@@ -60,7 +60,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Description:** As a user, I want the icon alone to tell me the worst state across all my PRs.
 
 **Acceptance Criteria:**
-- [ ] Implemented with SwiftUI `MenuBarExtra` (macOS 14+), `.menuBarExtraStyle(.window)`
+- [ ] Status item is an `NSStatusItem`; the drop-down is a non-activating, resizable `NSPanel` hosting the SwiftUI view. `MenuBarExtra` was dropped: its window can't resize and sizes to the view's ideal height
 - [ ] Icon is three horizontal 6pt dots (red, yellow, green). Each is lit when at least one non-draft PR is in that state, dim gray otherwise. All dim when signed out or no PRs
 - [ ] When the list transitions into all-green, the green dot pops once (~0.4s), then holds still. No looping animation in the menu bar
 - [ ] Icon respects the menu bar's light/dark appearance (template image for gray state, tinted for others)
@@ -72,7 +72,8 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Description:** As a user, I want to click the icon and see every PR with its status, and jump to any one of them.
 
 **Acceptance Criteria:**
-- [ ] Popover width 360pt, max height 480pt, scrolls beyond that
+- [ ] Panel opens under the dots, right edges aligned, default 380×520, resizable by dragging any edge or corner (min 320×240), size remembered across launches; list scrolls to fill
+- [ ] Panel closes on click outside, Escape, or clicking the dots again
 - [ ] Each row: 8pt status dot, `owner/repo #123` in secondary color, title on one line truncated with ellipsis, relative time ("4m ago") right-aligned
 - [ ] Rows sorted: `failure` first, then `pending`, then `success`, then `none`; within a group, most recently updated first
 - [ ] Draft PRs show a "Draft" tag and a hollow dot

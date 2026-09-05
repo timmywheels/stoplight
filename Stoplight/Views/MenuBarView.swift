@@ -12,6 +12,7 @@ struct MenuBarView: View {
     var body: some View {
         VStack(spacing: 0) {
             content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             if showWatchField {
                 Divider()
                 WatchField(model: model, isPresented: $showWatchField, focused: $watchFieldFocused)
@@ -19,7 +20,7 @@ struct MenuBarView: View {
             Divider()
             footer
         }
-        .frame(width: 360)
+        .padding(.top, 6)  // room under the (hidden) title bar of the panel
     }
 
     @ViewBuilder
@@ -43,13 +44,8 @@ struct MenuBarView: View {
             } else if rowCount == 0 && !model.statusFilter.isEmpty {
                 centered("No PRs match the filter")
             } else {
-                // MenuBarExtra windows size to the view's ideal height, and a ScrollView has none.
-                // Short lists render inline so the window fits them; long lists get a fixed-height ScrollView.
-                if rowCount > 9 {
-                    ScrollView { list }.frame(height: 480)
-                } else {
-                    list
-                }
+                // The panel has a user-chosen size; the list fills it and scrolls.
+                ScrollView { list }
             }
         }
     }
@@ -88,8 +84,10 @@ struct MenuBarView: View {
     }
 
     /// Menu bar apps aren't the active app, so the Settings window would open behind whatever is frontmost.
+    /// Hosted in an AppKit panel, the SwiftUI `openSettings` action may be unavailable; fall back to the AppKit selector.
     private func showSettings() {
         openSettings()
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
         NSApp.activate()
         DispatchQueue.main.async {
             let win = NSApp.windows.first { $0.identifier?.rawValue.contains("Settings") == true }
@@ -99,7 +97,7 @@ struct MenuBarView: View {
     }
 
     private func centered(_ text: String) -> some View {
-        Text(text).foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 80)
+        Text(text).foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var footer: some View {

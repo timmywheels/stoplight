@@ -5,6 +5,8 @@ import StoplightCore
 @MainActor
 @Observable
 final class AppModel {
+    static let shared = AppModel()
+
     enum AuthState: Equatable {
         case unknown
         case signedOut

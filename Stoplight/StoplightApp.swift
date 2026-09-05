@@ -3,27 +3,24 @@ import StoplightCore
 
 @main
 struct StoplightApp: App {
-    @State private var model: AppModel
-
-    init() {
-        // Start polling and the snapshot server at launch, not when the popover is first opened.
-        let m = AppModel()
-        m.start()
-        _model = State(initialValue: m)
-    }
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     var body: some Scene {
-        MenuBarExtra {
-            MenuBarView(model: model)
-        } label: {
-            // US-004: three stoplight dots. The green one pops once when everything turns green.
-            Image(nsImage: StatusGlyph.image(for: model.presence, count: model.badgeCount, pop: model.bob, housing: model.prefs.housing))
-        }
-        .menuBarExtraStyle(.window)
-
+        // The status item and its panel are AppKit (see StatusPanelController). SwiftUI owns Settings only.
         Settings {
-            SettingsView(model: model)
+            SettingsView(model: AppModel.shared)
         }
         .windowResizability(.contentMinSize)
+    }
+}
+
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var statusPanel: StatusPanelController?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        let model = AppModel.shared
+        model.start()  // polling + snapshot server, at launch, not on first click
+        statusPanel = StatusPanelController(model: model)
     }
 }
