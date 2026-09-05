@@ -5,7 +5,7 @@ import StoplightCore
 /// Every shortcut in one table (US-026). The panel's key handler and the "Keyboard Shortcuts" sheet both read it.
 enum Hotkey: CaseIterable {
     case toggleGlobal
-    case moveDown, moveUp, open, expand, collapse, close
+    case moveDown, moveUp, open, expand, collapse, close, nextButton, prevButton
     case copyURL, share, copyBranch, pin, fix, hide
     case filterRed, filterYellow, filterGreen, clearFilters
     case toggleSections, refresh, watch, settings, showHotkeys
@@ -21,6 +21,8 @@ enum Hotkey: CaseIterable {
         case .expand: Combo(key: " ", symbol: "Space", mods: [])
         case .collapse: Combo(key: "←", symbol: "←", mods: [])
         case .close: Combo(key: "⎋", symbol: "Esc", mods: [])
+        case .nextButton: Combo(key: "⇥", symbol: "Tab", mods: [])
+        case .prevButton: Combo(key: "⇥", symbol: "Tab", mods: [.shift])
         case .copyURL: Combo(key: "c", symbol: "C", mods: [.command])
         case .share: Combo(key: "c", symbol: "C", mods: [.shift, .command])
         case .copyBranch: Combo(key: "b", symbol: "B", mods: [.command])
@@ -48,6 +50,8 @@ enum Hotkey: CaseIterable {
         case .expand: "Expand or collapse selected PR"
         case .collapse: "Collapse selected PR"
         case .close: "Close the panel"
+        case .nextButton: "Next button in the expanded PR (↩ presses it)"
+        case .prevButton: "Previous button"
         case .copyURL: "Copy URL"
         case .share: "Share (title as a link)"
         case .copyBranch: "Copy branch name"
@@ -78,7 +82,7 @@ enum Hotkey: CaseIterable {
 
     static let groups: [(String, [Hotkey])] = [
         ("Anywhere", [.toggleGlobal]),
-        ("Navigate", [.moveDown, .moveUp, .open, .expand, .collapse, .close]),
+        ("Navigate", [.moveDown, .moveUp, .open, .expand, .nextButton, .prevButton, .collapse, .close]),
         ("Selected PR", [.copyURL, .share, .copyBranch, .pin, .fix, .hide]),
         ("Filter", [.filterRed, .filterYellow, .filterGreen, .clearFilters]),
         ("Panel", [.toggleSections, .refresh, .watch, .settings, .showHotkeys]),
@@ -98,6 +102,7 @@ enum Hotkey: CaseIterable {
             case "↩": if e.keyCode == 36 || e.keyCode == 76 { return h }
             case " ": if e.keyCode == 49 { return h }
             case "⎋": if e.keyCode == 53 { return h }
+            case "⇥": if e.keyCode == 48 { return h }
             default: if chars == c.key { return h }
             }
         }

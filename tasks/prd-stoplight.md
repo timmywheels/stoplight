@@ -312,6 +312,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Acceptance Criteria:**
 - [ ] ⌥⌘S toggles the panel from any app (Carbon hotkey, no accessibility permission)
 - [ ] In the panel: ↑/↓ select, ↩ opens on GitHub, Space expands/collapses, ← collapses, Esc closes; selection is highlighted and scrolled into view
+- [ ] In an expanded row, Tab / ⇧Tab cycle the circular buttons (accent ring) and ↩ presses the focused one
 - [ ] Selected PR: ⌘C copy URL, ⇧⌘C share, ⌘B copy branch, ⌘P pin, ⌘F fix with agent, ⌘H hide
 - [ ] ⌘1/2/3 toggle red/yellow/green filters, ⌘0 clears; ⇧⌘E collapses or expands all sections; ⌘R, ⌘N, ⌘, unchanged
 - [ ] ⌘/ (also right-click → Keyboard Shortcuts, and a keyboard glyph in the footer) shows a sheet generated from the single `Hotkey` table

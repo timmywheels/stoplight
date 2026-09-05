@@ -410,24 +410,16 @@ struct PRRow: View {
                 }
             }
             HStack(spacing: 10) {
-                circle("arrow.up.right", help: "Open on GitHub") { openURL(pr.url) }
-                circle(copied == "url" ? "checkmark" : "doc.on.doc", help: "Copy URL", tint: copied == "url" ? .green : nil) {
-                    flash("url") { copy(pr.url.absoluteString) }
-                }
-                circle(copied == "share" ? "checkmark" : "square.and.arrow.up",
-                       help: "Share: title as a link (Slack hyperlink, Markdown elsewhere)", tint: copied == "share" ? .green : nil) {
-                    flash("share") { copyRichLink() }
-                }
-                circle(pinned ? "pin.fill" : "pin", help: pinned ? "Unpin" : "Pin", tint: pinned ? .primary : nil) {
-                    withAnimation(Self.motion) { model.togglePin(pr) }
-                }
-                if pr.state == .failure && model.canFix(pr) {
-                    // US-025: worktree + terminal + your agent, prompt prefilled with the failure.
-                    circle("terminal", help: "Fix with \(model.agentTitle): worktree, terminal, agent") {
-                        model.fix(pr, runAgent: true)
-                    }
+                ForEach(Array(buttons.enumerated()), id: \.offset) { i, b in
+                    circle(b.symbol, help: b.help, tint: b.tint, focused: selected && model.focusedButton == i, action: b.action)
                 }
                 Spacer()
+            }
+            .onAppear { if selected { model.expandedButtonCount = buttons.count } }
+            .onChange(of: selected) { _, sel in if sel { model.expandedButtonCount = buttons.count } }
+            .onChange(of: model.activateFocused) { _, _ in
+                guard selected, let i = model.focusedButton, i < buttons.count else { return }
+                buttons[i].action()
             }
             if let err = model.agentError {
                 Text(err).font(.caption2).foregroundStyle(.red).lineLimit(2)
@@ -445,13 +437,39 @@ struct PRRow: View {
         .help(help)
     }
 
-    private func circle(_ symbol: String, help: String, tint: Color? = nil, action: @escaping () -> Void) -> some View {
+    private struct RowButton { let symbol: String; let help: String; let tint: Color?; let action: () -> Void }
+
+    /// The expanded row's buttons, in Tab order. Fix appears only when it can run.
+    private var buttons: [RowButton] {
+        var b: [RowButton] = [
+            RowButton(symbol: "arrow.up.right", help: "Open on GitHub", tint: nil) { openURL(pr.url) },
+            RowButton(symbol: copied == "url" ? "checkmark" : "doc.on.doc", help: "Copy URL", tint: copied == "url" ? .green : nil) {
+                flash("url") { copy(pr.url.absoluteString) }
+            },
+            RowButton(symbol: copied == "share" ? "checkmark" : "square.and.arrow.up",
+                      help: "Share: title as a link (Slack hyperlink, Markdown elsewhere)", tint: copied == "share" ? .green : nil) {
+                flash("share") { copyRichLink() }
+            },
+            RowButton(symbol: pinned ? "pin.fill" : "pin", help: pinned ? "Unpin" : "Pin", tint: pinned ? .primary : nil) {
+                withAnimation(Self.motion) { model.togglePin(pr) }
+            },
+        ]
+        if pr.state == .failure && model.canFix(pr) {
+            b.append(RowButton(symbol: "terminal", help: "Fix with \(model.agentTitle): worktree, terminal, agent", tint: nil) {
+                model.fix(pr, runAgent: true)
+            })
+        }
+        return b
+    }
+
+    private func circle(_ symbol: String, help: String, tint: Color? = nil, focused: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(tint ?? .secondary)
                 .frame(width: 32, height: 32)
                 .background(.quaternary, in: Circle())
+                .overlay(Circle().strokeBorder(Color.accentColor, lineWidth: focused ? 2 : 0))
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)

@@ -77,6 +77,12 @@ final class AppModel {
     /// Keyboard selection. Session-only. Nil until the user touches the arrow keys.
     var selectedID: String?
     var showHotkeys = false
+    /// Tab focus inside the expanded row: index into its button row. nil = none.
+    var focusedButton: Int?
+    /// The expanded row reports how many buttons it has, so Tab can wrap.
+    var expandedButtonCount = 0
+    /// Bumped on ↩ when a button is focused; the expanded row performs the focused action.
+    var activateFocused = 0
 
     /// Row ids in display order, skipping collapsed sections.
     var visibleRowIDs: [String] {
@@ -88,6 +94,7 @@ final class AppModel {
     }
 
     func moveSelection(_ delta: Int) {
+        focusedButton = nil
         let ids = visibleRowIDs
         guard !ids.isEmpty else { return }
         guard let cur = selectedID, let i = ids.firstIndex(of: cur) else {
@@ -102,9 +109,19 @@ final class AppModel {
         switch key {
         case .moveDown: moveSelection(1)
         case .moveUp: moveSelection(-1)
-        case .open: if let pr = selectedPR { NSWorkspace.shared.open(pr.url) } else { return false }
-        case .expand: if let id = selectedID { toggleExpanded(id) } else { moveSelection(1) }
-        case .collapse: if expandedID != nil { expandedID = nil } else { return false }
+        case .open:
+            if focusedButton != nil, expandedID == selectedID { activateFocused += 1 }
+            else if let pr = selectedPR { NSWorkspace.shared.open(pr.url) } else { return false }
+        case .expand:
+            focusedButton = nil
+            if let id = selectedID { toggleExpanded(id) } else { moveSelection(1) }
+        case .collapse:
+            focusedButton = nil
+            if expandedID != nil { expandedID = nil } else { return false }
+        case .nextButton, .prevButton:
+            guard let id = selectedID, expandedID == id, expandedButtonCount > 0 else { return false }
+            let n = expandedButtonCount, step = key == .nextButton ? 1 : -1
+            focusedButton = ((focusedButton ?? (step > 0 ? -1 : 0)) + step + n) % n
         case .copyURL: if let pr = selectedPR { PRActions.copyURL(pr) } else { return false }
         case .share: if let pr = selectedPR { PRActions.share(pr) } else { return false }
         case .copyBranch: if let pr = selectedPR { PRActions.copyBranch(pr) } else { return false }
