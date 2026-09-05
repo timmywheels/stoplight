@@ -261,6 +261,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Acceptance Criteria:**
 - [ ] Single click on a row expands it; one row is expanded at a time (accordion); clicking again collapses
 - [ ] Double-click or ⌘-click opens the PR directly
+- [ ] Settings → Popover → "Clicking a PR": Expands it (default) or Opens it; the other action moves to double-click / ⌘-click
 - [ ] Expansion shows, top to bottom: real title (if nicknamed), description (2 lines), failing checks as links, then four 32pt circular buttons: Open, Copy URL, Share, Pin
 - [ ] Copy and Share flash a checkmark for one second
 - [ ] Motion: a single 200ms snappy curve with no bounce; content fades and slides 8pt from under the header; nothing but row height moves

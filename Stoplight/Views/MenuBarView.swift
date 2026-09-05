@@ -309,14 +309,18 @@ struct PRRow: View {
         .padding(.horizontal, 12).padding(.vertical, 8)
         .contentShape(Rectangle())
         .gesture(
-            TapGesture(count: 2).onEnded { openURL(pr.url) }
+            // Setting decides which of open / expand is the single click; ⌘-click and double-click do the other.
+            TapGesture(count: 2).onEnded { secondary() }
                 .exclusively(before: TapGesture().onEnded {
                     guard !editingAlias else { return }
-                    if NSEvent.modifierFlags.contains(.command) { openURL(pr.url); return }
-                    withAnimation(Self.motion) { model.toggleExpanded(pr.id) }
+                    if NSEvent.modifierFlags.contains(.command) { secondary() } else { primary() }
                 })
         )
     }
+
+    private func toggleExpand() { withAnimation(Self.motion) { model.toggleExpanded(pr.id) } }
+    private func primary() { model.prefs.rowClick == .expand ? toggleExpand() : openURL(pr.url) }
+    private func secondary() { model.prefs.rowClick == .expand ? openURL(pr.url) : toggleExpand() }
 
     // MARK: Expansion (US-021)
 

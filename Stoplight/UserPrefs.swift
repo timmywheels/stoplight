@@ -84,6 +84,12 @@ final class UserPrefs {
         static let showCount = Prefs.showCount
         static let housing = Prefs.housing
         static let collapsed = "collapsedSections"
+        static let rowClick = "rowClick"
+    }
+
+    enum RowClick: String, CaseIterable, Identifiable {
+        case expand, open
+        var id: String { rawValue }
     }
 
     var sources: Sources { didSet { persistJSON(Key.sources, sources) } }
@@ -93,6 +99,8 @@ final class UserPrefs {
     // Menu bar look. Local only, not synced.
     var showCount: Bool { didSet { defaults.set(showCount, forKey: Key.showCount) } }
     var housing: Bool { didSet { defaults.set(housing, forKey: Key.housing) } }
+    /// What a single click on a row does (US-021). Local only.
+    var rowClick: RowClick { didSet { defaults.set(rowClick.rawValue, forKey: Key.rowClick) } }
     /// Popover section titles the user has collapsed. Local only.
     var collapsedSections: Set<String> { didSet { defaults.set(Array(collapsedSections).sorted(), forKey: Key.collapsed) } }
 
@@ -124,6 +132,7 @@ final class UserPrefs {
         showCount = defaults.bool(forKey: Key.showCount)
         housing = defaults.bool(forKey: Key.housing)
         collapsedSections = Set(defaults.stringArray(forKey: Key.collapsed) ?? [])
+        rowClick = RowClick(rawValue: defaults.string(forKey: Key.rowClick) ?? "") ?? .expand
 
         if let cloud {
             observer = NotificationCenter.default.addObserver(
