@@ -324,7 +324,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 
 **Acceptance Criteria:**
 - [ ] Panel height tracks the list's natural height (collapsed sections shrink it), capped at the height the user last dragged it to; width is always the user's
-- [ ] Drag any non-control area to move the panel; once moved it stays put until closed
+- [ ] Drag the centered handle at the top to move the panel (open-hand cursor on hover, closed hand while dragging); the rest of the background is inert; once moved it stays put until closed
 - [ ] Footer pin toggles pinned mode: floating level, no close on click-outside or focus loss, position kept; Esc unpins and closes
 - [ ] Description in an expanded row is capped at 3 lines and never overlaps the buttons
 

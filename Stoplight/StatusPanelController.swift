@@ -221,8 +221,8 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
         panel.standardWindowButton(.closeButton)?.isHidden = true
         panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
         panel.standardWindowButton(.zoomButton)?.isHidden = true
-        // Drag anywhere that isn't a control (headers' empty space, the footer, gaps) to move it (US-027).
-        panel.isMovableByWindowBackground = true
+        // Moving is the grab handle's job only (see DragHandle); the background stays inert.
+        panel.isMovableByWindowBackground = false
         panel.isMovable = true
         panel.level = .popUpMenu
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
@@ -311,10 +311,26 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
     }
 }
 
-/// SwiftUI's hosting view refuses window drags by default. Say yes: any area that no control claims
-/// (the grab handle, header gaps, the footer background) drags the panel.
+/// Plain hosting view; only the DragHandle moves the window.
 private final class MovableHostingView<Content: View>: NSHostingView<Content> {
-    override var mouseDownCanMoveWindow: Bool { true }
+    override var mouseDownCanMoveWindow: Bool { false }
+}
+
+/// The one place you can drag the panel from. Open-hand cursor on hover, closed hand while dragging (US-027).
+struct DragHandle: NSViewRepresentable {
+    func makeNSView(context: Context) -> DragHandleView { DragHandleView() }
+    func updateNSView(_ view: DragHandleView, context: Context) {}
+
+    final class DragHandleView: NSView {
+        override var mouseDownCanMoveWindow: Bool { false }
+        override func resetCursorRects() { addCursorRect(bounds, cursor: .openHand) }
+        override func mouseDown(with event: NSEvent) {
+            NSCursor.closedHand.push()
+            window?.performDrag(with: event)
+        }
+        override func mouseUp(with event: NSEvent) { NSCursor.pop() }
+        override func mouseDragged(with event: NSEvent) {}  // performDrag owns the drag
+    }
 }
 
 /// Wraps the popover content so Escape closes the panel and the view fills whatever size the user picked.

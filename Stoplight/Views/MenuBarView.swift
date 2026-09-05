@@ -17,10 +17,10 @@ struct MenuBarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Grab handle: the obvious place to drag the panel around (US-027).
+            // Grab handle: the only place to drag the panel around (US-027). Hit area is the full width.
             Capsule().fill(.quaternary).frame(width: 36, height: 4)
-                .padding(.top, 6).padding(.bottom, 2)
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, minHeight: 14)
+                .overlay(DragHandle())
                 .help("Drag to move")
             ZStack {
                 content
