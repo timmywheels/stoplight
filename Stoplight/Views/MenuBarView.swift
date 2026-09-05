@@ -308,6 +308,23 @@ struct PRRow: View {
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
         .contentShape(Rectangle())
+        // Open-on-click mode: the quick actions come back as a hover toolbar, since there's no expansion to hold them.
+        .overlay(alignment: .trailing) {
+            if model.prefs.rowClick == .open && hovering && !expanded && !editingAlias {
+                HStack(spacing: 12) {
+                    glyph(copied == "url" ? "checkmark" : "doc.on.doc", help: "Copy URL", tint: copied == "url" ? .green : nil) {
+                        flash("url") { copy(pr.url.absoluteString) }
+                    }
+                    glyph(copied == "share" ? "checkmark" : "square.and.arrow.up", help: "Share: title as a link",
+                          tint: copied == "share" ? .green : nil) { flash("share") { copyRichLink() } }
+                    glyph("chevron.down", help: "Expand") { toggleExpand() }
+                }
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .background(.regularMaterial, in: Capsule())
+                .padding(.trailing, 10)
+                .transition(.opacity)
+            }
+        }
         .gesture(
             // Setting decides which of open / expand is the single click; ⌘-click and double-click do the other.
             TapGesture(count: 2).onEnded { secondary() }
@@ -361,6 +378,14 @@ struct PRRow: View {
             }
         }
         .padding(.leading, 34 + CGFloat(depth) * 14).padding(.trailing, 12).padding(.bottom, 10)
+    }
+
+    private func glyph(_ symbol: String, help: String, tint: Color? = nil, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol).font(.caption.weight(.medium)).foregroundStyle(tint ?? .secondary)
+        }
+        .buttonStyle(.plain)
+        .help(help)
     }
 
     private func circle(_ symbol: String, help: String, tint: Color? = nil, action: @escaping () -> Void) -> some View {

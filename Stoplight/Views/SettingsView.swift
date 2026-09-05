@@ -46,7 +46,7 @@ private struct GeneralTab: View {
             Section("Popover") {
                 Picker("Clicking a PR", selection: $prefs.rowClick) {
                     Text("Expands it (double-click or ⌘-click opens)").tag(UserPrefs.RowClick.expand)
-                    Text("Opens it on GitHub (double-click or ⌘-click expands)").tag(UserPrefs.RowClick.open)
+                    Text("Opens it on GitHub (quick actions on hover; ⌘-click expands)").tag(UserPrefs.RowClick.open)
                 }
                 .pickerStyle(.radioGroup)
             }
