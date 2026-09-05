@@ -40,6 +40,7 @@ struct MenuBarView: View {
             Divider()
             footer
         }
+        .onChange(of: model.panelVisible) { _, visible in if !visible { showWatchField = false } }
     }
 
     @ViewBuilder

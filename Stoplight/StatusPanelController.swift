@@ -189,12 +189,14 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
         if !userMoved { position(panel) }
         panel.makeKeyAndOrderFront(nil)
         statusItem.button?.highlight(true)
+        model.panelVisible = true
         fitToContent()
         if !model.pinnedPanel { installClickOutside() }
         // Keyboard: dispatch through the Hotkey table while the panel is key. Text fields keep their keys.
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, let panel = self.panel, event.window === panel else { return event }
-            if panel.firstResponder is NSTextView, event.keyCode != 53 { return event }
+            // Typing in a field: every key, Esc included, belongs to the field (Esc dismisses the field itself).
+            if panel.firstResponder is NSTextView { return event }
             guard let key = Hotkey.match(event) else { return event }
             if key == .close { self.forceClose(); return nil }
             return MainActor.assumeIsolated { self.model.handle(key) } ? nil : event
@@ -205,6 +207,7 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
         if model.pinnedPanel { return }  // pinned panels only close via the pin button or Esc
         log.notice("close: \(reason, privacy: .public)")
         panel?.orderOut(nil)
+        model.panelVisible = false
         statusItem.button?.highlight(false)
         userMoved = false
         if let m = clickOutsideMonitor { NSEvent.removeMonitor(m); clickOutsideMonitor = nil }

@@ -14,6 +14,8 @@ final class AppModel {
     var contentHeight: CGFloat = 0
     /// Pinned: stays open above other windows, ignores click-outside, keeps wherever you dragged it.
     var pinnedPanel = false
+    /// Mirrors the panel's visibility so views can reset transient state (open text fields) on close.
+    var panelVisible = false
 
     enum AuthState: Equatable {
         case unknown
