@@ -81,13 +81,13 @@ func stateColor(_ s: CIState, profile: ColorProfile) -> Color {
     case .none: .secondary
     }
 
+    // Explicit returns: with a `let` above it, this switch is a statement, not an implicit return.
     switch profile {
-    case .standard: defaultColor
+    case .standard:
+        return defaultColor
     case .deuteranopia:
-        switch s {
-        case .success: .blue
-        default: defaultColor
-        }
+        // Red/green is the hard pair, so success moves to blue and failure stays red.
+        return s == .success ? .blue : defaultColor
     }
 }
 

@@ -16,12 +16,11 @@ extension ColorProfile {
         }
 
         switch self {
-        case .standard: defaultColor
+        case .standard:
+            return defaultColor
         case .deuteranopia:
-            switch state {
-            case .success: .systemBlue
-            default: defaultColor
-            }
+            // Red/green is the hard pair, so success moves to blue and failure stays red.
+            return state == .success ? .systemBlue : defaultColor
         }
     }
 }
