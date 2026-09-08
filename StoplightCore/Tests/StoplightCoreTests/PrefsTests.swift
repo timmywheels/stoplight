@@ -107,5 +107,11 @@ final class PrefsTests: XCTestCase {
         XCTAssertEqual(snap.prs.first?.author, "")
         XCTAssertEqual(snap.prs.first?.status, .open)
         XCTAssertEqual(snap.pinnedIDs, [])
+        XCTAssertEqual(snap.colorProfile, .standard)
+    }
+
+    func testSnapshotPreservesColorProfile() throws {
+        let data = try SharedStore.encode([], colorProfile: .deuteranopia)
+        XCTAssertEqual(SharedStore.decode(data)?.colorProfile, .deuteranopia)
     }
 }

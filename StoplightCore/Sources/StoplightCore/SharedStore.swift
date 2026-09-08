@@ -18,12 +18,15 @@ public struct Snapshot: Codable, Sendable {
     public let prs: [PullRequest]
     public let pinnedIDs: [String]
     public let sections: [Section]
+    public let colorProfile: ColorProfile
 
-    public init(writtenAt: Date = .now, prs: [PullRequest], pinnedIDs: [String] = [], sections: [Section] = []) {
+    public init(writtenAt: Date = .now, prs: [PullRequest], pinnedIDs: [String] = [], sections: [Section] = [],
+                colorProfile: ColorProfile = .standard) {
         self.writtenAt = writtenAt
         self.prs = prs
         self.pinnedIDs = pinnedIDs
         self.sections = sections
+        self.colorProfile = colorProfile
     }
 
     public init(from decoder: Decoder) throws {
@@ -32,6 +35,7 @@ public struct Snapshot: Codable, Sendable {
         prs = try c.decode([PullRequest].self, forKey: .prs)
         pinnedIDs = try c.decodeIfPresent([String].self, forKey: .pinnedIDs) ?? []
         sections = try c.decodeIfPresent([Section].self, forKey: .sections) ?? []
+        colorProfile = try c.decodeIfPresent(ColorProfile.self, forKey: .colorProfile) ?? .standard
     }
 
     /// Rows in popover order: section by section. Falls back to worst-first when no sections were written.
@@ -63,8 +67,9 @@ public enum SharedStore {
     private static let encoder: JSONEncoder = { let e = JSONEncoder(); e.dateEncodingStrategy = .iso8601; return e }()
     private static let decoder: JSONDecoder = { let d = JSONDecoder(); d.dateDecodingStrategy = .iso8601; return d }()
 
-    public static func encode(_ prs: [PullRequest], pinnedIDs: [String] = [], sections: [Snapshot.Section] = []) throws -> Data {
-        try encoder.encode(Snapshot(prs: prs, pinnedIDs: pinnedIDs, sections: sections))
+    public static func encode(_ prs: [PullRequest], pinnedIDs: [String] = [], sections: [Snapshot.Section] = [],
+                              colorProfile: ColorProfile = .standard) throws -> Data {
+        try encoder.encode(Snapshot(prs: prs, pinnedIDs: pinnedIDs, sections: sections, colorProfile: colorProfile))
     }
 
     public static func decode(_ data: Data) -> Snapshot? {

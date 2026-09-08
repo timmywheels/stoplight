@@ -90,6 +90,7 @@ final class UserPrefs {
         static let showCount = Prefs.showCount
         static let ghPath = Prefs.ghPath
         static let housing = Prefs.housing
+        static let colorProfile = Prefs.colorProfile
         static let collapsed = "collapsedSections"
         static let mergedDays = "mergedDays"
         static let branchCommits = "branchCommits"
@@ -118,9 +119,10 @@ final class UserPrefs {
     /// Where `gh` lives, when it isn't somewhere obvious. Empty means "find it automatically".
     var ghPath: String { didSet { defaults.set(ghPath, forKey: Key.ghPath) } }
 
-    // Menu bar look. Local only, not synced.
+    // Appearance. Local only, not synced.
     var showCount: Bool { didSet { defaults.set(showCount, forKey: Key.showCount) } }
     var housing: Bool { didSet { defaults.set(housing, forKey: Key.housing) } }
+    var colorProfile: ColorProfile { didSet { defaults.set(colorProfile.rawValue, forKey: Key.colorProfile) } }
     /// Recently-merged window in days (US-022). 0 = off. Local only.
     var mergedDays: Int { didSet { defaults.set(mergedDays, forKey: Key.mergedDays) } }
     // Agent launcher (US-025). Local only.
@@ -184,6 +186,7 @@ final class UserPrefs {
         ghPath = defaults.string(forKey: Key.ghPath) ?? ""
         showCount = defaults.bool(forKey: Key.showCount)
         housing = defaults.bool(forKey: Key.housing)
+        colorProfile = defaults.string(forKey: Key.colorProfile).flatMap(ColorProfile.init(rawValue:)) ?? .standard
         // Merged starts collapsed: a one-line count until you ask for it.
         collapsedSections = Set(defaults.stringArray(forKey: Key.collapsed) ?? ["Merged"])
         mergedDays = defaults.object(forKey: Key.mergedDays) == nil ? 1 : defaults.integer(forKey: Key.mergedDays)

@@ -1,7 +1,7 @@
 import AppKit
 import StoplightCore
 
-/// Menu bar image: three horizontal dots, red / yellow / green (US-004).
+/// Menu bar image: three horizontal status dots (US-004).
 /// A dot is lit when at least one PR is in that state, dim otherwise. Drawn directly with AppKit.
 enum StatusGlyph {
     static let dot: CGFloat = 6
@@ -13,7 +13,7 @@ enum StatusGlyph {
     /// - housing: draw a dark rounded pill behind the dots (🚥 style) for contrast on busy wallpapers.
     /// - attention: an agent is waiting on the user; adds a small orange marker (US-034).
     static func image(for presence: StatusPresence, count: Int?, pop: CGFloat = 0, housing: Bool = false,
-                      attention: Bool = false) -> NSImage {
+                      attention: Bool = false, colorProfile: ColorProfile = .standard) -> NSImage {
         let dotsWidth = dot * 3 + gap * 2
         let pad: CGFloat = housing ? housingPad : 0
         let width = dotsWidth + pad * 2 + (attention ? 4 : 0)
@@ -25,9 +25,9 @@ enum StatusGlyph {
             }
             let dim = housing ? NSColor(white: 1, alpha: 0.28) : NSColor.secondaryLabelColor.withAlphaComponent(0.35)
             let lights: [(on: Bool, color: NSColor, pop: CGFloat)] = [
-                (presence.failure, .systemRed, 0),
-                (presence.pending, .systemYellow, 0),
-                (presence.success, .systemGreen, pop),
+                (presence.failure, colorProfile.nsColor(for: .failure), 0),
+                (presence.pending, colorProfile.nsColor(for: .pending), 0),
+                (presence.success, colorProfile.nsColor(for: .success), pop),
             ]
             for (i, light) in lights.enumerated() {
                 let x = pad + CGFloat(i) * (dot + gap)

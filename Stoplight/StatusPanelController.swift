@@ -183,7 +183,8 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
         withObservationTracking {
             statusItem.button?.image = StatusGlyph.image(for: model.presence, count: model.badgeCount,
                                                          pop: model.bob, housing: model.prefs.housing,
-                                                         attention: model.agentNeedsAttention)
+                                                         attention: model.agentNeedsAttention,
+                                                         colorProfile: model.prefs.colorProfile)
             statusItem.button?.toolTip = statusItem.button?.image?.accessibilityDescription
         } onChange: { [weak self] in
             Task { @MainActor in self?.observeGlyph() }
@@ -390,6 +391,7 @@ private struct PanelRoot: View {
 
     var body: some View {
         MenuBarView(model: model)
+            .environment(\.colorProfile, model.prefs.colorProfile)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .ignoresSafeArea()
             .onExitCommand(perform: close)

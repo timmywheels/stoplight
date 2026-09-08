@@ -73,12 +73,21 @@ struct StoplightWidgetView: View {
     }
 }
 
-func stateColor(_ s: CIState) -> Color {
-    switch s {
+func stateColor(_ s: CIState, profile: ColorProfile) -> Color {
+    let defaultColor: Color = switch s {
     case .failure: .red
     case .pending: .yellow
     case .success: .green
     case .none: .secondary
+    }
+
+    switch profile {
+    case .standard: defaultColor
+    case .deuteranopia:
+        switch s {
+        case .success: .blue
+        default: defaultColor
+        }
     }
 }
 
@@ -108,7 +117,7 @@ struct SmallView: View {
         let n = count(s)
         return VStack(spacing: 6) {
             Circle()
-                .fill(n > 0 ? stateColor(s) : Color.secondary.opacity(0.25))
+                .fill(n > 0 ? stateColor(s, profile: snapshot.colorProfile) : Color.secondary.opacity(0.25))
                 .frame(width: 22, height: 22)
             Text("\(n)").font(.system(.title3, design: .rounded).monospacedDigit().weight(.semibold))
                 .foregroundStyle(n > 0 ? .primary : .tertiary)
@@ -144,7 +153,7 @@ struct ListView: View {
                         if row.pr.status == .merged && row.pr.checks.isEmpty {
                             Image(systemName: "checkmark.circle.fill").font(.caption2).foregroundStyle(Color.githubMerged).frame(width: 8)
                         } else {
-                            Circle().fill(stateColor(row.pr.state)).frame(width: 8, height: 8)
+                            Circle().fill(stateColor(row.pr.state, profile: snapshot.colorProfile)).frame(width: 8, height: 8)
                         }
                         if snapshot.pinnedIDs.contains(row.pr.id) {
                             Image(systemName: "pin.fill").font(.caption2).foregroundStyle(.secondary)

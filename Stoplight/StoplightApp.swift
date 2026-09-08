@@ -9,6 +9,7 @@ struct StoplightApp: App {
         // The status item and its panel are AppKit (see StatusPanelController). SwiftUI owns Settings only.
         Settings {
             SettingsView(model: AppModel.shared)
+                .environment(\.colorProfile, AppModel.shared.prefs.colorProfile)
         }
         .windowResizability(.contentMinSize)
     }

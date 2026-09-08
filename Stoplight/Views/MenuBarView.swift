@@ -401,6 +401,7 @@ struct PRRow: View {
     /// All rows of this PR's stack, bottom-up. nil when not stacked.
     var stack: [StackRow]? = nil
     @Environment(\.openURL) private var openURL
+    @Environment(\.colorProfile) private var colorProfile
     @State private var hovering = false
     @State private var copied: String?  // which button just copied, for the 1s checkmark
     @State private var editingAlias = false
@@ -466,7 +467,7 @@ struct PRRow: View {
                         .foregroundStyle(stateColor(bs))
                         .padding(.horizontal, 4).padding(.vertical, 1)
                         .background(.quaternary, in: Capsule())
-                        .help("\(pr.baseRefName) is \(bs == .failure ? "red" : bs == .pending ? "running" : "green") right now")
+                        .help("\(pr.baseRefName) is \(bs == .failure ? "failing" : bs == .pending ? "running" : "passing") right now")
                     }
                     if let note = pr.note { tag(note, color: .secondary) }
                     if let st = model.agentStatus[pr.id] {
@@ -724,12 +725,7 @@ struct PRRow: View {
     private func copyRichLink() { PRActions.share(pr) }
 
     private func stateColor(_ s: CIState) -> Color {
-        switch s {
-        case .failure: .red
-        case .pending: .yellow
-        case .success: .green
-        case .none: .secondary
-        }
+        colorProfile.color(for: s)
     }
 
     private func tag(_ text: String, color: Color = .secondary) -> some View {
@@ -777,15 +773,11 @@ struct FilterDot: View {
 struct StatusDot: View {
     let state: CIState
     var hollow = false
+    @Environment(\.colorProfile) private var colorProfile
     @State private var pulse = false
 
     var color: Color {
-        switch state {
-        case .failure: .red
-        case .pending: .yellow
-        case .success: .green
-        case .none: .secondary
-        }
+        colorProfile.color(for: state)
     }
 
     var body: some View {

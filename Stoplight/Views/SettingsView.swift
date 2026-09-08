@@ -57,7 +57,7 @@ private struct GeneralTab: View {
             }
             Section("Notifications") {
                 Picker("Notify me", selection: $notifications) {
-                    Text("On fail and all-green").tag("all")
+                    Text("On fail and all-passing").tag("all")
                     Text("On fail only").tag("failOnly")
                     Text("Never").tag("off")
                 }
@@ -87,6 +87,14 @@ private struct GeneralTab: View {
                 Text("A collapsed section of your merged PRs. When checks run on the merge commit (deploys on main), their status shows there and a failure lights the dots.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            Section("Appearance") {
+                Picker("Color profile", selection: $prefs.colorProfile) {
+                    ForEach(ColorProfile.allCases) { profile in
+                        Text(profile.title).tag(profile)
+                    }
+                }
+                .onChange(of: prefs.colorProfile) { _, _ in model.colorProfileChanged() }
+            }
             Section("Menu bar") {
                 Toggle("Dark housing behind the dots", isOn: $prefs.housing)
                 Toggle("Show count in menu bar", isOn: $prefs.showCount)
@@ -109,7 +117,7 @@ private struct GeneralTab: View {
             Section("Legend") {
                 LegendRow("Failing. At least one check failed.") { StatusDot(state: .failure) }
                 LegendRow("Running. Checks still in progress.") { StatusDot(state: .pending) }
-                LegendRow("Passed. Every check green, skipped, or neutral.") { StatusDot(state: .success) }
+                LegendRow("Passed. Every check passed, skipped, or neutral.") { StatusDot(state: .success) }
                 LegendRow("No checks configured.") { StatusDot(state: .none) }
                 LegendRow("Merged. The branch badge next to it is colored by the base branch's current CI state.") { Image(systemName: "checkmark.circle.fill").font(.caption).foregroundStyle(Color.githubMerged) }
                 LegendRow("Hollow dot: draft. Drafts never light the menu bar or notify.") { StatusDot(state: .success, hollow: true) }

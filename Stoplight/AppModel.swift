@@ -50,7 +50,7 @@ final class AppModel {
     private(set) var auth: AuthState = .unknown
     private(set) var isRefreshing = false
     private(set) var login: String?
-    /// Extra diameter for the green dot during the one-shot pop (US-004).
+    /// Extra diameter for the passing dot during the one-shot pop (US-004).
     private(set) var bob: CGFloat = 0
     private var lastAggregate: CIState?
 
@@ -489,7 +489,7 @@ final class AppModel {
 
     // MARK: Head-bob (US-004)
 
-    /// One pop, ~0.4s, only on the transition into all-green. Never loops.
+    /// One pop, ~0.4s, only on the transition into all-passing. Never loops.
     private func bobIfJustTurnedGreen() {
         let now = aggregate
         defer { lastAggregate = now }
@@ -536,7 +536,12 @@ final class AppModel {
         let secs = sections.map { Snapshot.Section(id: $0.id, title: $0.title, prIDs: $0.prs.map(\.id)) }
         var seen = Set<String>()
         let prs = (all + mergedRows).filter { seen.insert($0.id).inserted }
-        guard let data = try? SharedStore.encode(prs, pinnedIDs: Array(prefs.pinned), sections: secs) else { return }
+        guard let data = try? SharedStore.encode(
+            prs,
+            pinnedIDs: Array(prefs.pinned),
+            sections: secs,
+            colorProfile: prefs.colorProfile
+        ) else { return }
         server.update(data)
         WidgetBridge.reload()
     }
@@ -671,6 +676,10 @@ final class AppModel {
         Task { await refresh() }
     }
 
+    func colorProfileChanged() {
+        publishSnapshot()
+    }
+
     func togglePin(_ pr: PullRequest) {
         prefs.togglePin(pr.id)
         publishSnapshot()
@@ -698,5 +707,6 @@ enum Prefs {
     static let showCount = "showCountInMenuBar"
     static let ghPath = "ghPath"
     static let housing = "menuBarHousing"
+    static let colorProfile = "colorProfile"
     static let notifications = "notificationMode"  // all | failOnly | off
 }
