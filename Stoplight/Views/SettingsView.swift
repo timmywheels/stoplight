@@ -38,22 +38,27 @@ private struct GeneralTab: View {
                 default:
                     Text("Not signed in").foregroundStyle(.secondary)
                 }
-                // Field on its own row so a long path never fights the label or the button.
+                // One control: the path it's using, and a picker to change it. Typing a path is what
+                // the open panel's Go to Folder (⇧⌘G) is for.
                 LabeledContent("GitHub CLI") {
-                    TextField("Automatic", text: $prefs.ghPath)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(.callout, design: .monospaced))
-                        .onSubmit { reauth() }
+                    HStack(spacing: 8) {
+                        Text(TokenSource.ghPath() ?? "Not found")
+                            .font(.system(.callout, design: .monospaced))
+                            .lineLimit(1).truncationMode(.middle)
+                            .foregroundStyle(TokenSource.ghPath() == nil ? .red : .secondary)
+                        Button("Choose…") { chooseGH() }
+                    }
                 }
-                HStack {
-                    Text("Using \(TokenSource.ghPath() ?? "nothing, gh wasn't found")")
+                if !prefs.ghPath.isEmpty {
+                    HStack {
+                        Text("Set manually").font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Use automatic") { prefs.ghPath = ""; reauth() }.controlSize(.small)
+                    }
+                } else if TokenSource.ghPath() == nil {
+                    Text("Stoplight couldn't find gh on your shell's PATH. Choose it, or install the GitHub CLI.")
                         .font(.caption).foregroundStyle(.secondary)
-                        .lineLimit(1).truncationMode(.middle)
-                    Spacer()
-                    Button("Choose…") { chooseGH() }.controlSize(.small)
                 }
-                Text("Leave it empty to find gh on your shell's PATH. Set it when gh lives somewhere unusual, like /opt/zerobrew/bin/gh.")
-                    .font(.caption).foregroundStyle(.secondary)
             }
             Section("Notifications") {
                 Picker("Notify me", selection: $notifications) {
