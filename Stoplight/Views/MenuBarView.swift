@@ -39,14 +39,6 @@ struct MenuBarView: View {
                     .overlay(DragHandle())
                     .help("Drag to move")
 
-                let allCollapsed = !model.sections.isEmpty && model.sections.allSatisfy { model.prefs.collapsedSections.contains($0.id) }
-                Button { _ = model.handle(.toggleSections) } label: {
-                    Image(systemName: allCollapsed ? "rectangle.expand.vertical" : "rectangle.compress.vertical")
-                        .foregroundStyle(.secondary)
-                        .frame(width: 22, height: 22).contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help(allCollapsed ? "Expand all sections (⇧⌘E)" : "Collapse all sections (⇧⌘E)")
                 Button { model.pinnedPanel.toggle() } label: {
                     Image(systemName: model.pinnedPanel ? "pin.fill" : "pin")
                         .foregroundStyle(model.pinnedPanel ? Color.accentColor : .secondary)
@@ -125,6 +117,10 @@ struct MenuBarView: View {
         }
     }
 
+    private var allSectionsCollapsed: Bool {
+        !model.sections.isEmpty && model.sections.allSatisfy { model.prefs.collapsedSections.contains($0.id) }
+    }
+
     private var rowCount: Int {
         model.sections.reduce(0) { $0 + (model.isCollapsed($1.id) ? 0 : $1.prs.count) }
     }
@@ -146,7 +142,9 @@ struct MenuBarView: View {
             let collapsed = showHeader && model.isCollapsed(sec.id)
             if showHeader {
                 SectionHeader(id: sec.id, title: sec.title, prs: sec.prs, collapsed: collapsed, mode: model.prefs.sectionCounts,
+                              allCollapsed: allSectionsCollapsed,
                               toggle: { model.prefs.toggleCollapsed(sec.id) },
+                              toggleAll: { _ = model.handle(.toggleSections) },
                               drop: { moving in
                                   withAnimation(.snappy(duration: 0.2, extraBounce: 0)) {
                                       model.prefs.moveSection(moving, onto: sec.id, currentOrder: model.sectionIDs)
@@ -335,7 +333,9 @@ struct SectionHeader: View {
     let prs: [PullRequest]
     let collapsed: Bool
     var mode: UserPrefs.SectionCounts = .off
+    var allCollapsed = false
     let toggle: () -> Void
+    var toggleAll: () -> Void = {}
     let drop: (String) -> Void
     @State private var targeted = false
 
@@ -374,6 +374,13 @@ struct SectionHeader: View {
             if targeted { Rectangle().fill(Color.accentColor).frame(height: 2).padding(.horizontal, 8) }
         }
         .onTapGesture(perform: toggle)
+        .contextMenu {
+            Button(collapsed ? "Expand \(title)" : "Collapse \(title)", action: toggle)
+            Divider()
+            // No .keyboardShortcut here: the panel's own keyDown already owns ⇧⌘E, and
+            // registering it twice risks the two handlers cancelling each other out.
+            Button(allCollapsed ? "Expand All Sections (⇧⌘E)" : "Collapse All Sections (⇧⌘E)", action: toggleAll)
+        }
         .draggable(id)
         .dropDestination(for: String.self) { items, _ in
             guard let moving = items.first else { return false }
