@@ -30,45 +30,43 @@ struct MenuBarView: View {
             Capsule().fill(.quaternary).frame(width: 36, height: 4)
                 .frame(maxWidth: .infinity, minHeight: 22)
                 .overlay(DragHandle())
-                // Finding things on the left, shaping the panel on the right, handle centered between them.
-                .overlay(alignment: .leading) {
-                    HStack(spacing: 4) {
-                        Button { model.isSearching.toggle(); if !model.isSearching { model.searchText = "" } } label: {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundStyle(model.isSearching || !model.searchText.isEmpty ? Color.accentColor : .secondary)
-                                .frame(width: 22, height: 22).contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain).help("Search (⌘L)")
-                        Button { withAnimation(.snappy(duration: 0.2, extraBounce: 0)) { model.showHotkeys.toggle() } } label: {
-                            Image(systemName: "keyboard").foregroundStyle(.secondary)
-                                .frame(width: 22, height: 22).contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain).help("Keyboard shortcuts (⌘/)")
-                    }
-                    .padding(.leading, 6)
+                // Real HStack, not overlays: DragHandle is an AppKit view and would swallow clicks anywhere
+            // it covers, so it gets the middle only and the buttons keep their own space.
+            HStack(spacing: 4) {
+                Button { model.isSearching.toggle(); if !model.isSearching { model.searchText = "" } } label: {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(model.isSearching || !model.searchText.isEmpty ? Color.accentColor : .secondary)
+                        .frame(width: 22, height: 22).contentShape(Rectangle())
                 }
-                .overlay(alignment: .trailing) {
-                    HStack(spacing: 4) {
-                        let allCollapsed = !model.sections.isEmpty && model.sections.allSatisfy { model.prefs.collapsedSections.contains($0.id) }
-                        Button { _ = model.handle(.toggleSections) } label: {
-                            Image(systemName: allCollapsed ? "rectangle.expand.vertical" : "rectangle.compress.vertical")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 22, height: 22).contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .help(allCollapsed ? "Expand all sections (⇧⌘E)" : "Collapse all sections (⇧⌘E)")
-                        Button { model.pinnedPanel.toggle() } label: {
-                            Image(systemName: model.pinnedPanel ? "pin.fill" : "pin")
-                                .foregroundStyle(model.pinnedPanel ? Color.accentColor : .secondary)
-                                .frame(width: 22, height: 22).contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .help(model.pinnedPanel ? "Unpin: close on click outside again" : "Pin: stay open above other windows")
-                    }
-                    .padding(.trailing, 6)
+                .buttonStyle(.plain).help("Search (⌘L)")
+                Button { withAnimation(.snappy(duration: 0.2, extraBounce: 0)) { model.showHotkeys.toggle() } } label: {
+                    Image(systemName: "keyboard").foregroundStyle(.secondary)
+                        .frame(width: 22, height: 22).contentShape(Rectangle())
                 }
-                .padding(.top, 4).padding(.bottom, 4)
-                .help("Drag to move")
+                .buttonStyle(.plain).help("Keyboard shortcuts (⌘/)")
+
+                Capsule().fill(.quaternary).frame(width: 36, height: 4)
+                    .frame(maxWidth: .infinity, minHeight: 22)
+                    .overlay(DragHandle())
+                    .help("Drag to move")
+
+                let allCollapsed = !model.sections.isEmpty && model.sections.allSatisfy { model.prefs.collapsedSections.contains($0.id) }
+                Button { _ = model.handle(.toggleSections) } label: {
+                    Image(systemName: allCollapsed ? "rectangle.expand.vertical" : "rectangle.compress.vertical")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 22, height: 22).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(allCollapsed ? "Expand all sections (⇧⌘E)" : "Collapse all sections (⇧⌘E)")
+                Button { model.pinnedPanel.toggle() } label: {
+                    Image(systemName: model.pinnedPanel ? "pin.fill" : "pin")
+                        .foregroundStyle(model.pinnedPanel ? Color.accentColor : .secondary)
+                        .frame(width: 22, height: 22).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(model.pinnedPanel ? "Unpin: close on click outside again" : "Pin: stay open above other windows")
+            }
+            .padding(.horizontal, 6).padding(.vertical, 4)
                 .background(GeometryReader { g in Color.clear.onChange(of: g.size.height, initial: true) { _, h in if abs(topHeight - h) > 0.5 { topHeight = h; report() } } })
             VStack(spacing: 0) {
                 if model.isSearching {
