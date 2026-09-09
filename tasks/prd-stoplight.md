@@ -40,7 +40,9 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Acceptance Criteria:**
 - [ ] One GraphQL query: `search(query: "is:pr is:open author:@me", type: ISSUE, first: 50)` returning repo name, number, title, url, `isDraft`, `updatedAt`, `headRefOid`, and `commits(last:1) { nodes { commit { statusCheckRollup { state, contexts(first:100) { ... on CheckRun { name conclusion status detailsUrl } ... on StatusContext { context state targetUrl } } } } } }`
 - [ ] Rollup mapped to exactly four states: `failure` (any check FAILURE/ERROR/TIMED_OUT/CANCELLED/ACTION_REQUIRED), `pending` (any check queued or in progress), `success` (all completed and none failed), `none` (no checks configured)
-- [ ] `SKIPPED` and `NEUTRAL` conclusions count as success
+- [ ] `SKIPPED` and `NEUTRAL` count as success only when at least one check really passed; a PR whose every check was skipped is `none`, not `success`
+- [ ] `mergeStateStatus` is fetched: rows tag Conflicts / Behind / Blocked, and an open PR with conflicts counts as `failure` regardless of CI
+- [ ] (superseded) `SKIPPED` and `NEUTRAL` conclusions count as success
 - [ ] Failing checks are extracted into a list of (name, url) for display
 - [ ] Rate limit headers are read; if remaining < 100, polling backs off to 5 minutes
 - [ ] Network errors keep the last good data on screen and show a small "stale, retrying" label with the age

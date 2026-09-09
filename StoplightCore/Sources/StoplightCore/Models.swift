@@ -90,6 +90,36 @@ public struct PRRef: Codable, Sendable, Hashable, Identifiable {
     }
 }
 
+/// Whether GitHub would let this PR merge right now (US-039). Separate from CI: a PR can be
+/// "green" and still be unmergeable.
+public enum MergeState: String, Codable, Sendable {
+    case clean, conflicting, behind, blocked, unstable, draft, unknown
+
+    public init(github: String?) {
+        switch github {
+        case "CLEAN": self = .clean
+        case "DIRTY": self = .conflicting
+        case "BEHIND": self = .behind
+        case "BLOCKED": self = .blocked
+        case "UNSTABLE", "HAS_HOOKS": self = .unstable
+        case "DRAFT": self = .draft
+        default: self = .unknown
+        }
+    }
+
+    /// Short label for the row, or nil when there's nothing worth saying.
+    public var label: String? {
+        switch self {
+        case .conflicting: "Conflicts"
+        case .behind: "Behind"
+        case .blocked: "Blocked"
+        case .clean, .unstable, .draft, .unknown: nil
+        }
+    }
+    /// Conflicts need you before anything else can happen.
+    public var isBlocking: Bool { self == .conflicting }
+}
+
 /// GitHub merge queue membership (US-016).
 public struct MergeQueueInfo: Codable, Sendable, Hashable {
     /// 1-based position in the queue.
@@ -119,6 +149,7 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
     public let headRefName: String
     public let baseRefName: String
     public let mergeQueue: MergeQueueInfo?
+    public let mergeState: MergeState
     /// Set for merged PRs (US-022). For those, `checks` are the merge commit's checks on the base branch.
     public let mergedAt: Date?
     /// Short, user-facing context shown as a tag (branch patterns show the pattern here).
@@ -130,6 +161,7 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
                 isDraft: Bool, updatedAt: Date, headSha: String, checks: [CheckResult],
                 author: String = "", status: PRStatus = .open, summary: String = "",
                 headRefName: String = "", baseRefName: String = "", mergeQueue: MergeQueueInfo? = nil,
+                mergeState: MergeState = .unknown,
                 mergedAt: Date? = nil, note: String? = nil, baseState: CIState? = nil) {
         self.id = id
         self.repo = repo
@@ -146,6 +178,7 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
         self.headRefName = headRefName
         self.baseRefName = baseRefName
         self.mergeQueue = mergeQueue
+        self.mergeState = mergeState
         self.mergedAt = mergedAt
         self.note = note
         self.baseState = baseState
@@ -169,6 +202,7 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
         headRefName = try c.decodeIfPresent(String.self, forKey: .headRefName) ?? ""
         baseRefName = try c.decodeIfPresent(String.self, forKey: .baseRefName) ?? ""
         mergeQueue = try c.decodeIfPresent(MergeQueueInfo.self, forKey: .mergeQueue)
+        mergeState = try c.decodeIfPresent(MergeState.self, forKey: .mergeState) ?? .unknown
         mergedAt = try c.decodeIfPresent(Date.self, forKey: .mergedAt)
         note = try c.decodeIfPresent(String.self, forKey: .note)
         baseState = try c.decodeIfPresent(CIState.self, forKey: .baseState)
@@ -178,8 +212,8 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
     public func withBaseState(_ state: CIState) -> PullRequest {
         PullRequest(id: id, repo: repo, number: number, title: title, url: url, isDraft: isDraft, updatedAt: updatedAt,
                     headSha: headSha, checks: checks, author: author, status: status, summary: summary,
-                    headRefName: headRefName, baseRefName: baseRefName, mergeQueue: mergeQueue, mergedAt: mergedAt,
-                    note: note, baseState: state)
+                    headRefName: headRefName, baseRefName: baseRefName, mergeQueue: mergeQueue, mergeState: mergeState,
+                    mergedAt: mergedAt, note: note, baseState: state)
     }
 
     /// A merged PR is a live problem only when its own merge commit is red AND the base branch is still red.
@@ -188,6 +222,8 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
     /// What the UI should count and filter on. Open PRs: their checks. Merged PRs: red only while unresolved,
     /// otherwise "landed" (`.none`) so a fixed-since deploy stops showing as a problem anywhere.
     public var effectiveState: CIState {
+        // An open PR you can't merge isn't "good to go", whatever CI says.
+        if status == .open, mergeState.isBlocking { return .failure }
         guard status == .merged else { return state }
         if baseState == nil { return state }          // no branch info: fall back to the merge commit itself
         return isUnresolvedMerge ? .failure : .none

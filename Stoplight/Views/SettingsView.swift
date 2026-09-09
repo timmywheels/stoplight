@@ -123,7 +123,8 @@ private struct GeneralTab: View {
                 LegendRow("Failing. At least one check failed.") { StatusDot(state: .failure) }
                 LegendRow("Running. Checks still in progress.") { StatusDot(state: .pending) }
                 LegendRow("Passed. Every check passed, skipped, or neutral.") { StatusDot(state: .success) }
-                LegendRow("No checks configured.") { StatusDot(state: .none) }
+                LegendRow("Nothing ran: no checks configured, or every check was skipped.") { StatusDot(state: .none) }
+                LegendRow("GitHub won't merge it as-is. Conflicts count as red, since nothing else can happen until they're fixed.") { Text("Conflicts").font(.caption2).foregroundStyle(.red).padding(.horizontal, 4).padding(.vertical, 1).background(.quaternary, in: Capsule()) }
                 LegendRow("Merged. The branch badge next to it is colored by the base branch's current CI state.") { Image(systemName: "checkmark.circle.fill").font(.caption).foregroundStyle(Color.githubMerged) }
                 LegendRow("Hollow dot: draft. Drafts never light the menu bar or notify.") { StatusDot(state: .success, hollow: true) }
                 LegendRow("Stacked on the PR above it. Right-click to copy the whole stack.") { Image(systemName: "arrow.turn.down.right").font(.caption2).foregroundStyle(.tertiary) }

@@ -485,6 +485,9 @@ struct PRRow: View {
                         .help("Reported by your agent \(st.at.compactAgo) ago. Click to jump to its terminal window; right-click the row to dismiss.")
                     }
                     if pr.status == .closed { tag("Closed", color: .red) }
+                    if pr.status == .open, !pr.isDraft, let label = pr.mergeState.label {
+                        tag(label, color: pr.mergeState.isBlocking ? .red : .secondary)
+                    }
                     if let q = pr.mergeQueue {
                         tag(q.isBlocked ? "Queue: blocked" : "Queue #\(q.position)", color: q.isBlocked ? .red : .blue)
                     }

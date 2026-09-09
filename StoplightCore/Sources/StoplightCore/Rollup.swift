@@ -6,7 +6,9 @@ public enum Rollup {
         if checks.isEmpty { return .none }
         if checks.contains(where: { $0.state == .failure }) { return .failure }
         if checks.contains(where: { $0.state == .pending }) { return .pending }
-        return .success
+        // Skipped and neutral don't prove anything. Green means something actually passed, otherwise
+        // a PR whose only check was skipped would read as verified when nothing ran.
+        return checks.contains { $0.state == .success } ? .success : .none
     }
 
     /// FR-5: menu bar color is the worst state across non-draft PRs. Empty list is `.none`.
