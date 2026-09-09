@@ -2,6 +2,37 @@ import Foundation
 
 public enum Rollup {
     /// FR-4: exactly one state per PR. Failure wins, then pending, then success. No checks means `.none`.
+    /// One check run, with what it belongs to and when it ran.
+    public struct TimedCheck: Sendable {
+        public let check: CheckResult
+        /// The workflow the run came from. Two workflows can define a job of the same name,
+        /// and those are genuinely different checks.
+        public let workflow: String
+        public let at: Date?
+        public init(check: CheckResult, workflow: String, at: Date?) {
+            self.check = check; self.workflow = workflow; self.at = at
+        }
+    }
+
+    /// Newest run per (workflow, check name), in the order the names first appeared.
+    /// Without this, a re-run leaves its failed predecessor attached to the commit and the PR
+    /// reads red while GitHub shows it green.
+    public static func newestPerCheck(_ items: [TimedCheck]) -> [CheckResult] {
+        var best: [String: TimedCheck] = [:]
+        var order: [String] = []
+        for item in items {
+            let key = item.workflow + "\u{1}" + item.check.name
+            guard let current = best[key] else {
+                best[key] = item
+                order.append(key)
+                continue
+            }
+            // Undated runs fall back to position: GitHub returns them oldest first.
+            if (item.at ?? .distantPast) >= (current.at ?? .distantPast) { best[key] = item }
+        }
+        return order.compactMap { best[$0]?.check }
+    }
+
     public static func state(for checks: [CheckResult]) -> CIState {
         if checks.isEmpty { return .none }
         if checks.contains(where: { $0.state == .failure }) { return .failure }

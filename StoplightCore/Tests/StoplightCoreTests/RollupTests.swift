@@ -94,3 +94,67 @@ final class RollupTests: XCTestCase {
                     isDraft: draft, updatedAt: updated, headSha: "abc", checks: checks)
     }
 }
+
+// MARK: - Stale check runs (US-039)
+
+final class NewestPerCheckTests: XCTestCase {
+    private func timed(_ name: String, _ state: CheckState, _ minutesAgo: Int?, workflow: String = "CI") -> Rollup.TimedCheck {
+        Rollup.TimedCheck(check: CheckResult(name: name, state: state, url: nil),
+                          workflow: workflow,
+                          at: minutesAgo.map { Date(timeIntervalSince1970: 1_000_000 - Double($0) * 60) })
+    }
+
+    func testRerunReplacesTheStaleFailure() {
+        let checks = Rollup.newestPerCheck([
+            timed("validate-pr-title", .failure, 30),
+            timed("build", .success, 25),
+            timed("validate-pr-title", .success, 5),
+        ])
+        XCTAssertEqual(checks.map(\.name), ["validate-pr-title", "build"])
+        XCTAssertEqual(checks.first?.state, .success)
+        XCTAssertEqual(Rollup.state(for: checks), .success)
+    }
+
+    func testNewerFailureStillWins() {
+        let checks = Rollup.newestPerCheck([
+            timed("test", .success, 40),
+            timed("test", .failure, 2),
+        ])
+        XCTAssertEqual(checks.map(\.state), [.failure])
+        XCTAssertEqual(Rollup.state(for: checks), .failure)
+    }
+
+    func testSameNameInTwoWorkflowsAreDifferentChecks() {
+        let checks = Rollup.newestPerCheck([
+            timed("build", .success, 10, workflow: "CI"),
+            timed("build", .failure, 5, workflow: "Release"),
+        ])
+        XCTAssertEqual(checks.count, 2)
+        XCTAssertEqual(Rollup.state(for: checks), .failure)
+    }
+
+    func testUndatedRunsFallBackToPosition() {
+        // GitHub returns contexts oldest first, so the last undated one is the newest.
+        let checks = Rollup.newestPerCheck([
+            timed("lint", .failure, nil),
+            timed("lint", .success, nil),
+        ])
+        XCTAssertEqual(checks.map(\.state), [.success])
+    }
+
+    func testOrderFollowsFirstAppearance() {
+        let checks = Rollup.newestPerCheck([
+            timed("a", .success, 9),
+            timed("b", .success, 8),
+            timed("a", .success, 1),
+        ])
+        XCTAssertEqual(checks.map(\.name), ["a", "b"])
+    }
+
+    func testSevenRunsOfOneCheckCollapseToOne() {
+        let stale = (1...6).map { timed("validate-pr-title", .failure, 60 - $0) }
+        let checks = Rollup.newestPerCheck(stale + [timed("validate-pr-title", .success, 1)])
+        XCTAssertEqual(checks.count, 1)
+        XCTAssertEqual(Rollup.state(for: checks), .success)
+    }
+}
