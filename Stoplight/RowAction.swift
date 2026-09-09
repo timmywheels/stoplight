@@ -4,16 +4,17 @@ import StoplightCore
 
 /// The circular buttons in an expanded row (US-031). Users pick which appear and in what order.
 enum RowAction: String, CaseIterable, Identifiable, Codable {
-    case open, run, checks, copyURL, share, copyBranch, copyHash, pin, fix, review
+    case open, run, checks, queue, copyURL, share, copyBranch, copyHash, pin, fix, review
     var id: String { rawValue }
 
-    static let defaultOrder: [RowAction] = [.open, .run, .copyURL, .share, .copyHash, .pin, .fix, .review]
+    static let defaultOrder: [RowAction] = [.open, .run, .queue, .copyURL, .share, .copyHash, .pin, .fix, .review]
 
     var title: String {
         switch self {
         case .open: "Open on GitHub"
         case .run: "Actions run summary"
         case .checks: "Checks tab"
+        case .queue: "Merge queue"
         case .copyURL: "Copy URL"
         case .share: "Share (title as a link)"
         case .copyBranch: "Copy branch name"
@@ -29,6 +30,7 @@ enum RowAction: String, CaseIterable, Identifiable, Codable {
         case .open: "arrow.up.right"
         case .run: "list.bullet.rectangle"
         case .checks: "checklist"
+        case .queue: "line.3.horizontal"
         case .copyURL: "doc.on.doc"
         case .share: "square.and.arrow.up"
         case .copyBranch: "arrow.triangle.branch"
@@ -46,6 +48,7 @@ enum RowAction: String, CaseIterable, Identifiable, Codable {
         case .open, .copyURL, .share, .pin: true
         case .run: pr.actionsRunURL != nil
         case .checks: !pr.checks.isEmpty
+        case .queue: pr.queueURL != nil
         case .copyBranch: !pr.headRefName.isEmpty
         case .copyHash: !pr.headSha.isEmpty
         case .fix: pr.state == .failure && model.canRunAgent(pr)

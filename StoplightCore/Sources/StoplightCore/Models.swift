@@ -236,6 +236,12 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
     /// GitHub's full checks summary for this PR (every job, every workflow).
     public var checksURL: URL { url.appendingPathComponent("checks") }
 
+    /// The merge queue this PR is waiting in, which is per base branch. nil when it isn't queued.
+    public var queueURL: URL? {
+        guard mergeQueue != nil, !baseRefName.isEmpty else { return nil }
+        return URL(string: "https://github.com/\(repo)/queue/\(baseRefName)")
+    }
+
     /// The Actions run summary page (…/actions/runs/<id>) behind this PR's checks: the run holding the
     /// first failing job, else the first job. nil when checks aren't GitHub Actions.
     public var actionsRunURL: URL? {

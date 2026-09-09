@@ -644,6 +644,10 @@ struct PRRow: View {
             case .open: RowButton(symbol: a.symbol, help: pr.isBranch ? "Open commit on GitHub" : a.title, tint: nil) { openURL(pr.url) }
             case .run: RowButton(symbol: a.symbol, help: "\(a.title) (⌘K)", tint: nil) { if let u = pr.actionsRunURL { openURL(u) } }
             case .checks: RowButton(symbol: a.symbol, help: a.title, tint: nil) { openURL(pr.checksURL) }
+            // A `let` here would break the switch's implicit return, so the position is inline.
+            case .queue: RowButton(symbol: a.symbol,
+                                   help: "\(a.title)\(pr.mergeQueue.map { " · position \($0.position)" } ?? "")",
+                                   tint: nil) { if let u = pr.queueURL { openURL(u) } }
             case .copyURL: RowButton(symbol: copied == a.id ? "checkmark" : a.symbol, help: "\(a.title) (⌘C)", tint: copied == a.id ? stateColor(.success) : nil) {
                 flash(a.id) { PRActions.copyURL(pr) }
             }
