@@ -67,15 +67,13 @@ struct AgentSettingsTab: View {
                 Text("Fix and Adversarial review hand a PR to this agent in its own worktree, so your checkout is untouched. Fixing edits code and defaults to asking; reviewing only reports and defaults to plan mode.")
             }
 
-            Section("Prompts") {
+            Section {
                 DisclosureGroup {
                     TextEditor(text: $prefs.promptTemplate)
                         .font(.system(.callout, design: .monospaced))
                         .frame(minHeight: 96)
                         .scrollContentBackground(.hidden)
                     HStack {
-                        Text("{number} {title} {repo} {branch} {base} {sha} {url} {failing_checks} {check_urls} {description}")
-                            .font(.caption2).foregroundStyle(.secondary).textSelection(.enabled)
                         Spacer()
                         Button("Reset") { prefs.promptTemplate = AgentLauncher.defaultPrompt }.controlSize(.small)
                     }
@@ -88,14 +86,23 @@ struct AgentSettingsTab: View {
                         .frame(minHeight: 96)
                         .scrollContentBackground(.hidden)
                     HStack {
-                        Text("Same placeholders. Used by Adversarial review (⇧⌘F).")
-                            .font(.caption2).foregroundStyle(.secondary)
                         Spacer()
                         Button("Reset") { prefs.reviewTemplate = AgentLauncher.defaultReviewPrompt }.controlSize(.small)
                     }
                 } label: {
                     InfoLabel("Review prompt", "Sent with ⇧⌘F: pick the PR apart and report, don't fix it.")
                 }
+            } header: {
+                Text("Prompts")
+            } footer: {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Both prompts take the same placeholders, filled in from the PR:")
+                    Text(verbatim: "{number}  {title}  {repo}  {branch}  {base}  {sha}  {url}")
+                        .monospaced().textSelection(.enabled)
+                    Text(verbatim: "{failing_checks}  {check_urls}  {description}")
+                        .monospaced().textSelection(.enabled)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             Section {
