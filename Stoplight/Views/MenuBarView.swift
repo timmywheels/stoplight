@@ -467,39 +467,32 @@ struct PRRow: View {
                         Text("· @\(pr.author)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                     if pr.isDraft { tag("Draft") }
-                    if pr.status == .merged && section?.id != "Merged" { tag("Merged", color: .githubMerged) }
+                    if pr.status == .merged && section?.id != "Merged" { tag("Merged", symbol: "arrow.triangle.merge", tint: .githubMerged) }
                     if pr.status == .merged, let bs = pr.baseState {
                         // Base branch health: red / yellow / green by its latest CI run.
-                        HStack(spacing: 3) {
-                            Image(systemName: "arrow.triangle.branch").font(.caption2)
-                            Text(pr.baseRefName).font(.caption2)
-                        }
-                        .foregroundStyle(stateColor(bs))
-                        .padding(.horizontal, 4).padding(.vertical, 1)
-                        .background(.quaternary, in: Capsule())
+                        tag(pr.baseRefName, symbol: "arrow.triangle.branch", tint: stateColor(bs))
                         .help("\(pr.baseRefName) is \(bs == .failure ? "failing" : bs == .pending ? "running" : "passing") right now")
                     }
-                    if let note = pr.note { tag(note, color: .secondary) }
+                    if let note = pr.note { tag(note) }
                     if let st = model.agentStatus[pr.id] {
                         // Agent status from hooks / callbacks (US-034). Click to dismiss.
                         Button { model.focusAgent(pr) } label: {
-                            HStack(spacing: 3) {
-                                Image(systemName: "sparkles").font(.caption2)
-                                Text(st.state == "attention" ? "needs you" : st.state == "done" ? "agent done" : "agent working").font(.caption2)
-                            }
-                            .foregroundStyle(st.state == "attention" ? Color.orange : st.state == "done" ? .green : .secondary)
-                            .padding(.horizontal, 4).padding(.vertical, 1)
-                            .background(.quaternary, in: Capsule())
+                            tag(st.state == "attention" ? "needs you" : st.state == "done" ? "agent done" : "agent working",
+                                symbol: "sparkles",
+                                tint: st.state == "attention" ? .orange : st.state == "done" ? .green : .secondary)
                         }
                         .buttonStyle(.plain)
                         .help("Reported by your agent \(st.at.compactAgo) ago. Click to jump to its terminal window; right-click the row to dismiss.")
                     }
-                    if pr.status == .closed { tag("Closed", color: .red) }
+                    if pr.status == .closed { tag("Closed", symbol: "xmark", tint: .red) }
                     if pr.status == .open, !pr.isDraft, let label = pr.mergeState.label {
-                        tag(label, color: pr.mergeState.isBlocking ? .red : .secondary)
+                        tag(label, symbol: pr.mergeState.isBlocking ? "exclamationmark.triangle.fill" : nil,
+                            tint: pr.mergeState.isBlocking ? .red : .secondary)
                     }
                     if let q = pr.mergeQueue {
-                        tag(q.isBlocked ? "Queue: blocked" : "Queue #\(q.position)", color: q.isBlocked ? .red : .blue)
+                        tag(q.isBlocked ? "Queue: blocked" : "Queue #\(q.position)",
+                            symbol: q.isBlocked ? "exclamationmark.triangle.fill" : "line.3.horizontal",
+                            tint: q.isBlocked ? .red : .blue)
                     }
                     if depth == 0, stack == nil, pr.hasNonTrunkBase {
                         // Based on a branch we can't see: part of a stack whose bottom isn't in view.
@@ -741,10 +734,18 @@ struct PRRow: View {
         colorProfile.color(for: s)
     }
 
-    private func tag(_ text: String, color: Color = .secondary) -> some View {
-        Text(text).font(.caption2).foregroundStyle(color)
-            .padding(.horizontal, 4).padding(.vertical, 1)
-            .background(.quaternary, in: Capsule())
+    /// Badge text is always neutral; urgency rides on a small tinted glyph instead. Colored words in a
+    /// dense list fight the titles and each other.
+    private func tag(_ text: String, symbol: String? = nil, tint: Color = .secondary) -> some View {
+        HStack(spacing: 3) {
+            if let symbol {
+                Image(systemName: symbol).font(.system(size: 8, weight: .bold)).foregroundStyle(tint)
+            }
+            Text(text).foregroundStyle(.secondary)
+        }
+        .font(.caption2)
+        .padding(.horizontal, 5).padding(.vertical, 1.5)
+        .background(.quaternary, in: Capsule())
     }
 }
 
