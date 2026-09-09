@@ -467,7 +467,7 @@ struct PRRow: View {
                         // Agent status from hooks / callbacks (US-034). Click to dismiss.
                         Button { model.focusAgent(pr) } label: {
                             tag(st.state == "attention" ? "needs you" : st.state == "done" ? "agent done" : "agent working",
-                                symbol: "sparkles",
+                                symbol: "cpu",
                                 tint: st.state == "attention" ? .orange : st.state == "done" ? stateColor(.success) : .secondary)
                         }
                         .buttonStyle(.plain)

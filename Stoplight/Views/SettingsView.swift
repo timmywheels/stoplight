@@ -15,7 +15,7 @@ struct SettingsView: View {
             SourcesTab(model: model)
                 .tabItem { Label("Sources", systemImage: "person.2") }
             AgentSettingsTab(model: model)
-                .tabItem { Label("Agent", systemImage: "sparkles") }
+                .tabItem { Label("Agent", systemImage: "cpu") }
         }
         .frame(minWidth: 520, idealWidth: 560, minHeight: 480, idealHeight: 680)
     }
@@ -184,7 +184,7 @@ private struct DisplayTab: View {
                             Image(systemName: "arrow.turn.down.right").font(.caption).foregroundStyle(.tertiary)
                         }
                         legendRow("Agent", "An agent you launched is waiting on you.") {
-                            Image(systemName: "sparkles").font(.caption).foregroundStyle(.orange)
+                            Image(systemName: "cpu").font(.caption).foregroundStyle(.orange)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)

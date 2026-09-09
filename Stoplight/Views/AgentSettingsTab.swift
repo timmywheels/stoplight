@@ -23,7 +23,8 @@ struct AgentSettingsTab: View {
                 }
                 if prefs.agent == AgentLauncher.Agent.custom.rawValue {
                     LabeledContent {
-                        TextField("myagent {args} {prompt}", text: $prefs.agentCustomCommand)
+                        TextField("", text: $prefs.agentCustomCommand, prompt: Text("myagent {args} {prompt}"))
+                            .labelsHidden()
                             .font(.system(.body, design: .monospaced))
                             .textFieldStyle(.roundedBorder)
                             .frame(maxWidth: .infinity)
@@ -44,7 +45,8 @@ struct AgentSettingsTab: View {
                     }
                 }
                 LabeledContent {
-                    TextField("--model opus", text: $prefs.agentExtraArgs)
+                    TextField("", text: $prefs.agentExtraArgs, prompt: Text("--model opus"))
+                        .labelsHidden()
                         .font(.system(.body, design: .monospaced))
                         .textFieldStyle(.roundedBorder)
                         .frame(maxWidth: .infinity)
@@ -98,10 +100,14 @@ struct AgentSettingsTab: View {
 
             Section {
                 LabeledContent {
-                    HStack {
-                        TextField("~/dev", text: $prefs.scanRoot)
+                    HStack(spacing: 8) {
+                        TextField("", text: tildePath, prompt: Text("~/dev"))
+                            .labelsHidden()
                             .textFieldStyle(.roundedBorder)
+                            .font(.system(.callout, design: .monospaced))
                             .frame(maxWidth: .infinity)
+                            .onSubmit(scan)
+                        Button("Choose…") { chooseRoot() }
                         Button(scanning ? "Scanning…" : "Scan") { scan() }.disabled(scanning)
                     }
                 } label: {
@@ -130,6 +136,26 @@ struct AgentSettingsTab: View {
         }
         .formStyle(.grouped)
         .task { if !detected { await model.detectAgents(); detected = true } }
+    }
+
+    /// Shown with a ~, stored absolute.
+    private var tildePath: Binding<String> {
+        Binding(get: { (model.prefs.scanRoot as NSString).abbreviatingWithTildeInPath },
+                set: { model.prefs.scanRoot = ($0 as NSString).expandingTildeInPath })
+    }
+
+    /// Same folder picker the gh path row uses, so both rows behave alike.
+    private func chooseRoot() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.message = "Choose the folder that holds your git clones"
+        panel.directoryURL = URL(fileURLWithPath: model.prefs.scanRoot)
+        if panel.runModal() == .OK, let url = panel.url {
+            model.prefs.scanRoot = url.path
+            scan()
+        }
     }
 
     private func scan() {

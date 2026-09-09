@@ -34,7 +34,7 @@ enum RowAction: String, CaseIterable, Identifiable, Codable {
         case .copyBranch: "arrow.triangle.branch"
         case .copyHash: "number"
         case .pin: "pin"
-        case .fix: "sparkles"
+        case .fix: "wrench.and.screwdriver"
         case .review: "eye.trianglebadge.exclamationmark"
         }
     }
