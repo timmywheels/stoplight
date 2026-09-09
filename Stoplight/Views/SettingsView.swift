@@ -63,13 +63,14 @@ private struct GeneralTab: View {
             }
 
             Section("Notifications") {
-                Picker("Notify me", selection: $notifications) {
+                Picker(selection: $notifications) {
                     Text("When a PR fails or turns all-passing").tag("all")
                     Text("Only when a PR fails").tag("failOnly")
                     Text("Never").tag("off")
+                } label: {
+                    InfoLabel("Notify me", "A notification fires when a PR changes state, not on every refresh, so a run that stays red stays quiet.")
                 }
                 .pickerStyle(.radioGroup)
-                .help("A notification fires when a PR changes state, not on every refresh.")
             }
 
             Section("Startup") {
@@ -113,11 +114,12 @@ private struct DisplayTab: View {
         @Bindable var prefs = model.prefs
         Form {
             Section {
-                Picker("Color profile", selection: $prefs.colorProfile) {
+                Picker(selection: $prefs.colorProfile) {
                     ForEach(ColorProfile.allCases) { Text($0.title).tag($0) }
+                } label: {
+                    InfoLabel("Color profile", "Recolors every dot and badge, in the menu bar and the widget too.")
                 }
                 .onChange(of: prefs.colorProfile) { _, _ in model.colorProfileChanged() }
-                .help("Recolors every dot and badge, in the menu bar and the widget too.")
             } header: {
                 Text("Colors")
             } footer: {
@@ -125,26 +127,32 @@ private struct DisplayTab: View {
             }
 
             Section("Menu bar") {
-                Toggle("Dark housing behind the dots", isOn: $prefs.housing)
-                    .help("Draws a rounded dark plate behind the three dots so they read against a light wallpaper.")
-                Toggle("Show a count beside the dots", isOn: $prefs.showCount)
-                    .help("Puts the number of PRs in each state next to its dot: 2 red, 1 yellow, and so on.")
+                Toggle(isOn: $prefs.housing) {
+                    InfoLabel("Dark housing behind the dots",
+                              "Draws a rounded dark plate behind the three dots so they read against a light wallpaper.")
+                }
+                Toggle(isOn: $prefs.showCount) {
+                    InfoLabel("Show a count beside the dots",
+                              "Puts the number of PRs in each state next to its dot: 2 red, 1 yellow, and so on.")
+                }
             }
 
             Section {
-                Picker("Counts on collapsed sections", selection: $prefs.sectionCounts) {
+                Picker(selection: $prefs.sectionCounts) {
                     Text("Off").tag(UserPrefs.SectionCounts.off)
                     Text("Only what needs attention").tag(UserPrefs.SectionCounts.attention)
                     Text("Every state").tag(UserPrefs.SectionCounts.full)
+                } label: {
+                    InfoLabel("Counts on collapsed sections",
+                              "Dots and numbers on a collapsed section header, summarizing the PRs folded inside it. \"Only what needs attention\" shows red and yellow; \"Every state\" adds green and gray.")
                 }
-                .help("Dots and numbers on a collapsed section header, summarizing the PRs hidden inside it. \"Only what needs attention\" shows red and yellow; \"Every state\" adds green and gray.")
                 DisclosureGroup {
                     RowActionsEditor(prefs: prefs)
                     Text("The circles in an expanded PR. Check to show, drag to reorder.")
                         .font(.caption).foregroundStyle(.secondary)
                 } label: {
-                    Text("Row buttons")
-                        .help("Which action buttons appear when you expand a PR: open on GitHub, copy the branch, hand it to the agent, and so on.")
+                    InfoLabel("Row buttons",
+                              "Which action buttons appear when you expand a PR: open on GitHub, copy the branch, hand it to the agent, and so on.")
                 }
             } header: {
                 Text("Popover")
@@ -315,8 +323,10 @@ private struct SourcesTab: View {
                             normalize: { UserPrefs.normalize($0, kind: .branches, hideList: false) },
                             help: "Is main green? A followed branch shows its own CI verdict. A pattern like rc/* tracks whichever matching branch is newest.",
                             onChange: model.sourcesChanged)
-                Stepper("Commits shown per branch: \(prefs.branchCommits)", value: $prefs.branchCommits, in: 1...10)
-                    .help("How far back to list a followed branch's commits, so you can see which one broke it.")
+                Stepper(value: $prefs.branchCommits, in: 1...10) {
+                    InfoLabel("Commits shown per branch: \(prefs.branchCommits)",
+                              "How far back to list a followed branch's commits, so you can see which one broke it.")
+                }
                     .onChange(of: prefs.branchCommits) { _, _ in model.sourcesChanged() }
                 Text("Every open PR from a followed user, repo, or org gets its own section. A followed branch shows its latest CI verdict (is main green?) and notifies when it goes red; raise the commit count to see the last few commits and which one broke it. A pattern like rc/* follows whichever matching branch has the newest commit, adds a section of PRs targeting it, and tells you when a new one is cut.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -349,13 +359,15 @@ private struct SourcesTab: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section {
-                Picker("Recently merged", selection: $prefs.mergedDays) {
+                Picker(selection: $prefs.mergedDays) {
                     Text("Off").tag(0)
                     Text("Last 24 hours").tag(1)
                     Text("Last 7 days").tag(7)
+                } label: {
+                    InfoLabel("Recently merged",
+                              "Keeps your merged PRs in a collapsed section for a while, so a failure on the merge commit still reaches you.")
                 }
                 .onChange(of: prefs.mergedDays) { _, _ in model.sourcesChanged() }
-                .help("Keeps your merged PRs in a collapsed section for a while, so a failure on the merge commit still reaches you.")
             } footer: {
                 Text("Your merged PRs, collapsed. When checks run on the merge commit, a failure there lights the dots.")
             }
@@ -396,7 +408,7 @@ private struct TableEditor: View {
     private var rowCount: Int { items.count + (draft == nil ? 0 : 1) }
 
     var body: some View {
-        LabeledContent(title) {
+        LabeledContent {
             VStack(alignment: .leading, spacing: 4) {
                 List(selection: $selection) {
                     ForEach(items, id: \.self) { item in
@@ -431,9 +443,10 @@ private struct TableEditor: View {
                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 5))
                 .onDeleteCommand(perform: removeSelected)
             }
+        } label: {
+            InfoLabel(title, help)
         }
         .labeledContentStyle(.automatic)
-        .help(help)
     }
 
     private func startDraft() {

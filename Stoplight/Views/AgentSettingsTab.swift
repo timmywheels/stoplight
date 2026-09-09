@@ -11,40 +11,50 @@ struct AgentSettingsTab: View {
         @Bindable var prefs = model.prefs
         Form {
             Section {
-                Picker("Coding agent", selection: $prefs.agent) {
+                Picker(selection: $prefs.agent) {
                     Text("Off").tag("")
                     ForEach(AgentLauncher.Agent.allCases) { a in
                         let installed = model.installedAgents.contains(a)
                         Text(installed || a == .custom ? a.title : "\(a.title) (not found)").tag(a.rawValue)
                             .selectionDisabled(!installed && a != .custom)
                     }
+                } label: {
+                    InfoLabel("Coding agent", "Which CLI coding agent Stoplight hands a PR to. Greyed-out entries aren't installed on your PATH.")
                 }
-                .help("Which CLI coding agent Stoplight hands a PR to. Greyed-out entries aren't installed on your PATH.")
                 if prefs.agent == AgentLauncher.Agent.custom.rawValue {
-                    TextField("Command, use {prompt} and {args}", text: $prefs.agentCustomCommand)
-                        .font(.system(.body, design: .monospaced))
-                        .help("The exact command to run. {prompt} is replaced by the filled-in template, {args} by the extra arguments below.")
+                    LabeledContent {
+                        TextField("myagent {args} {prompt}", text: $prefs.agentCustomCommand)
+                            .font(.system(.body, design: .monospaced))
+                    } label: {
+                        InfoLabel("Command", "The exact command to run. {prompt} is replaced by the filled-in template, {args} by the extra arguments below.")
+                    }
                 }
                 if let agent = AgentLauncher.Agent(rawValue: prefs.agent), !agent.permissionModes.isEmpty {
-                    Picker("Permissions when fixing", selection: $prefs.agentPermissionMode) {
+                    Picker(selection: $prefs.agentPermissionMode) {
                         ForEach(agent.permissionModes, id: \.id) { Text($0.title).tag($0.id) }
+                    } label: {
+                        InfoLabel("Permissions when fixing", "How much the agent may do on its own when you send it a failing PR (⌘F). It edits code, so asking first is the safe default.")
                     }
-                    .help("How much the agent may do on its own when you send it a failing PR to fix. It edits code, so asking first is the safe default.")
-                    Picker("Permissions when reviewing", selection: $prefs.agentReviewPermissionMode) {
+                    Picker(selection: $prefs.agentReviewPermissionMode) {
                         ForEach(agent.permissionModes, id: \.id) { Text($0.title).tag($0.id) }
+                    } label: {
+                        InfoLabel("Permissions when reviewing", "Permissions for Adversarial review (⇧⌘F), which only reads and reports. Plan mode keeps it from touching files.")
                     }
-                    .help("Permissions for Adversarial review, which only reads and reports. Plan mode keeps it from touching files.")
                 }
-                TextField("Extra arguments (optional)", text: $prefs.agentExtraArgs)
-                    .font(.system(.body, design: .monospaced))
-                    .help("Appended to every agent command, for flags like --model or a config path.")
-                Picker("Open in", selection: $prefs.terminal) {
+                LabeledContent {
+                    TextField("--model opus", text: $prefs.agentExtraArgs)
+                        .font(.system(.body, design: .monospaced))
+                } label: {
+                    InfoLabel("Extra arguments", "Appended to every agent command, for flags like a model choice or a config path.")
+                }
+                Picker(selection: $prefs.terminal) {
                     ForEach(AgentLauncher.Terminal.allCases) { t in
                         Text(t.isInstalled ? t.title : "\(t.title) (not installed)").tag(t.rawValue)
                             .selectionDisabled(!t.isInstalled)
                     }
+                } label: {
+                    InfoLabel("Open in", "The terminal app Stoplight opens the agent in. One window per PR, reused if that session is still running.")
                 }
-                .help("The terminal app Stoplight opens the agent in. One window per PR, reused if it's still running.")
             } header: {
                 Text("Agent")
             } footer: {
@@ -64,8 +74,7 @@ struct AgentSettingsTab: View {
                         Button("Reset") { prefs.promptTemplate = AgentLauncher.defaultPrompt }.controlSize(.small)
                     }
                 } label: {
-                    Text("Fix prompt")
-                        .help("What Stoplight says to the agent when you send it a failing PR (⌘F). Placeholders are filled in from that PR.")
+                    InfoLabel("Fix prompt", "What Stoplight says to the agent when you send it a failing PR (⌘F). The placeholders below are filled in from that PR.")
                 }
                 DisclosureGroup {
                     TextEditor(text: $prefs.reviewTemplate)
@@ -79,17 +88,18 @@ struct AgentSettingsTab: View {
                         Button("Reset") { prefs.reviewTemplate = AgentLauncher.defaultReviewPrompt }.controlSize(.small)
                     }
                 } label: {
-                    Text("Review prompt")
-                        .help("What Stoplight says to the agent for Adversarial review (⇧⌘F): pick the PR apart, don't fix it.")
+                    InfoLabel("Review prompt", "What Stoplight says to the agent for Adversarial review (⇧⌘F): pick the PR apart and report, don't fix it.")
                 }
             }
 
             Section {
-                HStack {
-                    TextField("Folder to scan", text: $prefs.scanRoot).textFieldStyle(.roundedBorder)
-                        .help("A folder holding your git checkouts. Stoplight walks it and matches each clone's remote to a repo.")
-                    Button(scanning ? "Scanning…" : "Scan") { scan() }.disabled(scanning)
-                        .help("Find clones under that folder now.")
+                LabeledContent {
+                    HStack {
+                        TextField("~/dev", text: $prefs.scanRoot).textFieldStyle(.roundedBorder)
+                        Button(scanning ? "Scanning…" : "Scan") { scan() }.disabled(scanning)
+                    }
+                } label: {
+                    InfoLabel("Folder to scan", "A folder holding your git checkouts. Stoplight walks it and matches each clone's remote to the repos your PRs live in.")
                 }
                 if model.prefs.repoPaths.isEmpty {
                     Text("No clones found yet. Scan a folder that holds your git checkouts; remotes are matched to the PRs' repos.")
