@@ -98,7 +98,7 @@ public struct GitHubProvider: CIProvider {
             guard let history = repos["b\(i)"]??.ref?.target?.history?.nodes, let head = history.first else { continue }
             func status(_ c: C) -> BranchStatus {
                 BranchStatus(ref: r, sha: c.oid, message: c.messageHeadline, url: c.url,
-                             committedAt: c.committedDate, checks: (c.statusCheckRollup?.contexts.nodes ?? []).compactMap(Self.mapCheck))
+                             committedAt: c.committedDate, checks: Self.checks(of: c.statusCheckRollup))
             }
             let withChecks = history.filter { !($0.statusCheckRollup?.contexts.nodes.isEmpty ?? true) }
             out[r.key] = withChecks.isEmpty ? [status(head)] : withChecks.prefix(max(1, commits)).map(status)
@@ -230,11 +230,14 @@ public struct GitHubProvider: CIProvider {
     fragment CommitChecks on Commit {
       statusCheckRollup {
         state
-        contexts(first: 100) {
+        contexts(last: 100) {
           nodes {
             __typename
-            ... on CheckRun { name status conclusion detailsUrl }
-            ... on StatusContext { context state targetUrl }
+            ... on CheckRun {
+              name status conclusion detailsUrl startedAt completedAt
+              checkSuite { workflowRun { workflow { name } } }
+            }
+            ... on StatusContext { context state targetUrl createdAt }
           }
         }
       }
@@ -281,6 +284,9 @@ public struct GitHubProvider: CIProvider {
         struct Commit: Decodable { let statusCheckRollup: RollupNode? }
         struct RollupNode: Decodable { let state: String?; let contexts: Contexts }
         struct Contexts: Decodable { let nodes: [Context] }
+        struct Workflow: Decodable { let name: String? }
+        struct WorkflowRun: Decodable { let workflow: Workflow? }
+        struct CheckSuite: Decodable { let workflowRun: WorkflowRun? }
         struct Context: Decodable {
             let __typename: String
             // CheckRun
@@ -288,10 +294,14 @@ public struct GitHubProvider: CIProvider {
             let status: String?
             let conclusion: String?
             let detailsUrl: URL?
+            let startedAt: Date?
+            let completedAt: Date?
+            let checkSuite: CheckSuite?
             // StatusContext
             let context: String?
             let state: String?
             let targetUrl: URL?
+            let createdAt: Date?
         }
 
         let id: String?
@@ -325,11 +335,11 @@ public struct GitHubProvider: CIProvider {
         }
         // Once merged, the branch's checks are history; what matters is what ran on the merge commit (US-022).
         let commit = status == .merged ? n.mergeCommit : n.commits?.nodes.first?.commit
-        let contexts = commit?.statusCheckRollup?.contexts.nodes ?? []
+
         return PullRequest(
             id: id, repo: repo, number: number, title: title, url: url,
             isDraft: n.isDraft ?? false, updatedAt: n.updatedAt ?? .distantPast,
-            headSha: sha, checks: contexts.compactMap(mapCheck),
+            headSha: sha, checks: checks(of: commit?.statusCheckRollup),
             author: n.author?.login ?? "ghost", status: status,
             summary: summarize(n.bodyText),
             headRefName: n.headRefName ?? "", baseRefName: n.baseRefName ?? "",
@@ -345,6 +355,18 @@ public struct GitHubProvider: CIProvider {
         let collapsed = body.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }.joined(separator: "\n")
         return collapsed.count > 300 ? String(collapsed.prefix(300)).trimmingCharacters(in: .whitespaces) + "…" : collapsed
+    }
+
+    /// A commit keeps every run that ever reported on it: re-run a workflow and the old, failed
+    /// check run is still attached. Keep the newest per workflow and name so a stale failure
+    /// doesn't outvote the passing re-run that replaced it.
+    private static func checks(of rollup: Node.RollupNode?) -> [CheckResult] {
+        Rollup.newestPerCheck((rollup?.contexts.nodes ?? []).compactMap { c in
+            guard let check = mapCheck(c) else { return nil }
+            let workflow = c.checkSuite?.workflowRun?.workflow?.name ?? ""
+            return Rollup.TimedCheck(check: check, workflow: workflow,
+                                     at: c.completedAt ?? c.startedAt ?? c.createdAt)
+        })
     }
 
     private static func mapCheck(_ c: Node.Context) -> CheckResult? {
