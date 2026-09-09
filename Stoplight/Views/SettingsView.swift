@@ -36,10 +36,10 @@ private struct GeneralTab: View {
                 case .signedIn(let login, let source):
                     LabeledContent("Signed in as", value: "@\(login)")
                     LabeledContent("Source", value: source.rawValue)
-                        .help("Where the token came from: the GitHub CLI on your PATH, or one you pasted into Stoplight.")
+                        .help("The GitHub CLI on your PATH, or a token you pasted in.")
                     LabeledContent("Session") {
                         Button("Sign out") { model.signOut() }
-                            .help("Clears the token Stoplight stored in your keychain and stops fetching PRs.")
+                            .help("Clears the stored token and stops fetching.")
                     }
                 case .failed(let msg):
                     LabeledContent("Status") {
@@ -73,7 +73,7 @@ private struct GeneralTab: View {
                     ForEach(UserPrefs.RefreshRate.allCases) { Text($0.title).tag($0) }
                 } label: {
                     InfoLabel("Check GitHub",
-                              "Automatic checks every 20 seconds while something is running and every minute otherwise. Whatever you pick here, Stoplight still speeds up for running checks and backs off when the API rate limit gets close.")
+                              "Automatic is 20 seconds while checks run, a minute otherwise. Any choice still speeds up for running checks and backs off near the rate limit.")
                 }
             } header: {
                 Text("Refreshing")
@@ -87,7 +87,7 @@ private struct GeneralTab: View {
                     Text("Only when a PR fails").tag("failOnly")
                     Text("Never").tag("off")
                 } label: {
-                    InfoLabel("Notify me", "A notification fires when a PR changes state, not on every refresh, so a run that stays red stays quiet.")
+                    InfoLabel("Notify me", "Fires when a PR changes state, not on every refresh. A PR that stays red stays quiet.")
                 }
                 .pickerStyle(.radioGroup)
             }
@@ -145,7 +145,7 @@ private struct DisplayTab: View {
                 Picker(selection: $prefs.colorProfile) {
                     ForEach(ColorProfile.allCases) { Text($0.title).tag($0) }
                 } label: {
-                    InfoLabel("Color profile", "Recolors every dot and badge, in the menu bar and the widget too.")
+                    InfoLabel("Color profile", "Recolors every dot and badge, menu bar and widget included.")
                 }
                 .onChange(of: prefs.colorProfile) { _, _ in model.colorProfileChanged() }
             } header: {
@@ -161,7 +161,7 @@ private struct DisplayTab: View {
                 }
                 Toggle(isOn: $prefs.showCount) {
                     InfoLabel("Show a count beside the dots",
-                              "One number after the dots: how many PRs need attention right now, meaning failing or still running. Drafts don't count, and the number disappears when it's zero.")
+                              "How many PRs are red or yellow right now. Same PRs the dots cover, drafts excluded, hidden at zero.")
                 }
             }
 
@@ -170,7 +170,7 @@ private struct DisplayTab: View {
                     ForEach(UserPrefs.PrimaryClick.allCases) { Text($0.title).tag($0) }
                 } label: {
                     InfoLabel("Clicking a PR",
-                              "Whichever one you don't pick moves to double-click, and ⌘-click always does it too. Nothing becomes unreachable.")
+                              "The other action moves to double-click, and ⌘-click always does it too.")
                 }
                 Picker(selection: $prefs.sectionCounts) {
                     Text("Off").tag(UserPrefs.SectionCounts.off)
@@ -178,7 +178,7 @@ private struct DisplayTab: View {
                     Text("Every state").tag(UserPrefs.SectionCounts.full)
                 } label: {
                     InfoLabel("Counts on collapsed sections",
-                              "Dots and numbers on a collapsed section header, summarizing the PRs folded inside it. \"Only what needs attention\" shows red and yellow; \"Every state\" adds green and gray.")
+                              "A collapsed header's summary of the PRs folded inside it. Attention is red and yellow only; Every state adds green and gray.")
                 }
                 DisclosureGroup {
                     RowActionsEditor(prefs: prefs)
@@ -186,7 +186,7 @@ private struct DisplayTab: View {
                         .font(.caption).foregroundStyle(.secondary)
                 } label: {
                     InfoLabel("Row buttons",
-                              "Which action buttons appear when you expand a PR: open on GitHub, copy the branch, hand it to the agent, and so on.")
+                              "The buttons on an expanded PR: open, copy, share, pin, hand it to the agent.")
                 }
             } header: {
                 Text("Popover")
@@ -337,7 +337,7 @@ private struct SourcesTab: View {
             Section("Follow") {
                 TableEditor(title: "Users", items: $prefs.sources.followUsers, placeholder: "username",
                             normalize: { UserPrefs.normalize($0, kind: .users, hideList: false) },
-                            help: "Teammates whose open PRs you want to watch. Each gets its own section.",
+                            help: "Their open PRs, each author in its own section.",
                             onChange: model.sourcesChanged,
                             trailing: { login in
                                 AnyView(TextField(model.displayName(for: login) ?? "Label",
@@ -352,14 +352,14 @@ private struct SourcesTab: View {
                             help: "Every open PR in these repos, whoever wrote it.", onChange: model.sourcesChanged)
                 TableEditor(title: "Orgs", items: $prefs.sources.followOrgs, placeholder: "org",
                             normalize: { UserPrefs.normalize($0, kind: .orgs, hideList: false) },
-                            help: "Every open PR across an organization. Broad: pair it with Hide.", onChange: model.sourcesChanged)
+                            help: "Every open PR in the org. Broad, so pair it with Hide.", onChange: model.sourcesChanged)
                 TableEditor(title: "Branches", items: $prefs.sources.followBranches, placeholder: "owner/repo@main  or  owner/repo@rc/*",
                             normalize: { UserPrefs.normalize($0, kind: .branches, hideList: false) },
-                            help: "Is main green? A followed branch shows its own CI verdict. A pattern like rc/* tracks whichever matching branch is newest.",
+                            help: "Is main green? Each branch shows its own CI verdict. A pattern like rc/* tracks the newest match.",
                             onChange: model.sourcesChanged)
                 Stepper(value: $prefs.branchCommits, in: 1...10) {
                     InfoLabel("Commits shown per branch: \(prefs.branchCommits)",
-                              "How far back to list a followed branch's commits, so you can see which one broke it.")
+                              "How many recent commits each followed branch lists, so you can see which one broke it.")
                 }
                     .onChange(of: prefs.branchCommits) { _, _ in model.sourcesChanged() }
                 Text("Every open PR from a followed user, repo, or org gets its own section. A followed branch shows its latest CI verdict (is main green?) and notifies when it goes red; raise the commit count to see the last few commits and which one broke it. A pattern like rc/* follows whichever matching branch has the newest commit, adds a section of PRs targeting it, and tells you when a new one is cut.")
@@ -368,10 +368,10 @@ private struct SourcesTab: View {
             Section("Hide") {
                 TableEditor(title: "Users", items: $prefs.sources.hiddenUsers, placeholder: "username or name[bot]",
                             normalize: { UserPrefs.normalize($0, kind: .users, hideList: true) },
-                            help: "Drops these authors everywhere. Bots like dependabot[bot] are the usual case.", onChange: model.sourcesChanged)
+                            help: "Dropped everywhere. Bots like dependabot[bot] are the usual case.", onChange: model.sourcesChanged)
                 TableEditor(title: "Repos", items: $prefs.sources.hiddenRepos, placeholder: "owner/repo",
                             normalize: { UserPrefs.normalize($0, kind: .repos, hideList: true) },
-                            help: "Drops these repos everywhere, including your own PRs in them.", onChange: model.sourcesChanged)
+                            help: "Dropped everywhere, including your own PRs in them.", onChange: model.sourcesChanged)
                 LabeledContent("PRs") {
                     if model.prefs.sources.hiddenPRs.isEmpty {
                         Text("None. Right-click a PR → Hide this PR. Hidden repos are set here only.").foregroundStyle(.secondary)
@@ -399,7 +399,7 @@ private struct SourcesTab: View {
                     Text("Last 7 days").tag(7)
                 } label: {
                     InfoLabel("Recently merged",
-                              "Keeps your merged PRs in a collapsed section for a while, so a failure on the merge commit still reaches you.")
+                              "Keeps your merged PRs around a while, so a red merge commit still reaches you.")
                 }
                 .onChange(of: prefs.mergedDays) { _, _ in model.sourcesChanged() }
             } footer: {

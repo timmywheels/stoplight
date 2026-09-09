@@ -19,7 +19,7 @@ struct AgentSettingsTab: View {
                             .selectionDisabled(!installed && a != .custom)
                     }
                 } label: {
-                    InfoLabel("Coding agent", "Which CLI coding agent Stoplight hands a PR to. Greyed-out entries aren't installed on your PATH.")
+                    InfoLabel("Coding agent", "Who gets the PR. Greyed-out agents aren't on your PATH.")
                 }
                 if prefs.agent == AgentLauncher.Agent.custom.rawValue {
                     LabeledContent {
@@ -29,19 +29,19 @@ struct AgentSettingsTab: View {
                             .textFieldStyle(.roundedBorder)
                             .frame(maxWidth: .infinity)
                     } label: {
-                        InfoLabel("Command", "The exact command to run. {prompt} is replaced by the filled-in template, {args} by the extra arguments below.")
+                        InfoLabel("Command", "{prompt} becomes the filled-in template, {args} the extra arguments below.")
                     }
                 }
                 if let agent = AgentLauncher.Agent(rawValue: prefs.agent), !agent.permissionModes.isEmpty {
                     Picker(selection: $prefs.agentPermissionMode) {
                         ForEach(agent.permissionModes, id: \.id) { Text($0.title).tag($0.id) }
                     } label: {
-                        InfoLabel("Permissions when fixing", "How much the agent may do on its own when you send it a failing PR (⌘F). It edits code, so asking first is the safe default.")
+                        InfoLabel("Permissions when fixing", "How much the agent may do on its own with ⌘F. It edits code, so asking first is safest.")
                     }
                     Picker(selection: $prefs.agentReviewPermissionMode) {
                         ForEach(agent.permissionModes, id: \.id) { Text($0.title).tag($0.id) }
                     } label: {
-                        InfoLabel("Permissions when reviewing", "Permissions for Adversarial review (⇧⌘F), which only reads and reports. Plan mode keeps it from touching files.")
+                        InfoLabel("Permissions when reviewing", "For ⇧⌘F, which only reads and reports. Plan mode keeps it off your files.")
                     }
                 }
                 LabeledContent {
@@ -51,7 +51,7 @@ struct AgentSettingsTab: View {
                         .textFieldStyle(.roundedBorder)
                         .frame(maxWidth: .infinity)
                 } label: {
-                    InfoLabel("Extra arguments", "Appended to every agent command, for flags like a model choice or a config path.")
+                    InfoLabel("Extra arguments", "Appended to every agent command, like a model choice or a config path.")
                 }
                 Picker(selection: $prefs.terminal) {
                     ForEach(AgentLauncher.Terminal.allCases) { t in
@@ -59,7 +59,7 @@ struct AgentSettingsTab: View {
                             .selectionDisabled(!t.isInstalled)
                     }
                 } label: {
-                    InfoLabel("Open in", "The terminal app Stoplight opens the agent in. One window per PR, reused if that session is still running.")
+                    InfoLabel("Open in", "One window per PR, reused while that session is still running.")
                 }
             } header: {
                 Text("Agent")
@@ -80,7 +80,7 @@ struct AgentSettingsTab: View {
                         Button("Reset") { prefs.promptTemplate = AgentLauncher.defaultPrompt }.controlSize(.small)
                     }
                 } label: {
-                    InfoLabel("Fix prompt", "What Stoplight says to the agent when you send it a failing PR (⌘F). The placeholders below are filled in from that PR.")
+                    InfoLabel("Fix prompt", "Sent with ⌘F. Placeholders below are filled in from that PR.")
                 }
                 DisclosureGroup {
                     TextEditor(text: $prefs.reviewTemplate)
@@ -94,7 +94,7 @@ struct AgentSettingsTab: View {
                         Button("Reset") { prefs.reviewTemplate = AgentLauncher.defaultReviewPrompt }.controlSize(.small)
                     }
                 } label: {
-                    InfoLabel("Review prompt", "What Stoplight says to the agent for Adversarial review (⇧⌘F): pick the PR apart and report, don't fix it.")
+                    InfoLabel("Review prompt", "Sent with ⇧⌘F: pick the PR apart and report, don't fix it.")
                 }
             }
 
@@ -111,7 +111,7 @@ struct AgentSettingsTab: View {
                         Button(scanning ? "Scanning…" : "Scan") { scan() }.disabled(scanning)
                     }
                 } label: {
-                    InfoLabel("Folder to scan", "A folder holding your git checkouts. Stoplight walks it and matches each clone's remote to the repos your PRs live in.")
+                    InfoLabel("Folder to scan", "Where your git clones live. Stoplight matches each clone's remote to a repo.")
                 }
                 if model.prefs.repoPaths.isEmpty {
                     Text("No clones found yet. Scan a folder that holds your git checkouts; remotes are matched to the PRs' repos.")

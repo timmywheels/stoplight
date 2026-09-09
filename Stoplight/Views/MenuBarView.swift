@@ -236,12 +236,15 @@ struct MenuBarView: View {
             Button("Watch a PR") { model.isWatching = true }
                 .keyboardShortcut("n").hidden().frame(width: 0, height: 0)
             Button { Task { await model.refresh() } } label: {
-                Image(systemName: "arrow.clockwise").frame(width: 22, height: 22)
-                    .rotationEffect(.degrees(model.isRefreshing ? 360 : 0))
-                    .animation(model.isRefreshing
-                               ? .linear(duration: 0.9).repeatForever(autoreverses: false)
-                               : .default,
-                               value: model.isRefreshing)
+                // AppKit's own spinner while it works: a rotated SF Symbol wobbles off its centre.
+                ZStack {
+                    if model.isRefreshing {
+                        ProgressView().controlSize(.small).scaleEffect(0.7)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                }
+                .frame(width: 22, height: 22)
             }
             .keyboardShortcut("r").disabled(model.isRefreshing).help("Refresh now (⌘R)")
             Button { showSettings() } label: { Image(systemName: "gearshape").frame(width: 22, height: 22) }
