@@ -124,7 +124,7 @@ private struct GeneralTab: View {
                 LegendRow("Running. Checks still in progress.") { StatusDot(state: .pending) }
                 LegendRow("Passed. Every check passed, skipped, or neutral.") { StatusDot(state: .success) }
                 LegendRow("Nothing ran: no checks configured, or every check was skipped.") { StatusDot(state: .none) }
-                LegendRow("GitHub won't merge it as-is. Conflicts count as red, since nothing else can happen until they're fixed.") { Text("Conflicts").font(.caption2).foregroundStyle(.red).padding(.horizontal, 4).padding(.vertical, 1).background(.quaternary, in: Capsule()) }
+                LegendRow("GitHub won't merge it as-is. Conflicts count as red, since nothing else can happen until they're fixed.") { HStack(spacing: 3) { Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 8, weight: .bold)).foregroundStyle(model.prefs.colorProfile.color(for: .failure)); Text("Conflicts").foregroundStyle(Color.secondary) }.font(.caption2).padding(.horizontal, 5).padding(.vertical, 1.5).background(.quaternary, in: Capsule()) }
                 LegendRow("Merged. The branch badge next to it is colored by the base branch's current CI state.") { Image(systemName: "checkmark.circle.fill").font(.caption).foregroundStyle(Color.githubMerged) }
                 LegendRow("Hollow dot: draft. Drafts never light the menu bar or notify.") { StatusDot(state: .success, hollow: true) }
                 LegendRow("Stacked on the PR above it. Right-click to copy the whole stack.") { Image(systemName: "arrow.turn.down.right").font(.caption2).foregroundStyle(.tertiary) }

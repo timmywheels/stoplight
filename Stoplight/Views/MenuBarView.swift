@@ -598,7 +598,7 @@ struct PRRow: View {
                 buttons[i].action()
             }
             if let err = model.agentError {
-                Text(err).font(.caption2).foregroundStyle(.red).lineLimit(2)
+                Text(err).font(.caption2).foregroundStyle(stateColor(.failure)).lineLimit(2)
             }
         }
         .padding(.leading, 34 + CGFloat(depth) * 14).padding(.trailing, 12).padding(.bottom, 10)

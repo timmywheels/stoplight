@@ -4,6 +4,7 @@ import StoplightCore
 /// First-run tour (US-024). Four slides inside the panel; Skip or Done marks it seen. Replay from Settings.
 struct TourView: View {
     let done: () -> Void
+    @Environment(\.colorProfile) private var colorProfile
     @State private var index = 0
     private static let motion = Animation.snappy(duration: 0.2, extraBounce: 0)
 
@@ -13,13 +14,14 @@ struct TourView: View {
         let art: AnyView
     }
 
-    private let slides: [Slide] = [
+    // Computed, not stored: the art has to read the color profile from the environment.
+    private var slides: [Slide] { [
         Slide(title: "Stop refreshing GitHub",
               body: "Stoplight watches every open PR you have. Red means go fix something. Yellow means keep working, it's still running. Green means ship it. One glance at the menu bar is the whole check. ⌥⌘S opens the list from anywhere.",
               art: AnyView(HStack(spacing: 10) {
-                  Circle().fill(.red).frame(width: 14, height: 14)
-                  Circle().fill(.yellow).frame(width: 14, height: 14)
-                  Circle().fill(.green).frame(width: 14, height: 14)
+                  Circle().fill(colorProfile.color(for: .failure)).frame(width: 14, height: 14)
+                  Circle().fill(colorProfile.color(for: .pending)).frame(width: 14, height: 14)
+                  Circle().fill(colorProfile.color(for: .success)).frame(width: 14, height: 14)
               }.padding(.horizontal, 14).padding(.vertical, 10).background(Color(white: 0.22), in: Capsule()))),
         Slide(title: "Everything about a PR, a double-click away",
               body: "Click a PR to open it on GitHub. Double-click to expand it right here: description, exactly which checks failed, and buttons to open, copy, share, or pin.",
@@ -38,7 +40,7 @@ struct TourView: View {
         Slide(title: "Watch your team, not just yourself",
               body: "Follow people, repos, or orgs in Settings → Sources and each gets its own section. You get a notification the moment CI fails, or goes green. The desktop widget shows the same list.",
               art: AnyView(Image(systemName: "person.2").font(.system(size: 34)).foregroundStyle(.secondary))),
-    ]
+    ] }
 
     var body: some View {
         VStack(spacing: 0) {
