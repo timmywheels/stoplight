@@ -22,10 +22,17 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
     private var globalHotkey: GlobalHotkey?
 
     private static let sizeKey = "panelSize"
+    private static let manualHeightKey = "panelHeightIsManual"
     private static let defaultSize = NSSize(width: 380, height: 520)
     private static let minSize = NSSize(width: 320, height: 160)
     /// Set once the user drags the panel; we then stop snapping it under the dots until it's closed unpinned.
     private var userMoved = false
+    /// Set once the user resizes the panel: from then on the height they chose wins over fitting the content.
+    /// "Reset Panel Position and Size" hands control back to auto-fit.
+    private var manualHeight: Bool {
+        get { UserDefaults.standard.bool(forKey: Self.manualHeightKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.manualHeightKey) }
+    }
     private var fitting = false
 
     init(model: AppModel) {
@@ -69,7 +76,8 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.fitScheduled = false
-            guard let panel = self.panel, panel.isVisible, !panel.inLiveResize, !self.fitting,
+            guard !self.manualHeight,   // the user picked a height; leave it alone
+                  let panel = self.panel, panel.isVisible, !panel.inLiveResize, !self.fitting,
                   self.model.contentHeight > 0, self.model.chromeHeight > 0 else { return }
             let maxH = self.savedSize().height
             let wanted = max(Self.minSize.height, min(maxH, self.model.contentHeight + self.model.chromeHeight))
@@ -147,6 +155,7 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
     @objc private func resetPanel() {
         model.pinnedPanel = false
         userMoved = false
+        manualHeight = false
         UserDefaults.standard.removeObject(forKey: Self.sizeKey)
         if let panel {
             panel.setContentSize(Self.defaultSize)
@@ -329,7 +338,8 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
 
     func windowDidEndLiveResize(_ notification: Notification) {
         guard let panel else { return }
-        // The user's size is the ceiling: width always, height as the max the list may grow to.
+        // A deliberate resize is the size, not a ceiling: stop auto-fitting the height from here on.
+        manualHeight = true
         UserDefaults.standard.set(NSStringFromSize(panel.frame.size), forKey: Self.sizeKey)
         // Reposition on the next turn, never inside the resize callback (re-entrant layout → stack overflow).
         DispatchQueue.main.async { [weak self] in

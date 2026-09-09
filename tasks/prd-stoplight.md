@@ -330,7 +330,7 @@ App name: **Stoplight**. The menu bar glyph is three horizontal dots, red / yell
 **Description:** As a user, I want the panel to take only the space its content needs, to drag it where I like, and to pin it open while I work.
 
 **Acceptance Criteria:**
-- [ ] Panel height tracks the list's natural height (collapsed sections shrink it), capped at the height the user last dragged it to; width is always the user's. All frame changes are deferred to the next run-loop turn and measurements are equality-guarded, so layout can never re-enter itself
+- [ ] Panel height tracks the list's natural height (collapsed sections shrink it) until the user resizes it; a deliberate resize wins from then on, empty space included, and "Reset Panel Position and Size" restores auto-fit. Width is always the user's. All frame changes are deferred to the next run-loop turn and measurements are equality-guarded, so layout can never re-enter itself
 - [ ] Drag the centered handle at the top to move the panel (open-hand cursor on hover, closed hand while dragging); the rest of the background is inert; once moved it stays put until closed
 - [ ] Pin button top-right beside the grab handle toggles pinned mode: floating level, no close on click-outside or focus loss, position kept; Esc unpins and closes
 - [ ] Description in an expanded row is capped at 3 lines and never overlaps the buttons
