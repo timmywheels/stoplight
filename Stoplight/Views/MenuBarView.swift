@@ -205,16 +205,13 @@ struct MenuBarView: View {
                 }
                 .fixedSize()
             }
-            if showTime {
-                if let err = model.lastError {
+            if let err = model.lastError {
+                if showTime {
                     Label("Stale, retrying", systemImage: "wifi.exclamationmark")
                         .font(.caption).foregroundStyle(.orange).help(err).lineLimit(1).fixedSize()
-                } else if let t = model.lastRefresh {
-                    Text("\(t, style: .relative) ago").font(.caption).foregroundStyle(.tertiary).lineLimit(1).fixedSize()
-                        .help("Last refreshed")
+                } else {
+                    Image(systemName: "wifi.exclamationmark").font(.caption).foregroundStyle(.orange).help(err)
                 }
-            } else if model.lastError != nil {
-                Image(systemName: "wifi.exclamationmark").font(.caption).foregroundStyle(.orange).help(model.lastError ?? "")
             }
             Spacer(minLength: 8)
             if model.updater.updateAvailable, let v = model.updater.latest?.version {
@@ -235,6 +232,16 @@ struct MenuBarView: View {
             // ⌘N has no button of its own; it lives in the dots' right-click menu.
             Button("Watch a PR") { model.isWatching = true }
                 .keyboardShortcut("n").hidden().frame(width: 0, height: 0)
+            if showTime, model.lastError == nil, let t = model.lastRefresh {
+                // Ticks on its own; the panel can sit open far longer than a refresh interval.
+                TimelineView(.periodic(from: .now, by: 1)) { _ in
+                    Text(t.terseAgo)
+                        .font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+                        .lineLimit(1).fixedSize()
+                }
+                .help("Last refreshed")
+                .padding(.trailing, 2)
+            }
             Button { Task { await model.refresh() } } label: {
                 // AppKit's own spinner while it works: a rotated SF Symbol wobbles off its centre.
                 ZStack {
