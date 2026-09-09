@@ -5,6 +5,7 @@ import StoplightCore
 struct AgentSettingsTab: View {
     @Bindable var model: AppModel
     @State private var scanning = false
+    @State private var repoFilter = ""
     @State private var detected = false
 
     var body: some View {
@@ -124,25 +125,50 @@ struct AgentSettingsTab: View {
                     Text("No clones found yet. Scan a folder that holds your git checkouts; remotes are matched to the PRs' repos.")
                         .foregroundStyle(.secondary).font(.callout)
                 } else {
-                    ForEach(model.prefs.repoPaths.sorted(by: { $0.key < $1.key }), id: \.key) { slug, path in
-                        HStack {
-                            Text(slug)
-                            Spacer()
-                            Text(path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-                                .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                            Button { prefs.repoPaths[slug] = nil } label: { Image(systemName: "minus.circle") }
-                                .buttonStyle(.borderless).help("Forget")
+                    // A dev folder holds hundreds of clones. They cost nothing to keep (it's a lookup
+                    // table, consulted only when a PR goes to the agent), so the list folds away instead.
+                    DisclosureGroup {
+                        TextField("", text: $repoFilter, prompt: Text("Filter"))
+                            .textFieldStyle(.roundedBorder).labelsHidden()
+                        List {
+                            ForEach(matchingRepos, id: \.key) { slug, path in
+                                HStack {
+                                    Text(slug).lineLimit(1).truncationMode(.middle)
+                                    Spacer(minLength: 12)
+                                    Text(path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                                        .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                                    Button { prefs.repoPaths[slug] = nil } label: { Image(systemName: "minus.circle") }
+                                        .buttonStyle(.borderless).help("Forget this clone")
+                                }
+                            }
                         }
+                        .listStyle(.bordered)
+                        .alternatingRowBackgrounds()
+                        .frame(height: 6 * 24 + 2)
+                        HStack {
+                            Spacer()
+                            Button("Forget All") { prefs.repoPaths = [:]; repoFilter = "" }.controlSize(.small)
+                        }
+                    } label: {
+                        InfoLabel("\(model.prefs.repoPaths.count) clones mapped",
+                                  "Only consulted when a PR goes to the agent, so extras are harmless.")
                     }
                 }
             } header: {
                 Text("Repos")
             } footer: {
-                Text("A repo needs a clone here before its PRs can go to the agent. Worktrees are created beside it as repo-branch.")
+                Text("A repo needs a clone here before its PRs can go to the agent. Scanning is one pass over the folder, two levels deep; worktrees are created beside each clone as repo-branch.")
             }
         }
         .formStyle(.grouped)
         .task { if !detected { await model.detectAgents(); detected = true } }
+    }
+
+    private var matchingRepos: [(key: String, value: String)] {
+        let all = model.prefs.repoPaths.sorted { $0.key < $1.key }
+        let q = repoFilter.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return all }
+        return all.filter { $0.key.contains(q) || $0.value.lowercased().contains(q) }
     }
 
     /// Shown with a ~, stored absolute.
