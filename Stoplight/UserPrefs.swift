@@ -111,6 +111,7 @@ final class UserPrefs {
         static let scanRoots = "repoScanRoots"
         static let repoPaths = "repoPaths"
         static let primaryClick = "primaryClick"
+        static let stackOrder = "stackCopyOrder"
         static let refreshSeconds = "refreshSeconds"
     }
 
@@ -142,6 +143,15 @@ final class UserPrefs {
     var scanRoots: [String] { didSet { defaults.set(scanRoots, forKey: Key.scanRoots) } }
     /// "owner/name" (lowercased) → local clone path.
     var repoPaths: [String: String] { didSet { defaults.set(repoPaths, forKey: Key.repoPaths) } }
+
+    /// Which end of a stack "Copy stack as Markdown" starts from.
+    enum StackOrder: String, CaseIterable, Identifiable {
+        case bottomFirst, topFirst
+        var id: String { rawValue }
+        var title: String { self == .bottomFirst ? "Bottom of the stack first" : "Top of the stack first" }
+    }
+    /// Local only.
+    var stackOrder: StackOrder { didSet { defaults.set(stackOrder.rawValue, forKey: Key.stackOrder) } }
 
     /// Idle seconds between refreshes. 0 keeps the adaptive schedule, which is what most people want.
     /// A chosen value still tightens while checks are running and still backs off near the rate limit.
@@ -239,6 +249,7 @@ final class UserPrefs {
         sectionCounts = SectionCounts(rawValue: defaults.string(forKey: Key.sectionCounts) ?? "") ?? .off
         primaryClick = PrimaryClick(rawValue: defaults.string(forKey: Key.primaryClick) ?? "") ?? .open
         refreshRate = RefreshRate(rawValue: defaults.integer(forKey: Key.refreshSeconds)) ?? .automatic
+        stackOrder = StackOrder(rawValue: defaults.string(forKey: Key.stackOrder) ?? "") ?? .bottomFirst
         agent = defaults.string(forKey: Key.agent) ?? ""
         agentCustomCommand = defaults.string(forKey: Key.agentCustom) ?? "my-agent {prompt}"
         agentPermissionMode = defaults.string(forKey: Key.agentPermission) ?? "ask"

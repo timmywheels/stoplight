@@ -59,17 +59,12 @@ public enum Stacks {
         rows.filter { $0.stackID == stackID }
     }
 
-    /// Shareable summary, bottom-up. One line per PR: status, link, title, branch.
-    public static func markdown(_ rows: [StackRow]) -> String {
-        rows.map { row in
-            let icon: String = switch row.pr.state {
-            case .failure: "🔴"
-            case .pending: "🟡"
-            case .success: "🟢"
-            case .none: "⚪️"
-            }
-            let indent = String(repeating: "  ", count: row.depth)
-            return "\(indent)- \(icon) [#\(row.pr.number)](\(row.pr.url.absoluteString)) \(row.pr.title) `\(row.pr.headRefName)`"
+    /// Shareable summary: one flat line per PR, link, title, branch, so it pastes cleanly into a
+    /// comment or a message. No CI state — a pasted list outlives the run it described.
+    /// `topFirst` starts at the newest PR; the default starts at the one merging into trunk.
+    public static func markdown(_ rows: [StackRow], topFirst: Bool = false) -> String {
+        (topFirst ? rows.reversed() : rows).map { row in
+            "- [#\(row.pr.number)](\(row.pr.url.absoluteString)) \(row.pr.title) `\(row.pr.headRefName)`"
         }.joined(separator: "\n")
     }
 }

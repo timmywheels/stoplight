@@ -732,7 +732,9 @@ struct PRRow: View {
         if !pr.headRefName.isEmpty { Button("Copy branch name") { copy(pr.headRefName) } }
         Button("Copy commit hash (\(pr.headSha.prefix(7)))") { PRActions.copyHash(pr) }
         if let stack, stack.count > 1 {
-            Button("Copy stack (\(stack.count) PRs) as Markdown") { copy(Stacks.markdown(stack)) }
+            Button("Copy stack (\(stack.count) PRs) as Markdown") {
+                copy(Stacks.markdown(stack, topFirst: model.prefs.stackOrder == .topFirst))
+            }
         }
     }
 

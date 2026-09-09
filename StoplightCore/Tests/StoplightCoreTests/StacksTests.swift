@@ -46,8 +46,12 @@ final class StacksTests: XCTestCase {
     func testMarkdown() {
         let a = pr("a1", head: "feat-1", base: "main", state: .success)
         let b = pr("b2", head: "feat-2", base: "feat-1", state: .failure)
-        let md = Stacks.markdown(Stacks.layout([a, b]))
-        XCTAssertEqual(md, "- 🟢 [#1](https://github.com/o/r/pull/1) T a1 `feat-1`\n  - 🔴 [#2](https://github.com/o/r/pull/1) T b2 `feat-2`")
+        let rows = Stacks.layout([a, b])
+        let bottom = "- [#1](https://github.com/o/r/pull/1) T a1 `feat-1`"
+        let top = "- [#2](https://github.com/o/r/pull/1) T b2 `feat-2`"
+        // Flat, never indented: it gets pasted into comments and chat.
+        XCTAssertEqual(Stacks.markdown(rows), bottom + "\n" + top)
+        XCTAssertEqual(Stacks.markdown(rows, topFirst: true), top + "\n" + bottom)
     }
 
     func testDequeuedTransition() {

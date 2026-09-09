@@ -172,6 +172,12 @@ private struct DisplayTab: View {
                     InfoLabel("Clicking a PR",
                               "The other action moves to double-click, and ⌘-click always does it too.")
                 }
+                Picker(selection: $prefs.stackOrder) {
+                    ForEach(UserPrefs.StackOrder.allCases) { Text($0.title).tag($0) }
+                } label: {
+                    InfoLabel("Copy a stack starting from",
+                              "Right-click a stacked PR → Copy stack as Markdown. Bottom of the stack is the PR merging into trunk.")
+                }
                 Picker(selection: $prefs.sectionCounts) {
                     Text("Off").tag(UserPrefs.SectionCounts.off)
                     Text("Only what needs attention").tag(UserPrefs.SectionCounts.attention)

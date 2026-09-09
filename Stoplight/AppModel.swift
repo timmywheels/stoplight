@@ -45,6 +45,10 @@ final class AppModel {
     private var resolvedPatterns: [String: String] = [:]
     /// Open PRs targeting each resolved release branch (US-030).
     private(set) var inbound: [(query: PRQuery, prs: [PullRequest])] = []
+    /// Last search-derived lists, so a PR that drops out of search can be checked by ref (US-038).
+    private var lastSearch: (queries: [PRQuery], mine: [PullRequest], followed: [[PullRequest]], inbound: [[PullRequest]])?
+    /// How many PRs the last refresh put back. Surfaced in /status.json.
+    private(set) var rescued = 0
     private(set) var lastRefresh: Date?
     private(set) var lastError: String?
     private(set) var auth: AuthState = .unknown
@@ -342,6 +346,7 @@ final class AppModel {
             "lastRefresh": lastRefresh.map(f.string) ?? "never",
             "lastError": lastError ?? "",
             "isRefreshing": isRefreshing,
+            "rescued": rescued,
             "counts": ["mine": mine.count, "watched": watched.count, "followed": followed.reduce(0) { $0 + $1.prs.count },
                        "inbound": inbound.reduce(0) { $0 + $1.prs.count }, "branches": branches.count, "merged": merged.count, "all": all.count],
             "queries": ["follow": prefs.followQueries.count, "branches": prefs.sources.followBranches, "mergedDays": prefs.mergedDays],
@@ -436,6 +441,7 @@ final class AppModel {
             mine = results.first ?? []
             followed = Array(zip(follow, results.dropFirst(cursor).prefix(follow.count))); cursor += follow.count
             inbound = Array(zip(inboundQueries, results.dropFirst(cursor).prefix(inboundQueries.count))); cursor += inboundQueries.count
+            await rescueVanished(provider, queries: Array(queries.prefix(1 + follow.count + inboundQueries.count)))
             var freshMerged = mergedQuery == nil ? [] : (results.dropFirst(cursor).first ?? [])
 
             // One branch request covers both: followed branches (US-029) and the base branches behind merges (US-028).
@@ -490,6 +496,43 @@ final class AppModel {
                 self.provider = nil
             }
         }
+    }
+
+    // MARK: Search flakiness (US-038)
+
+    /// GitHub's search index is eventually consistent: a query that returned seven PRs a minute
+    /// ago can return one, with no error and plenty of rate limit left. Anything that vanished is
+    /// re-checked by ref — an exact lookup, not search — and put back when it's still open.
+    private func rescueVanished(_ provider: GitHubProvider, queries: [PRQuery]) async {
+        defer { lastSearch = (queries, mine, followed.map(\.prs), inbound.map(\.prs)) }
+        rescued = 0
+        // Only comparable when the same questions were asked in the same order.
+        guard let last = lastSearch, last.queries == queries else { return }
+        let present = Set((mine + followed.flatMap(\.prs) + inbound.flatMap(\.prs)).map(\.id))
+        let gone = (last.mine + last.followed.flatMap { $0 } + last.inbound.flatMap { $0 })
+            .filter { $0.status == .open && !present.contains($0.id) }
+        let refs = Array(Set(gone.compactMap(\.ref)))
+        guard !refs.isEmpty, let rechecked = try? await provider.fetchPullRequests(refs: refs) else { return }
+        let alive = Dictionary(rechecked.filter { $0.status == .open }.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        guard !alive.isEmpty else { return }
+        rescued = alive.count
+        log.notice("search dropped \(refs.count, privacy: .public) PRs, \(alive.count, privacy: .public) still open: keeping them")
+        mine = Self.restore(alive, into: mine, from: last.mine)
+        followed = zip(followed, last.followed).map { ($0.query, Self.restore(alive, into: $0.prs, from: $1)) }
+        inbound = zip(inbound, last.inbound).map { ($0.query, Self.restore(alive, into: $0.prs, from: $1)) }
+    }
+
+    /// Put each still-open PR back where it sat, using the fresh copy from the ref lookup.
+    private static func restore(_ alive: [String: PullRequest], into current: [PullRequest],
+                                from before: [PullRequest]) -> [PullRequest] {
+        var out = current
+        var ids = Set(current.map(\.id))
+        for (i, old) in before.enumerated() where !ids.contains(old.id) {
+            guard let fresh = alive[old.id] else { continue }
+            out.insert(fresh, at: min(i, out.count))
+            ids.insert(fresh.id)
+        }
+        return out
     }
 
     // MARK: Head-bob (US-004)
