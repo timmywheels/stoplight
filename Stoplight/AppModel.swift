@@ -522,7 +522,7 @@ final class AppModel {
         guard let found = try? await provider.fetchMergeQueues(refs, limit: prefs.queueItems) else { return }
         queues = refs.sorted { $0.spec < $1.spec }.compactMap { ref in
             guard let prs = found[ref.key], !prs.isEmpty else { return nil }
-            return (ref, prs)
+            return (ref, prs.map { $0.asQueueRow() })
         }
     }
 

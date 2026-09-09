@@ -480,6 +480,10 @@ struct PRRow: View {
                         .help("\(pr.baseRefName) is \(bs == .failure ? "failing" : bs == .pending ? "running" : "passing") right now")
                     }
                     if let note = pr.note { tag(note) }
+                    if pr.id.hasPrefix("queue:"), model.isMine(pr) {
+                        tag("yours", symbol: "person.fill")
+                            .help("Your PR, also listed in its own section above")
+                    }
                     if let st = model.agentStatus[pr.id] {
                         // Agent status from hooks / callbacks (US-034). Click to dismiss.
                         Button { model.focusAgent(pr) } label: {
