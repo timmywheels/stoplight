@@ -110,6 +110,7 @@ final class UserPrefs {
         static let scanRoot = "repoScanRoot"
         static let repoPaths = "repoPaths"
         static let primaryClick = "primaryClick"
+        static let refreshSeconds = "refreshSeconds"
     }
 
 
@@ -139,6 +140,25 @@ final class UserPrefs {
     var scanRoot: String { didSet { defaults.set(scanRoot, forKey: Key.scanRoot) } }
     /// "owner/name" (lowercased) → local clone path.
     var repoPaths: [String: String] { didSet { defaults.set(repoPaths, forKey: Key.repoPaths) } }
+
+    /// Idle seconds between refreshes. 0 keeps the adaptive schedule, which is what most people want.
+    /// A chosen value still tightens while checks are running and still backs off near the rate limit.
+    enum RefreshRate: Int, CaseIterable, Identifiable {
+        case automatic = 0, halfMinute = 30, minute = 60, twoMinutes = 120, fiveMinutes = 300, quarterHour = 900
+        var id: Int { rawValue }
+        var title: String {
+            switch self {
+            case .automatic: "Automatically"
+            case .halfMinute: "Every 30 seconds"
+            case .minute: "Every minute"
+            case .twoMinutes: "Every 2 minutes"
+            case .fiveMinutes: "Every 5 minutes"
+            case .quarterHour: "Every 15 minutes"
+            }
+        }
+    }
+    /// Local only.
+    var refreshRate: RefreshRate { didSet { defaults.set(refreshRate.rawValue, forKey: Key.refreshSeconds) } }
 
     /// What a single click on a PR row does; the other action moves to double-click (US-037).
     enum PrimaryClick: String, CaseIterable, Identifiable {
@@ -216,6 +236,7 @@ final class UserPrefs {
         defaults.set(RowAction.allCases.map(\.rawValue), forKey: Key.rowActionsSeen)
         sectionCounts = SectionCounts(rawValue: defaults.string(forKey: Key.sectionCounts) ?? "") ?? .off
         primaryClick = PrimaryClick(rawValue: defaults.string(forKey: Key.primaryClick) ?? "") ?? .open
+        refreshRate = RefreshRate(rawValue: defaults.integer(forKey: Key.refreshSeconds)) ?? .automatic
         agent = defaults.string(forKey: Key.agent) ?? ""
         agentCustomCommand = defaults.string(forKey: Key.agentCustom) ?? "my-agent {prompt}"
         agentPermissionMode = defaults.string(forKey: Key.agentPermission) ?? "ask"

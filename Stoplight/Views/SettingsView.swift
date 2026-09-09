@@ -68,6 +68,19 @@ private struct GeneralTab: View {
                      : "Found on your shell's PATH. Choose another if gh lives somewhere unusual.")
             }
 
+            Section {
+                Picker(selection: $prefs.refreshRate) {
+                    ForEach(UserPrefs.RefreshRate.allCases) { Text($0.title).tag($0) }
+                } label: {
+                    InfoLabel("Check GitHub",
+                              "Automatic checks every 20 seconds while something is running and every minute otherwise. Whatever you pick here, Stoplight still speeds up for running checks and backs off when the API rate limit gets close.")
+                }
+            } header: {
+                Text("Refreshing")
+            } footer: {
+                Text("⌘R, the refresh button in the panel, and Refresh Now in the menu bar icon's menu all refresh straight away.")
+            }
+
             Section("Notifications") {
                 Picker(selection: $notifications) {
                     Text("When a PR fails or turns all-passing").tag("all")

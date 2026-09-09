@@ -355,10 +355,12 @@ final class AppModel {
 
     /// US-003 adaptive polling.
     private var nextInterval: TimeInterval {
-        if lastError != nil { return 15 }   // a failed fetch retries soon, never "5 minutes because the list looks empty"
-        if let rl = GitHubProvider.lastRateLimit, rl.remaining < 100 { return 300 }
+        let chosen = TimeInterval(prefs.refreshRate.rawValue)   // 0 = automatic
+        if lastError != nil { return chosen == 0 ? 15 : min(chosen, 60) }   // a failed fetch retries soon, never "5 minutes because the list looks empty"
+        if let rl = GitHubProvider.lastRateLimit, rl.remaining < 100 { return max(chosen, 300) }
+        if all.contains(where: { $0.state == .pending }) { return chosen == 0 ? 20 : min(chosen, 20) }
+        if chosen > 0 { return chosen }
         if all.isEmpty { return 300 }
-        if all.contains(where: { $0.state == .pending }) { return 20 }
         return 60
     }
 

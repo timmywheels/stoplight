@@ -232,11 +232,18 @@ struct MenuBarView: View {
                 .disabled(model.updater.state == .downloading || model.updater.state == .installing)
                 .help("Download, verify, and relaunch")
             }
-            // ⌘N and ⌘R still work; their buttons live in the dots' right-click menu now.
+            // ⌘N has no button of its own; it lives in the dots' right-click menu.
             Button("Watch a PR") { model.isWatching = true }
                 .keyboardShortcut("n").hidden().frame(width: 0, height: 0)
-            Button("Refresh") { Task { await model.refresh() } }
-                .keyboardShortcut("r").hidden().frame(width: 0, height: 0)
+            Button { Task { await model.refresh() } } label: {
+                Image(systemName: "arrow.clockwise").frame(width: 22, height: 22)
+                    .rotationEffect(.degrees(model.isRefreshing ? 360 : 0))
+                    .animation(model.isRefreshing
+                               ? .linear(duration: 0.9).repeatForever(autoreverses: false)
+                               : .default,
+                               value: model.isRefreshing)
+            }
+            .keyboardShortcut("r").disabled(model.isRefreshing).help("Refresh now (⌘R)")
             Button { showSettings() } label: { Image(systemName: "gearshape").frame(width: 22, height: 22) }
                 .keyboardShortcut(",").help("Settings (⌘,)")
             // ⌘Q still quits while the popover is open; the visible Quit button lives in Settings.
