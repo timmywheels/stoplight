@@ -47,8 +47,6 @@ final class AppModel {
     private(set) var inbound: [(query: PRQuery, prs: [PullRequest])] = []
     /// Last search-derived lists, so a PR that drops out of search can be checked by ref (US-038).
     private var lastSearch: (queries: [PRQuery], mine: [PullRequest], followed: [[PullRequest]], inbound: [[PullRequest]])?
-    /// How many PRs the last refresh put back. Surfaced in /status.json.
-    private(set) var rescued = 0
     private(set) var lastRefresh: Date?
     private(set) var lastError: String?
     private(set) var auth: AuthState = .unknown
@@ -346,7 +344,6 @@ final class AppModel {
             "lastRefresh": lastRefresh.map(f.string) ?? "never",
             "lastError": lastError ?? "",
             "isRefreshing": isRefreshing,
-            "rescued": rescued,
             "counts": ["mine": mine.count, "watched": watched.count, "followed": followed.reduce(0) { $0 + $1.prs.count },
                        "inbound": inbound.reduce(0) { $0 + $1.prs.count }, "branches": branches.count, "merged": merged.count, "all": all.count],
             "queries": ["follow": prefs.followQueries.count, "branches": prefs.sources.followBranches, "mergedDays": prefs.mergedDays],
@@ -505,7 +502,6 @@ final class AppModel {
     /// re-checked by ref — an exact lookup, not search — and put back when it's still open.
     private func rescueVanished(_ provider: GitHubProvider, queries: [PRQuery]) async {
         defer { lastSearch = (queries, mine, followed.map(\.prs), inbound.map(\.prs)) }
-        rescued = 0
         // Only comparable when the same questions were asked in the same order.
         guard let last = lastSearch, last.queries == queries else { return }
         let present = Set((mine + followed.flatMap(\.prs) + inbound.flatMap(\.prs)).map(\.id))
@@ -515,7 +511,6 @@ final class AppModel {
         guard !refs.isEmpty, let rechecked = try? await provider.fetchPullRequests(refs: refs) else { return }
         let alive = Dictionary(rechecked.filter { $0.status == .open }.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         guard !alive.isEmpty else { return }
-        rescued = alive.count
         log.notice("search dropped \(refs.count, privacy: .public) PRs, \(alive.count, privacy: .public) still open: keeping them")
         mine = Self.restore(alive, into: mine, from: last.mine)
         followed = zip(followed, last.followed).map { ($0.query, Self.restore(alive, into: $0.prs, from: $1)) }
