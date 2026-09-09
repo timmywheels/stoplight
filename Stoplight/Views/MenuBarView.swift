@@ -30,25 +30,27 @@ struct MenuBarView: View {
             Capsule().fill(.quaternary).frame(width: 36, height: 4)
                 .frame(maxWidth: .infinity, minHeight: 22)
                 .overlay(DragHandle())
-                .overlay(alignment: .trailing) {
-                    HStack(spacing: 4) {
-                        let allCollapsed = !model.sections.isEmpty && model.sections.allSatisfy { model.prefs.collapsedSections.contains($0.id) }
-                        Button { _ = model.handle(.toggleSections) } label: {
-                            Image(systemName: allCollapsed ? "rectangle.expand.vertical" : "rectangle.compress.vertical")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 22, height: 22).contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .help(allCollapsed ? "Expand all sections (⇧⌘E)" : "Collapse all sections (⇧⌘E)")
-                        Button { model.pinnedPanel.toggle() } label: {
-                            Image(systemName: model.pinnedPanel ? "pin.fill" : "pin")
-                                .foregroundStyle(model.pinnedPanel ? Color.accentColor : .secondary)
-                                .frame(width: 22, height: 22).contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .help(model.pinnedPanel ? "Unpin: close on click outside again" : "Pin: stay open above other windows")
+                // Pin left, collapse right: the handle sits centered between them.
+                .overlay(alignment: .leading) {
+                    Button { model.pinnedPanel.toggle() } label: {
+                        Image(systemName: model.pinnedPanel ? "pin.fill" : "pin")
+                            .foregroundStyle(model.pinnedPanel ? Color.accentColor : .secondary)
+                            .frame(width: 22, height: 22).contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
+                    .padding(.leading, 6)
+                    .help(model.pinnedPanel ? "Unpin: close on click outside again" : "Pin: stay open above other windows")
+                }
+                .overlay(alignment: .trailing) {
+                    let allCollapsed = !model.sections.isEmpty && model.sections.allSatisfy { model.prefs.collapsedSections.contains($0.id) }
+                    Button { _ = model.handle(.toggleSections) } label: {
+                        Image(systemName: allCollapsed ? "rectangle.expand.vertical" : "rectangle.compress.vertical")
+                            .foregroundStyle(.secondary)
+                            .frame(width: 22, height: 22).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                     .padding(.trailing, 6)
+                    .help(allCollapsed ? "Expand all sections (⇧⌘E)" : "Collapse all sections (⇧⌘E)")
                 }
                 .padding(.top, 4).padding(.bottom, 4)
                 .help("Drag to move")
