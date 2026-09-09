@@ -22,6 +22,8 @@ struct SettingsView: View {
 }
 
 private struct GeneralTab: View {
+    static let repo = URL(string: "https://github.com/timmywheels/stoplight")!
+
     @Bindable var model: AppModel
     @AppStorage(Prefs.notifications) private var notifications = "all"
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -96,10 +98,19 @@ private struct GeneralTab: View {
                     Button("Show Again") { model.prefs.tourSeen = false; model.openPanel?() }
                         .help("Replays the first-run walkthrough in the popover.")
                 }
-                HStack {
-                    Spacer()
-                    Button("Quit Stoplight") { NSApp.terminate(nil) }.keyboardShortcut("q")
+                LabeledContent("Source") {
+                    Link("github.com/timmywheels/stoplight", destination: Self.repo)
+                        .help("Issues and pull requests welcome.")
                 }
+                LabeledContent("Quit") {
+                    Button("Quit Stoplight") { NSApp.terminate(nil) }
+                        .keyboardShortcut("q")
+                        .help("Stops watching your PRs until you open Stoplight again.")
+                }
+            } header: {
+                Text("About")
+            } footer: {
+                Text("Made by [@timmywheels](https://github.com/timmywheels). Stoplight is open source.")
             }
         }
         .formStyle(.grouped)
