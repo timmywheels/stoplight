@@ -34,7 +34,9 @@ private struct GeneralTab: View {
                 case .signedIn(let login, let source):
                     LabeledContent("Signed in as", value: "@\(login)")
                     LabeledContent("Source", value: source.rawValue)
+                        .help("Where the token came from: the GitHub CLI on your PATH, or one you pasted into Stoplight.")
                     Button("Sign out") { model.signOut() }
+                        .help("Clears the token Stoplight stored in your keychain and stops fetching PRs.")
                 case .failed(let msg):
                     Text(msg).foregroundStyle(prefs.colorProfile.color(for: .failure))
                 default:
@@ -48,8 +50,10 @@ private struct GeneralTab: View {
                             .foregroundStyle(TokenSource.ghPath() == nil ? prefs.colorProfile.color(for: .failure) : .secondary)
                         if !prefs.ghPath.isEmpty { Button("Automatic") { prefs.ghPath = ""; reauth() } }
                         Button("Choose…") { chooseGH() }
+                            .help("Point Stoplight at a gh binary somewhere unusual, like a managed Homebrew prefix.")
                     }
                 }
+                .help("Stoplight reads your GitHub token from this gh install, so it never asks for a password.")
             } header: {
                 Text("Account")
             } footer: {
@@ -65,10 +69,12 @@ private struct GeneralTab: View {
                     Text("Never").tag("off")
                 }
                 .pickerStyle(.radioGroup)
+                .help("A notification fires when a PR changes state, not on every refresh.")
             }
 
             Section("Startup") {
                 Toggle("Open Stoplight at login", isOn: $launchAtLogin)
+                    .help("Registers Stoplight as a macOS login item. It starts hidden, as a menu bar app.")
                     .onChange(of: launchAtLogin) { _, on in
                         do {
                             if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
@@ -87,6 +93,7 @@ private struct GeneralTab: View {
                 }
                 LabeledContent("Guided tour") {
                     Button("Show Again") { model.prefs.tourSeen = false; model.openPanel?() }
+                        .help("Replays the first-run walkthrough in the popover.")
                 }
                 HStack {
                     Spacer()
@@ -105,16 +112,23 @@ private struct DisplayTab: View {
     var body: some View {
         @Bindable var prefs = model.prefs
         Form {
-            Section("Colors") {
+            Section {
                 Picker("Color profile", selection: $prefs.colorProfile) {
                     ForEach(ColorProfile.allCases) { Text($0.title).tag($0) }
                 }
                 .onChange(of: prefs.colorProfile) { _, _ in model.colorProfileChanged() }
+                .help("Recolors every dot and badge, in the menu bar and the widget too.")
+            } header: {
+                Text("Colors")
+            } footer: {
+                Text("Deuteranopia swaps green for blue, which stays distinct from red and amber.")
             }
 
             Section("Menu bar") {
                 Toggle("Dark housing behind the dots", isOn: $prefs.housing)
+                    .help("Draws a rounded dark plate behind the three dots so they read against a light wallpaper.")
                 Toggle("Show a count beside the dots", isOn: $prefs.showCount)
+                    .help("Puts the number of PRs in each state next to its dot: 2 red, 1 yellow, and so on.")
             }
 
             Section {
@@ -123,10 +137,14 @@ private struct DisplayTab: View {
                     Text("Only what needs attention").tag(UserPrefs.SectionCounts.attention)
                     Text("Every state").tag(UserPrefs.SectionCounts.full)
                 }
-                DisclosureGroup("Row buttons") {
+                .help("Dots and numbers on a collapsed section header, summarizing the PRs hidden inside it. \"Only what needs attention\" shows red and yellow; \"Every state\" adds green and gray.")
+                DisclosureGroup {
                     RowActionsEditor(prefs: prefs)
                     Text("The circles in an expanded PR. Check to show, drag to reorder.")
                         .font(.caption).foregroundStyle(.secondary)
+                } label: {
+                    Text("Row buttons")
+                        .help("Which action buttons appear when you expand a PR: open on GitHub, copy the branch, hand it to the agent, and so on.")
                 }
             } header: {
                 Text("Popover")
@@ -135,28 +153,37 @@ private struct DisplayTab: View {
             }
 
             Section {
-                DisclosureGroup("What the dots and badges mean") {
-                    LegendRow("At least one check failed.") { StatusDot(state: .failure) }
-                    LegendRow("Checks still running.") { StatusDot(state: .pending) }
-                    LegendRow("Every check passed.") { StatusDot(state: .success) }
-                    LegendRow("Nothing ran: no checks, or all of them skipped.") { StatusDot(state: .none) }
-                    LegendRow("Draft. Never lights the menu bar or notifies.") { StatusDot(state: .success, hollow: true) }
-                    LegendRow("Can't merge until conflicts are fixed. Counts as red.") {
-                        Image(systemName: "exclamationmark.triangle.fill").font(.caption)
-                            .foregroundStyle(prefs.colorProfile.color(for: .failure))
+                DisclosureGroup {
+                    Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 7) {
+                        legendRow("Red", "At least one check failed.") { StatusDot(state: .failure) }
+                        legendRow("Yellow", "Checks still running.") { StatusDot(state: .pending) }
+                        legendRow("Green", "Every check passed.") { StatusDot(state: .success) }
+                        legendRow("Gray", "Nothing ran: no checks, or all of them skipped.") { StatusDot(state: .none) }
+                        legendRow("Hollow", "Draft. Never lights the menu bar or notifies.") {
+                            StatusDot(state: .success, hollow: true)
+                        }
+                        legendRow("Conflicts", "Can't merge until conflicts are fixed. Counts as red.") {
+                            Image(systemName: "exclamationmark.triangle.fill").font(.caption)
+                                .foregroundStyle(prefs.colorProfile.color(for: .failure))
+                        }
+                        legendRow("Merged", "The branch badge shows how that branch is doing now.") {
+                            Image(systemName: "checkmark.circle.fill").font(.caption).foregroundStyle(Color.githubMerged)
+                        }
+                        legendRow("Queued", "In the merge queue at that position.") {
+                            Image(systemName: "line.3.horizontal").font(.caption).foregroundStyle(.secondary)
+                        }
+                        legendRow("Stacked", "Targets the PR above it, not the default branch.") {
+                            Image(systemName: "arrow.turn.down.right").font(.caption).foregroundStyle(.tertiary)
+                        }
+                        legendRow("Agent", "An agent you launched is waiting on you.") {
+                            Image(systemName: "sparkles").font(.caption).foregroundStyle(.orange)
+                        }
                     }
-                    LegendRow("Merged. The branch badge shows how that branch is doing now.") {
-                        Image(systemName: "checkmark.circle.fill").font(.caption).foregroundStyle(Color.githubMerged)
-                    }
-                    LegendRow("In the merge queue at that position.") {
-                        Image(systemName: "line.3.horizontal").font(.caption).foregroundStyle(.secondary)
-                    }
-                    LegendRow("Stacked on the PR above it.") {
-                        Image(systemName: "arrow.turn.down.right").font(.caption).foregroundStyle(.tertiary)
-                    }
-                    LegendRow("An agent you launched is waiting on you.") {
-                        Image(systemName: "sparkles").font(.caption).foregroundStyle(.orange)
-                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 4)
+                } label: {
+                    Text("Legend")
+                        .help("What every dot and badge in the popover means.")
                 }
             } footer: {
                 Text("Double-click a PR to expand it, right-click for the rest, ⌘/ for every shortcut.")
@@ -164,24 +191,17 @@ private struct DisplayTab: View {
         }
         .formStyle(.grouped)
     }
-}
 
-private func legendTag(_ text: String, _ color: Color) -> some View {
-    Text(text).font(.caption2).foregroundStyle(color)
-        .padding(.horizontal, 4).padding(.vertical, 1)
-        .background(.quaternary, in: Capsule())
-}
-
-private struct LegendRow<Icon: View>: View {
-    @ViewBuilder let icon: () -> Icon
-    let text: String
-    init(_ text: String, @ViewBuilder icon: @escaping () -> Icon) { self.text = text; self.icon = icon }
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            icon().frame(minWidth: 22, alignment: .center)
-            Text(text).font(.callout).foregroundStyle(.secondary)
+    /// One legend line: glyph, short name, meaning. Columns align across every row.
+    @ViewBuilder
+    private func legendRow<Icon: View>(_ name: String, _ meaning: String,
+                                       @ViewBuilder icon: () -> Icon) -> some View {
+        GridRow {
+            icon().gridColumnAlignment(.center)
+            Text(name).gridColumnAlignment(.leading)
+            Text(meaning).foregroundStyle(.secondary).gridColumnAlignment(.leading)
         }
+        .font(.callout)
     }
 }
 
@@ -275,6 +295,7 @@ private struct SourcesTab: View {
             Section("Follow") {
                 TableEditor(title: "Users", items: $prefs.sources.followUsers, placeholder: "username",
                             normalize: { UserPrefs.normalize($0, kind: .users, hideList: false) },
+                            help: "Teammates whose open PRs you want to watch. Each gets its own section.",
                             onChange: model.sourcesChanged,
                             trailing: { login in
                                 AnyView(TextField(model.displayName(for: login) ?? "Label",
@@ -285,21 +306,28 @@ private struct SourcesTab: View {
                                     .help("Section title instead of @\(login)"))
                             })
                 TableEditor(title: "Repos", items: $prefs.sources.followRepos, placeholder: "owner/repo",
-                            normalize: { UserPrefs.normalize($0, kind: .repos, hideList: false) }, onChange: model.sourcesChanged)
+                            normalize: { UserPrefs.normalize($0, kind: .repos, hideList: false) },
+                            help: "Every open PR in these repos, whoever wrote it.", onChange: model.sourcesChanged)
                 TableEditor(title: "Orgs", items: $prefs.sources.followOrgs, placeholder: "org",
-                            normalize: { UserPrefs.normalize($0, kind: .orgs, hideList: false) }, onChange: model.sourcesChanged)
+                            normalize: { UserPrefs.normalize($0, kind: .orgs, hideList: false) },
+                            help: "Every open PR across an organization. Broad: pair it with Hide.", onChange: model.sourcesChanged)
                 TableEditor(title: "Branches", items: $prefs.sources.followBranches, placeholder: "owner/repo@main  or  owner/repo@rc/*",
-                            normalize: { UserPrefs.normalize($0, kind: .branches, hideList: false) }, onChange: model.sourcesChanged)
+                            normalize: { UserPrefs.normalize($0, kind: .branches, hideList: false) },
+                            help: "Is main green? A followed branch shows its own CI verdict. A pattern like rc/* tracks whichever matching branch is newest.",
+                            onChange: model.sourcesChanged)
                 Stepper("Commits shown per branch: \(prefs.branchCommits)", value: $prefs.branchCommits, in: 1...10)
+                    .help("How far back to list a followed branch's commits, so you can see which one broke it.")
                     .onChange(of: prefs.branchCommits) { _, _ in model.sourcesChanged() }
                 Text("Every open PR from a followed user, repo, or org gets its own section. A followed branch shows its latest CI verdict (is main green?) and notifies when it goes red; raise the commit count to see the last few commits and which one broke it. A pattern like rc/* follows whichever matching branch has the newest commit, adds a section of PRs targeting it, and tells you when a new one is cut.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Hide") {
                 TableEditor(title: "Users", items: $prefs.sources.hiddenUsers, placeholder: "username or name[bot]",
-                            normalize: { UserPrefs.normalize($0, kind: .users, hideList: true) }, onChange: model.sourcesChanged)
+                            normalize: { UserPrefs.normalize($0, kind: .users, hideList: true) },
+                            help: "Drops these authors everywhere. Bots like dependabot[bot] are the usual case.", onChange: model.sourcesChanged)
                 TableEditor(title: "Repos", items: $prefs.sources.hiddenRepos, placeholder: "owner/repo",
-                            normalize: { UserPrefs.normalize($0, kind: .repos, hideList: true) }, onChange: model.sourcesChanged)
+                            normalize: { UserPrefs.normalize($0, kind: .repos, hideList: true) },
+                            help: "Drops these repos everywhere, including your own PRs in them.", onChange: model.sourcesChanged)
                 LabeledContent("PRs") {
                     if model.prefs.sources.hiddenPRs.isEmpty {
                         Text("None. Right-click a PR → Hide this PR. Hidden repos are set here only.").foregroundStyle(.secondary)
@@ -327,6 +355,7 @@ private struct SourcesTab: View {
                     Text("Last 7 days").tag(7)
                 }
                 .onChange(of: prefs.mergedDays) { _, _ in model.sourcesChanged() }
+                .help("Keeps your merged PRs in a collapsed section for a while, so a failure on the merge commit still reaches you.")
             } footer: {
                 Text("Your merged PRs, collapsed. When checks run on the merge commit, a failure there lights the dots.")
             }
@@ -356,6 +385,7 @@ private struct TableEditor: View {
     @Binding var items: [String]
     let placeholder: String
     let normalize: (String) -> String?
+    var help: String = ""
     var onChange: () -> Void = {}
     var trailing: ((String) -> AnyView)? = nil
 
@@ -403,6 +433,7 @@ private struct TableEditor: View {
             }
         }
         .labeledContentStyle(.automatic)
+        .help(help)
     }
 
     private func startDraft() {

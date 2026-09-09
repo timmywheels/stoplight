@@ -19,26 +19,32 @@ struct AgentSettingsTab: View {
                             .selectionDisabled(!installed && a != .custom)
                     }
                 }
+                .help("Which CLI coding agent Stoplight hands a PR to. Greyed-out entries aren't installed on your PATH.")
                 if prefs.agent == AgentLauncher.Agent.custom.rawValue {
                     TextField("Command, use {prompt} and {args}", text: $prefs.agentCustomCommand)
                         .font(.system(.body, design: .monospaced))
+                        .help("The exact command to run. {prompt} is replaced by the filled-in template, {args} by the extra arguments below.")
                 }
                 if let agent = AgentLauncher.Agent(rawValue: prefs.agent), !agent.permissionModes.isEmpty {
                     Picker("Permissions when fixing", selection: $prefs.agentPermissionMode) {
                         ForEach(agent.permissionModes, id: \.id) { Text($0.title).tag($0.id) }
                     }
+                    .help("How much the agent may do on its own when you send it a failing PR to fix. It edits code, so asking first is the safe default.")
                     Picker("Permissions when reviewing", selection: $prefs.agentReviewPermissionMode) {
                         ForEach(agent.permissionModes, id: \.id) { Text($0.title).tag($0.id) }
                     }
+                    .help("Permissions for Adversarial review, which only reads and reports. Plan mode keeps it from touching files.")
                 }
                 TextField("Extra arguments (optional)", text: $prefs.agentExtraArgs)
                     .font(.system(.body, design: .monospaced))
+                    .help("Appended to every agent command, for flags like --model or a config path.")
                 Picker("Open in", selection: $prefs.terminal) {
                     ForEach(AgentLauncher.Terminal.allCases) { t in
                         Text(t.isInstalled ? t.title : "\(t.title) (not installed)").tag(t.rawValue)
                             .selectionDisabled(!t.isInstalled)
                     }
                 }
+                .help("The terminal app Stoplight opens the agent in. One window per PR, reused if it's still running.")
             } header: {
                 Text("Agent")
             } footer: {
@@ -46,7 +52,7 @@ struct AgentSettingsTab: View {
             }
 
             Section("Prompts") {
-                DisclosureGroup("Fix prompt") {
+                DisclosureGroup {
                     TextEditor(text: $prefs.promptTemplate)
                         .font(.system(.callout, design: .monospaced))
                         .frame(minHeight: 96)
@@ -57,8 +63,11 @@ struct AgentSettingsTab: View {
                         Spacer()
                         Button("Reset") { prefs.promptTemplate = AgentLauncher.defaultPrompt }.controlSize(.small)
                     }
+                } label: {
+                    Text("Fix prompt")
+                        .help("What Stoplight says to the agent when you send it a failing PR (⌘F). Placeholders are filled in from that PR.")
                 }
-                DisclosureGroup("Review prompt") {
+                DisclosureGroup {
                     TextEditor(text: $prefs.reviewTemplate)
                         .font(.system(.callout, design: .monospaced))
                         .frame(minHeight: 96)
@@ -69,13 +78,18 @@ struct AgentSettingsTab: View {
                         Spacer()
                         Button("Reset") { prefs.reviewTemplate = AgentLauncher.defaultReviewPrompt }.controlSize(.small)
                     }
+                } label: {
+                    Text("Review prompt")
+                        .help("What Stoplight says to the agent for Adversarial review (⇧⌘F): pick the PR apart, don't fix it.")
                 }
             }
 
             Section {
                 HStack {
                     TextField("Folder to scan", text: $prefs.scanRoot).textFieldStyle(.roundedBorder)
+                        .help("A folder holding your git checkouts. Stoplight walks it and matches each clone's remote to a repo.")
                     Button(scanning ? "Scanning…" : "Scan") { scan() }.disabled(scanning)
+                        .help("Find clones under that folder now.")
                 }
                 if model.prefs.repoPaths.isEmpty {
                     Text("No clones found yet. Scan a folder that holds your git checkouts; remotes are matched to the PRs' repos.")
