@@ -24,7 +24,7 @@ struct TourView: View {
                   Circle().fill(colorProfile.color(for: .success)).frame(width: 14, height: 14)
               }.padding(.horizontal, 14).padding(.vertical, 10).background(Color(white: 0.22), in: Capsule()))),
         Slide(title: "Everything about a PR, a double-click away",
-              body: "Click a PR to open it on GitHub. Double-click to expand it right here: description, exactly which checks failed, and buttons to open, copy, share, or pin.",
+              body: "Click a PR to open it on GitHub. Double-click to expand it right here: description, exactly which checks failed, and buttons to open, copy, share, or pin. Prefer one click to expand? Settings → Display → Clicking a PR.",
               art: AnyView(HStack(spacing: 10) {
                   ForEach(["arrow.up.right", "doc.on.doc", "square.and.arrow.up", "pin"], id: \.self) { name in
                       Image(systemName: name).font(.system(size: 13, weight: .medium)).foregroundStyle(.secondary)

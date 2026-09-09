@@ -148,11 +148,17 @@ private struct DisplayTab: View {
                 }
                 Toggle(isOn: $prefs.showCount) {
                     InfoLabel("Show a count beside the dots",
-                              "Puts the number of PRs in each state next to its dot: 2 red, 1 yellow, and so on.")
+                              "One number after the dots: how many PRs need attention right now, meaning failing or still running. Drafts don't count, and the number disappears when it's zero.")
                 }
             }
 
             Section {
+                Picker(selection: $prefs.primaryClick) {
+                    ForEach(UserPrefs.PrimaryClick.allCases) { Text($0.title).tag($0) }
+                } label: {
+                    InfoLabel("Clicking a PR",
+                              "Whichever one you don't pick moves to double-click, and ⌘-click always does it too. Nothing becomes unreachable.")
+                }
                 Picker(selection: $prefs.sectionCounts) {
                     Text("Off").tag(UserPrefs.SectionCounts.off)
                     Text("Only what needs attention").tag(UserPrefs.SectionCounts.attention)
@@ -209,7 +215,7 @@ private struct DisplayTab: View {
                         .help("What every dot and badge in the popover means.")
                 }
             } footer: {
-                Text("Double-click a PR to expand it, right-click for the rest, ⌘/ for every shortcut.")
+                Text("Right-click a PR for everything else, ⌘/ for every shortcut.")
             }
         }
         .formStyle(.grouped)

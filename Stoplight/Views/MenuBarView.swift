@@ -432,7 +432,7 @@ struct PRRow: View {
         .contextMenu { menu }
     }
 
-    // MARK: Header row. Click expands; double-click or ⌘-click opens.
+    // MARK: Header row. Click does whatever Settings → Display says; double-click or ⌘-click does the other.
 
     private var header: some View {
         HStack(spacing: 10) {
@@ -506,12 +506,13 @@ struct PRRow: View {
         .padding(.horizontal, 12).padding(.vertical, 8)
         .contentShape(Rectangle())
         .gesture(
-            // Click opens on GitHub. Double-click or ⌘-click expands the row.
-            TapGesture(count: 2).onEnded { model.selectedID = pr.id; toggleExpand() }
+            // Whichever action isn't on the single click lives on the double click, so both are
+            // always reachable. ⌘-click always does the other one too (Settings → Display).
+            TapGesture(count: 2).onEnded { model.selectedID = pr.id; secondaryClick() }
                 .exclusively(before: TapGesture().onEnded {
                     guard !editingAlias else { return }
                     model.selectedID = pr.id
-                    if NSEvent.modifierFlags.contains(.command) { toggleExpand() } else { openURL(pr.url) }
+                    if NSEvent.modifierFlags.contains(.command) { secondaryClick() } else { primaryClick() }
                 })
         )
         // Quick actions on hover. Attached AFTER the tap gesture so the buttons own their clicks.
@@ -534,6 +535,14 @@ struct PRRow: View {
     }
 
     private func toggleExpand() { withAnimation(Self.motion) { model.toggleExpanded(pr.id) } }
+
+    private func primaryClick() {
+        if model.prefs.primaryClick == .expand { toggleExpand() } else { openURL(pr.url) }
+    }
+
+    private func secondaryClick() {
+        if model.prefs.primaryClick == .expand { openURL(pr.url) } else { toggleExpand() }
+    }
 
     /// "3 of 16 checks failed" / "2 of 4 checks running" / "12 checks passed" / "1 check passed"
     private var checksSummary: String {

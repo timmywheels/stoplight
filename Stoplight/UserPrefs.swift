@@ -109,6 +109,7 @@ final class UserPrefs {
         static let reviewTemplate = "agentReviewPrompt"
         static let scanRoot = "repoScanRoot"
         static let repoPaths = "repoPaths"
+        static let primaryClick = "primaryClick"
     }
 
 
@@ -138,6 +139,15 @@ final class UserPrefs {
     var scanRoot: String { didSet { defaults.set(scanRoot, forKey: Key.scanRoot) } }
     /// "owner/name" (lowercased) → local clone path.
     var repoPaths: [String: String] { didSet { defaults.set(repoPaths, forKey: Key.repoPaths) } }
+
+    /// What a single click on a PR row does; the other action moves to double-click (US-037).
+    enum PrimaryClick: String, CaseIterable, Identifiable {
+        case open, expand
+        var id: String { rawValue }
+        var title: String { self == .open ? "Opens it on GitHub" : "Shows its details" }
+    }
+    /// Local only.
+    var primaryClick: PrimaryClick { didSet { defaults.set(primaryClick.rawValue, forKey: Key.primaryClick) } }
 
     enum SectionCounts: String, CaseIterable, Identifiable {
         case attention, full, off
@@ -205,6 +215,7 @@ final class UserPrefs {
         }
         defaults.set(RowAction.allCases.map(\.rawValue), forKey: Key.rowActionsSeen)
         sectionCounts = SectionCounts(rawValue: defaults.string(forKey: Key.sectionCounts) ?? "") ?? .off
+        primaryClick = PrimaryClick(rawValue: defaults.string(forKey: Key.primaryClick) ?? "") ?? .open
         agent = defaults.string(forKey: Key.agent) ?? ""
         agentCustomCommand = defaults.string(forKey: Key.agentCustom) ?? "my-agent {prompt}"
         agentPermissionMode = defaults.string(forKey: Key.agentPermission) ?? "ask"
