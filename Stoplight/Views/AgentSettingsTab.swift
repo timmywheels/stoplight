@@ -130,21 +130,27 @@ struct AgentSettingsTab: View {
                     DisclosureGroup {
                         TextField("", text: $repoFilter, prompt: Text("Filter"))
                             .textFieldStyle(.roundedBorder).labelsHidden()
-                        List {
-                            ForEach(matchingRepos, id: \.key) { slug, path in
-                                HStack {
-                                    Text(slug).lineLimit(1).truncationMode(.middle)
-                                    Spacer(minLength: 12)
-                                    Text(path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-                                        .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                                    Button { prefs.repoPaths[slug] = nil } label: { Image(systemName: "minus.circle") }
-                                        .buttonStyle(.borderless).help("Forget this clone")
+                        // A List here inherits the Form's own scroll view and never scrolls itself,
+                        // so this is a plain ScrollView with the bordered look drawn by hand.
+                        ScrollView {
+                            LazyVStack(spacing: 0) {
+                                ForEach(Array(matchingRepos.enumerated()), id: \.element.key) { i, item in
+                                    HStack(spacing: 8) {
+                                        Text(item.key).lineLimit(1).truncationMode(.middle)
+                                        Spacer(minLength: 12)
+                                        Text(item.value.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                                            .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                                        Button { prefs.repoPaths[item.key] = nil } label: { Image(systemName: "minus.circle") }
+                                            .buttonStyle(.borderless).help("Forget this clone")
+                                    }
+                                    .padding(.horizontal, 8).padding(.vertical, 4)
+                                    .background(i.isMultiple(of: 2) ? Color.clear : Color.primary.opacity(0.04))
                                 }
                             }
                         }
-                        .listStyle(.bordered)
-                        .alternatingRowBackgrounds()
                         .frame(height: 6 * 24 + 2)
+                        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+                        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.quaternary))
                         HStack {
                             Spacer()
                             Button("Forget All") { prefs.repoPaths = [:]; repoFilter = "" }.controlSize(.small)
