@@ -107,7 +107,8 @@ final class UserPrefs {
         static let terminal = "terminal"
         static let promptTemplate = "agentPrompt"
         static let reviewTemplate = "agentReviewPrompt"
-        static let scanRoot = "repoScanRoot"
+        static let scanRoot = "repoScanRoot"        // pre-0.9, a single folder
+        static let scanRoots = "repoScanRoots"
         static let repoPaths = "repoPaths"
         static let primaryClick = "primaryClick"
         static let refreshSeconds = "refreshSeconds"
@@ -137,7 +138,8 @@ final class UserPrefs {
     var terminal: String { didSet { defaults.set(terminal, forKey: Key.terminal) } }
     var promptTemplate: String { didSet { defaults.set(promptTemplate, forKey: Key.promptTemplate) } }
     var reviewTemplate: String { didSet { defaults.set(reviewTemplate, forKey: Key.reviewTemplate) } }
-    var scanRoot: String { didSet { defaults.set(scanRoot, forKey: Key.scanRoot) } }
+    /// Folders to look for git clones in. Projects rarely live under one tree, so this is a list.
+    var scanRoots: [String] { didSet { defaults.set(scanRoots, forKey: Key.scanRoots) } }
     /// "owner/name" (lowercased) → local clone path.
     var repoPaths: [String: String] { didSet { defaults.set(repoPaths, forKey: Key.repoPaths) } }
 
@@ -246,7 +248,10 @@ final class UserPrefs {
         terminal = defaults.string(forKey: Key.terminal) ?? "terminal"
         promptTemplate = defaults.string(forKey: Key.promptTemplate) ?? AgentLauncher.defaultPrompt
         reviewTemplate = defaults.string(forKey: Key.reviewTemplate) ?? AgentLauncher.defaultReviewPrompt
-        scanRoot = defaults.string(forKey: Key.scanRoot) ?? (NSHomeDirectory() + "/dev")
+        // Carry the old single folder over, then fall back to ~/dev.
+        scanRoots = defaults.stringArray(forKey: Key.scanRoots)
+            ?? defaults.string(forKey: Key.scanRoot).map { [$0] }
+            ?? [NSHomeDirectory() + "/dev"]
         repoPaths = (defaults.dictionary(forKey: Key.repoPaths) as? [String: String]) ?? [:]
 
         if let cloud {

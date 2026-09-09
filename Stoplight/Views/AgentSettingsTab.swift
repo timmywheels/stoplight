@@ -108,21 +108,31 @@ struct AgentSettingsTab: View {
 
             Section {
                 LabeledContent {
-                    HStack(spacing: 8) {
-                        TextField("", text: tildePath, prompt: Text("~/dev"))
-                            .labelsHidden()
-                            .textFieldStyle(.roundedBorder)
-                            .font(.system(.callout, design: .monospaced))
-                            .frame(maxWidth: .infinity)
-                            .onSubmit(scan)
-                        Button("Choose…") { chooseRoot() }
-                        Button(scanning ? "Scanning…" : "Scan") { scan() }.disabled(scanning)
+                    VStack(alignment: .leading, spacing: 6) {
+                        BoxList(items: prefs.scanRoots.map(Folder.init), visibleRows: 4) { folder in
+                            HStack(spacing: 6) {
+                                Image(systemName: "folder").foregroundStyle(.secondary).font(.caption)
+                                Text(folder.tilde).font(.system(.callout, design: .monospaced))
+                                    .lineLimit(1).truncationMode(.head)
+                                Spacer(minLength: 8)
+                                RowRemoveButton(help: "Stop scanning this folder") {
+                                    prefs.scanRoots.removeAll { $0 == folder.path }
+                                }
+                            }
+                        }
+                        HStack {
+                            Button("Add Folder…") { addRoot() }.controlSize(.small)
+                            Spacer()
+                            Button(scanning ? "Scanning…" : "Scan") { scan() }
+                                .controlSize(.small)
+                                .disabled(scanning || prefs.scanRoots.isEmpty)
+                        }
                     }
                 } label: {
-                    InfoLabel("Folder to scan", "Where your git clones live. Stoplight matches each clone's remote to a repo.")
+                    InfoLabel("Folders to scan", "Wherever your git clones live. Each clone's remote is matched to a repo; add as many folders as you keep projects in.")
                 }
                 if model.prefs.repoPaths.isEmpty {
-                    Text("No clones found yet. Scan a folder that holds your git checkouts; remotes are matched to the PRs' repos.")
+                    Text("No clones found yet. Add a folder that holds your git checkouts, then Scan.")
                         .foregroundStyle(.secondary).font(.callout)
                 } else {
                     // A dev folder holds hundreds of clones. They cost nothing to keep (it's a lookup
@@ -130,27 +140,15 @@ struct AgentSettingsTab: View {
                     DisclosureGroup {
                         TextField("", text: $repoFilter, prompt: Text("Filter"))
                             .textFieldStyle(.roundedBorder).labelsHidden()
-                        // A List here inherits the Form's own scroll view and never scrolls itself,
-                        // so this is a plain ScrollView with the bordered look drawn by hand.
-                        ScrollView {
-                            LazyVStack(spacing: 0) {
-                                ForEach(Array(matchingRepos.enumerated()), id: \.element.key) { i, item in
-                                    HStack(spacing: 8) {
-                                        Text(item.key).lineLimit(1).truncationMode(.middle)
-                                        Spacer(minLength: 12)
-                                        Text(item.value.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-                                            .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                                        Button { prefs.repoPaths[item.key] = nil } label: { Image(systemName: "minus.circle") }
-                                            .buttonStyle(.borderless).help("Forget this clone")
-                                    }
-                                    .padding(.horizontal, 8).padding(.vertical, 4)
-                                    .background(i.isMultiple(of: 2) ? Color.clear : Color.primary.opacity(0.04))
-                                }
+                        BoxList(items: matchingRepos) { repo in
+                            HStack(spacing: 8) {
+                                Text(repo.slug).lineLimit(1).truncationMode(.middle)
+                                Spacer(minLength: 12)
+                                Text(repo.tilde)
+                                    .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                                RowRemoveButton(help: "Forget this clone") { prefs.repoPaths[repo.slug] = nil }
                             }
                         }
-                        .frame(height: 6 * 24 + 2)
-                        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
-                        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.quaternary))
                         HStack {
                             Spacer()
                             Button("Forget All") { prefs.repoPaths = [:]; repoFilter = "" }.controlSize(.small)
@@ -170,37 +168,46 @@ struct AgentSettingsTab: View {
         .task { if !detected { await model.detectAgents(); detected = true } }
     }
 
-    private var matchingRepos: [(key: String, value: String)] {
-        let all = model.prefs.repoPaths.sorted { $0.key < $1.key }
+    /// Identifiable wrappers so BoxList can key its rows.
+    private struct Folder: Identifiable {
+        let path: String
+        init(_ path: String) { self.path = path }
+        var id: String { path }
+        var tilde: String { (path as NSString).abbreviatingWithTildeInPath }
+    }
+
+    private struct Clone: Identifiable {
+        let slug: String, path: String
+        var id: String { slug }
+        var tilde: String { path.replacingOccurrences(of: NSHomeDirectory(), with: "~") }
+    }
+
+    private var matchingRepos: [Clone] {
+        let all = model.prefs.repoPaths.sorted { $0.key < $1.key }.map { Clone(slug: $0.key, path: $0.value) }
         let q = repoFilter.trimmingCharacters(in: .whitespaces).lowercased()
         guard !q.isEmpty else { return all }
-        return all.filter { $0.key.contains(q) || $0.value.lowercased().contains(q) }
+        return all.filter { $0.slug.contains(q) || $0.path.lowercased().contains(q) }
     }
 
-    /// Shown with a ~, stored absolute.
-    private var tildePath: Binding<String> {
-        Binding(get: { (model.prefs.scanRoot as NSString).abbreviatingWithTildeInPath },
-                set: { model.prefs.scanRoot = ($0 as NSString).expandingTildeInPath })
-    }
-
-    /// Same folder picker the gh path row uses, so both rows behave alike.
-    private func chooseRoot() {
+    /// Pick one or more folders. Duplicates are ignored; a new folder is scanned right away.
+    private func addRoot() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.message = "Choose the folder that holds your git clones"
-        panel.directoryURL = URL(fileURLWithPath: model.prefs.scanRoot)
-        if panel.runModal() == .OK, let url = panel.url {
-            model.prefs.scanRoot = url.path
-            scan()
-        }
+        panel.allowsMultipleSelection = true
+        panel.message = "Choose folders that hold your git clones"
+        panel.directoryURL = URL(fileURLWithPath: model.prefs.scanRoots.first ?? NSHomeDirectory())
+        guard panel.runModal() == .OK else { return }
+        let added = panel.urls.map(\.path).filter { !model.prefs.scanRoots.contains($0) }
+        guard !added.isEmpty else { return }
+        model.prefs.scanRoots.append(contentsOf: added)
+        scan()
     }
 
     private func scan() {
         scanning = true
         Task {
-            let found = await AgentLauncher.scanRepos(root: model.prefs.scanRoot)
+            let found = await AgentLauncher.scanRepos(roots: model.prefs.scanRoots)
             model.prefs.repoPaths.merge(found) { _, new in new }
             scanning = false
         }

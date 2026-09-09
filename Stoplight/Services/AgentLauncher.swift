@@ -124,6 +124,15 @@ enum AgentLauncher {
     // MARK: Repos
 
     /// Scan `root` (two levels deep) for git repos and map "owner/name" → path using their origin remote.
+    static func scanRepos(roots: [String]) async -> [String: String] {
+        var merged: [String: String] = [:]
+        for root in roots where !root.trimmingCharacters(in: .whitespaces).isEmpty {
+            // Later roots don't overwrite earlier ones: the first folder listed wins a tie.
+            for (slug, path) in await scanRepos(root: root) where merged[slug] == nil { merged[slug] = path }
+        }
+        return merged
+    }
+
     static func scanRepos(root: String) async -> [String: String] {
         let script = """
         for d in "\(root)"/*/ "\(root)"/*/*/; do
