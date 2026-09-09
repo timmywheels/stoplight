@@ -112,6 +112,8 @@ final class UserPrefs {
         static let repoPaths = "repoPaths"
         static let primaryClick = "primaryClick"
         static let stackOrder = "stackCopyOrder"
+        static let showQueues = "showQueues"
+        static let queueItems = "queueItems"
         static let refreshSeconds = "refreshSeconds"
     }
 
@@ -143,6 +145,11 @@ final class UserPrefs {
     var scanRoots: [String] { didSet { defaults.set(scanRoots, forKey: Key.scanRoots) } }
     /// "owner/name" (lowercased) → local clone path.
     var repoPaths: [String: String] { didSet { defaults.set(repoPaths, forKey: Key.repoPaths) } }
+
+    /// Show a section for each merge queue any visible PR is waiting in (US-041). Local only.
+    var showQueues: Bool { didSet { defaults.set(showQueues, forKey: Key.showQueues) } }
+    /// How many entries of each queue to list.
+    var queueItems: Int { didSet { defaults.set(queueItems, forKey: Key.queueItems) } }
 
     /// Which end of a stack "Copy stack as Markdown" starts from.
     enum StackOrder: String, CaseIterable, Identifiable {
@@ -250,6 +257,8 @@ final class UserPrefs {
         primaryClick = PrimaryClick(rawValue: defaults.string(forKey: Key.primaryClick) ?? "") ?? .open
         refreshRate = RefreshRate(rawValue: defaults.integer(forKey: Key.refreshSeconds)) ?? .automatic
         stackOrder = StackOrder(rawValue: defaults.string(forKey: Key.stackOrder) ?? "") ?? .bottomFirst
+        showQueues = defaults.object(forKey: Key.showQueues) as? Bool ?? true
+        queueItems = max(1, defaults.object(forKey: Key.queueItems) as? Int ?? 10)
         agent = defaults.string(forKey: Key.agent) ?? ""
         agentCustomCommand = defaults.string(forKey: Key.agentCustom) ?? "my-agent {prompt}"
         agentPermissionMode = defaults.string(forKey: Key.agentPermission) ?? "ask"

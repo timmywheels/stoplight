@@ -45,6 +45,9 @@ final class AppModel {
     private var resolvedPatterns: [String: String] = [:]
     /// Open PRs targeting each resolved release branch (US-030).
     private(set) var inbound: [(query: PRQuery, prs: [PullRequest])] = []
+    /// One section per merge queue that a visible PR is sitting in (US-041). Deliberately kept out
+    /// of `all`: these are other people's PRs, and they must not light your dots or notify you.
+    private(set) var queues: [(ref: BranchRef, prs: [PullRequest])] = []
     /// Last search-derived lists, so a PR that drops out of search can be checked by ref (US-038).
     private var lastSearch: (queries: [PRQuery], mine: [PullRequest], followed: [[PullRequest]], inbound: [[PullRequest]])?
     private(set) var lastRefresh: Date?
@@ -269,6 +272,11 @@ final class AppModel {
         }
         for f in inbound { out.append(Section(id: f.query.title, title: f.query.title, prs: take(f.prs), query: f.query)) }
         out.append(Section(id: "Branches", title: "Branches", prs: take(branches)))
+        for q in queues {
+            // Queue rows are informational, so they bypass `take`: no claiming, no dot filter.
+            let rows = q.prs.filter(matchesSearch)
+            out.append(Section(id: Self.queueSectionID(q.ref), title: "Queue → \(q.ref.branch)", prs: rows))
+        }
         // Merged rows aren't in `all` unless they have checks, so filter them directly here.
         let mergedFiltered = mergedRows.filter { pr in
             !claimed.contains(pr.id) && (filter.isEmpty || filter.contains(pr.effectiveState)) && matchesSearch(pr)
@@ -282,6 +290,7 @@ final class AppModel {
         applyOrder(["Pinned", "Mine", "Watching"].map { Section(id: $0, title: $0, prs: []) }
                    + followed.map { Section(id: $0.query.title, title: $0.query.title, prs: []) }
                    + inbound.map { Section(id: $0.query.title, title: $0.query.title, prs: []) }
+                   + queues.map { Section(id: Self.queueSectionID($0.ref), title: $0.ref.branch, prs: []) }
                    + [Section(id: "Branches", title: "Branches", prs: []), Section(id: "Merged", title: "Merged", prs: [])]).map(\.id)
     }
 
@@ -345,8 +354,10 @@ final class AppModel {
             "lastError": lastError ?? "",
             "isRefreshing": isRefreshing,
             "counts": ["mine": mine.count, "watched": watched.count, "followed": followed.reduce(0) { $0 + $1.prs.count },
-                       "inbound": inbound.reduce(0) { $0 + $1.prs.count }, "branches": branches.count, "merged": merged.count, "all": all.count],
-            "queries": ["follow": prefs.followQueries.count, "branches": prefs.sources.followBranches, "mergedDays": prefs.mergedDays],
+                       "inbound": inbound.reduce(0) { $0 + $1.prs.count }, "branches": branches.count, "merged": merged.count, "all": all.count,
+                       "queued": queues.reduce(0) { $0 + $1.prs.count }],
+            "queries": ["follow": prefs.followQueries.count, "branches": prefs.sources.followBranches, "mergedDays": prefs.mergedDays,
+                        "queues": queues.map(\.ref.spec)],
             "agent": ["configured": prefs.agent, "installed": installedAgents.map(\.rawValue).sorted(), "repos": prefs.repoPaths.count,
                       "fixArgs": agentConfig?.args(for: .fix) ?? "", "reviewArgs": agentConfig?.args(for: .review) ?? "",
                       "needsAttention": agentNeedsAttention,
@@ -464,6 +475,7 @@ final class AppModel {
             }
             merged = freshMerged
             watched = freshWatched
+            await refreshQueues(provider)
 
             // New release branch? Tell the user (only when we knew the previous one).
             for p in patterns {
@@ -492,6 +504,25 @@ final class AppModel {
                 auth = .failed("Token rejected")
                 self.provider = nil
             }
+        }
+    }
+
+    // MARK: Merge queues (US-041)
+
+    static func queueSectionID(_ ref: BranchRef) -> String { "Queue \(ref.spec)" }
+
+    /// Which queues to show is derived, not configured: a queue belongs to a base branch, and orgs
+    /// queue into rc/*, develop, whatever. Any PR you can already see that is waiting in a queue
+    /// names that queue exactly, so there is nothing to type in and nothing to keep in sync.
+    private func refreshQueues(_ provider: GitHubProvider) async {
+        guard prefs.showQueues else { queues = []; return }
+        let refs = Array(Set(all.filter { $0.mergeQueue != nil && !$0.baseRefName.isEmpty }
+            .map { BranchRef(repo: $0.repo, branch: $0.baseRefName) }))
+        guard !refs.isEmpty else { queues = []; return }
+        guard let found = try? await provider.fetchMergeQueues(refs, limit: prefs.queueItems) else { return }
+        queues = refs.sorted { $0.spec < $1.spec }.compactMap { ref in
+            guard let prs = found[ref.key], !prs.isEmpty else { return nil }
+            return (ref, prs)
         }
     }
 

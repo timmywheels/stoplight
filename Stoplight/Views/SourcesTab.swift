@@ -85,6 +85,20 @@ struct SourcesTab: View {
                 }
                 .onChange(of: prefs.mergedDays) { _, _ in model.sourcesChanged() }
 
+                Toggle(isOn: $prefs.showQueues) {
+                    InfoLabel("Merge queues",
+                              "When a PR you can see is waiting in a queue, that queue gets its own section: what's ahead of it, and whether the front is failing. Queue rows never light the dots or notify you.")
+                }
+                .onChange(of: prefs.showQueues) { _, _ in model.sourcesChanged() }
+
+                if prefs.showQueues {
+                    Stepper(value: $prefs.queueItems, in: 1...25) {
+                        InfoLabel("Queue entries shown: \(prefs.queueItems)",
+                                  "How far down each queue to list. The queue a PR is in belongs to its base branch, whatever that branch is called.")
+                    }
+                    .onChange(of: prefs.queueItems) { _, _ in model.sourcesChanged() }
+                }
+
                 Stepper(value: $prefs.branchCommits, in: 1...10) {
                     InfoLabel("Commits shown per branch: \(prefs.branchCommits)",
                               "How many recent commits each followed branch lists, so you can see which one broke it.")

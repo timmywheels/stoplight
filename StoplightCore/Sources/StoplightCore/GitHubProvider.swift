@@ -106,6 +106,32 @@ public struct GitHubProvider: CIProvider {
         return out
     }
 
+    /// The merge queue behind each base branch (US-041). Queues belong to a branch, not to "main":
+    /// an org can queue into rc/2026-09, develop, or anything else, so the caller says which.
+    /// Entries come back in queue order; each PR keeps its own position from `mergeQueueEntry`.
+    public func fetchMergeQueues(_ refs: [BranchRef], limit: Int) async throws -> [String: [PullRequest]] {
+        guard !refs.isEmpty else { return [:] }
+        let fields = refs.enumerated().compactMap { i, r -> String? in
+            let parts = r.repo.split(separator: "/", maxSplits: 1).map(String.init)
+            guard parts.count == 2, Filters.isValidRepo(r.repo), Filters.isValidBranch(r.branch) else { return nil }
+            return "m\(i): repository(owner: \"\(parts[0])\", name: \"\(parts[1])\") { mergeQueue(branch: \"\(r.branch)\") { entries(first: \(min(max(limit, 1), 50))) { nodes { pullRequest { ...PRFields } } } } }"
+        }
+        guard !fields.isEmpty else { return [:] }
+        let data = try await post(["query": "query {\n" + fields.joined(separator: "\n") + "\n}\n" + Self.prFields])
+        struct Entry: Decodable { let pullRequest: Node? }
+        struct Entries: Decodable { let nodes: [Entry] }
+        struct Queue: Decodable { let entries: Entries? }
+        struct Repo: Decodable { let mergeQueue: Queue? }
+        struct Env: Decodable { let data: [String: Repo?]? }
+        let repos = try Self.decoder.decode(Env.self, from: data).data ?? [:]
+        var out: [String: [PullRequest]] = [:]
+        for (i, r) in refs.enumerated() {
+            guard let nodes = repos["m\(i)"]??.mergeQueue?.entries?.nodes else { continue }
+            out[r.key] = nodes.compactMap { $0.pullRequest }.compactMap(Self.map)
+        }
+        return out
+    }
+
     public func resolveBranchPatterns(_ patterns: [BranchRef]) async throws -> [String: String] {
         var out: [String: String] = [:]
         for p in patterns.filter(\.isPattern) {
