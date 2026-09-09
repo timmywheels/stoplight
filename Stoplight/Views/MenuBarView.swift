@@ -472,20 +472,20 @@ struct PRRow: View {
                         Button { model.focusAgent(pr) } label: {
                             tag(st.state == "attention" ? "needs you" : st.state == "done" ? "agent done" : "agent working",
                                 symbol: "sparkles",
-                                tint: st.state == "attention" ? .orange : st.state == "done" ? .green : .secondary)
+                                tint: st.state == "attention" ? .orange : st.state == "done" ? stateColor(.success) : .secondary)
                         }
                         .buttonStyle(.plain)
                         .help("Reported by your agent \(st.at.compactAgo) ago. Click to jump to its terminal window; right-click the row to dismiss.")
                     }
-                    if pr.status == .closed { tag("Closed", symbol: "xmark", tint: .red) }
+                    if pr.status == .closed { tag("Closed", symbol: "xmark", tint: stateColor(.failure)) }
                     if pr.status == .open, !pr.isDraft, let label = pr.mergeState.label {
                         tag(label, symbol: pr.mergeState.isBlocking ? "exclamationmark.triangle.fill" : nil,
-                            tint: pr.mergeState.isBlocking ? .red : .secondary)
+                            tint: pr.mergeState.isBlocking ? stateColor(.failure) : .secondary)
                     }
                     if let q = pr.mergeQueue {
                         tag(q.isBlocked ? "Queue: blocked" : "Queue #\(q.position)",
                             symbol: q.isBlocked ? "exclamationmark.triangle.fill" : "line.3.horizontal",
-                            tint: q.isBlocked ? .red : .blue)
+                            tint: q.isBlocked ? stateColor(.failure) : .secondary)
                     }
                     if depth == 0, stack == nil, pr.hasNonTrunkBase {
                         // Based on a branch we can't see: part of a stack whose bottom isn't in view.
@@ -523,11 +523,11 @@ struct PRRow: View {
             if hovering && !expanded && !editingAlias {
                 HStack(spacing: 12) {
                     glyph("arrow.up.right", help: "Open on GitHub") { openURL(pr.url) }
-                    glyph(copied == "url" ? "checkmark" : "doc.on.doc", help: "Copy URL", tint: copied == "url" ? .green : nil) {
+                    glyph(copied == "url" ? "checkmark" : "doc.on.doc", help: "Copy URL", tint: copied == "url" ? stateColor(.success) : nil) {
                         flash("url") { copy(pr.url.absoluteString) }
                     }
                     glyph(copied == "share" ? "checkmark" : "square.and.arrow.up", help: "Share: title as a link",
-                          tint: copied == "share" ? .green : nil) { flash("share") { copyRichLink() } }
+                          tint: copied == "share" ? stateColor(.success) : nil) { flash("share") { copyRichLink() } }
                 }
                 .padding(.horizontal, 10).padding(.vertical, 6)
                 .background(.regularMaterial, in: Capsule())
@@ -568,7 +568,7 @@ struct PRRow: View {
                     ForEach(pr.failingChecks) { check in
                         Button { if let u = check.url { openURL(u) } } label: {
                             HStack(spacing: 6) {
-                                Image(systemName: "xmark.circle.fill").foregroundStyle(.red).font(.caption)
+                                Image(systemName: "xmark.circle.fill").foregroundStyle(stateColor(.failure)).font(.caption)
                                 Text(check.name).font(.caption).lineLimit(1)
                             }
                         }
@@ -622,16 +622,16 @@ struct PRRow: View {
             case .open: RowButton(symbol: a.symbol, help: pr.isBranch ? "Open commit on GitHub" : a.title, tint: nil) { openURL(pr.url) }
             case .run: RowButton(symbol: a.symbol, help: "\(a.title) (⌘K)", tint: nil) { if let u = pr.actionsRunURL { openURL(u) } }
             case .checks: RowButton(symbol: a.symbol, help: a.title, tint: nil) { openURL(pr.checksURL) }
-            case .copyURL: RowButton(symbol: copied == a.id ? "checkmark" : a.symbol, help: "\(a.title) (⌘C)", tint: copied == a.id ? .green : nil) {
+            case .copyURL: RowButton(symbol: copied == a.id ? "checkmark" : a.symbol, help: "\(a.title) (⌘C)", tint: copied == a.id ? stateColor(.success) : nil) {
                 flash(a.id) { PRActions.copyURL(pr) }
             }
-            case .share: RowButton(symbol: copied == a.id ? "checkmark" : a.symbol, help: "\(a.title) (⇧⌘C)", tint: copied == a.id ? .green : nil) {
+            case .share: RowButton(symbol: copied == a.id ? "checkmark" : a.symbol, help: "\(a.title) (⇧⌘C)", tint: copied == a.id ? stateColor(.success) : nil) {
                 flash(a.id) { PRActions.share(pr) }
             }
-            case .copyBranch: RowButton(symbol: copied == a.id ? "checkmark" : a.symbol, help: "\(a.title) (⌘B)", tint: copied == a.id ? .green : nil) {
+            case .copyBranch: RowButton(symbol: copied == a.id ? "checkmark" : a.symbol, help: "\(a.title) (⌘B)", tint: copied == a.id ? stateColor(.success) : nil) {
                 flash(a.id) { PRActions.copyBranch(pr) }
             }
-            case .copyHash: RowButton(symbol: copied == a.id ? "checkmark" : a.symbol, help: "Copy commit hash \(pr.headSha.prefix(7)) (⇧⌘B)", tint: copied == a.id ? .green : nil) {
+            case .copyHash: RowButton(symbol: copied == a.id ? "checkmark" : a.symbol, help: "Copy commit hash \(pr.headSha.prefix(7)) (⇧⌘B)", tint: copied == a.id ? stateColor(.success) : nil) {
                 flash(a.id) { PRActions.copyHash(pr) }
             }
             case .pin: RowButton(symbol: pinned ? "pin.fill" : "pin", help: pinned ? "Unpin" : "Pin", tint: pinned ? .primary : nil) {
