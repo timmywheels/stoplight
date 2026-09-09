@@ -117,26 +117,37 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
     private func showMenu() {
         close(reason: "right-click menu")
         let menu = NSMenu()
-        menu.addItem(withTitle: "Show Tour", action: #selector(showTour), keyEquivalent: "").target = self
-        menu.addItem(withTitle: "Refresh Now", action: #selector(refreshNow), keyEquivalent: "r").target = self
-        menu.addItem(withTitle: "Watch a PR by URL…", action: #selector(watchPR), keyEquivalent: "n").target = self
-        let hk = menu.addItem(withTitle: "Keyboard Shortcuts", action: #selector(showHotkeys), keyEquivalent: "/")
-        hk.target = self
-        menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",").target = self
+        // Every item carries a symbol: AppKit reserves the image gutter as soon as one does, and a
+        // half-filled gutter reads as a mistake. Grouped by what they act on.
+        func add(_ title: String, _ symbol: String, _ action: Selector, key: String = "") -> NSMenuItem {
+            let item = menu.addItem(withTitle: title, action: action, keyEquivalent: key)
+            item.target = self
+            item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+            return item
+        }
+
+        _ = add("Refresh Now", "arrow.clockwise", #selector(refreshNow), key: "r")
+        _ = add("Watch a PR by URL…", "eye", #selector(watchPR), key: "n")
+
         menu.addItem(.separator())
-        let pin = menu.addItem(withTitle: "Pin Panel Open", action: #selector(togglePin), keyEquivalent: "")
-        pin.target = self
+        let pin = add("Keep Panel Open", "pin", #selector(togglePin))
         pin.state = model.pinnedPanel ? .on : .off
-        let home = menu.addItem(withTitle: "Bring Panel to the Menu Bar", action: #selector(bringHome), keyEquivalent: "")
-        home.target = self
+        let home = add("Bring Panel to the Menu Bar", "arrow.up.left.square", #selector(bringHome))
         home.isEnabled = panel?.isVisible == true
-        menu.addItem(withTitle: "Reset Panel Position and Size", action: #selector(resetPanel), keyEquivalent: "").target = self
+        _ = add("Reset Panel Size and Position", "arrow.counterclockwise", #selector(resetPanel))
+
         menu.addItem(.separator())
-        let login = menu.addItem(withTitle: "Open at Login", action: #selector(toggleLogin), keyEquivalent: "")
-        login.target = self
+        _ = add("Keyboard Shortcuts", "keyboard", #selector(showHotkeys), key: "/")
+        _ = add("Guided Tour", "questionmark.circle", #selector(showTour))
+        _ = add("Settings…", "gearshape", #selector(openSettings), key: ",")
+
+        menu.addItem(.separator())
+        let login = add("Open at Login", "power", #selector(toggleLogin))
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
+
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Quit Stoplight", action: #selector(quit), keyEquivalent: "q").target = self
+        _ = add("Quit Stoplight", "xmark.circle", #selector(quit), key: "q")
+
         // Attach just long enough to pop it up, so left click keeps toggling the panel.
         statusItem.menu = menu
         statusItem.button?.performClick(nil)

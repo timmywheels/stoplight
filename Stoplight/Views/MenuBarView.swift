@@ -257,7 +257,7 @@ struct SearchField: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Search  ·  author:  repo:  branch:  is:red", text: $model.searchText)
+                TextField("Search", text: $model.searchText)
                     .textFieldStyle(.plain)
                     .focused($focused)
                     .onExitCommand {
@@ -275,8 +275,8 @@ struct SearchField: View {
                     HStack(spacing: 6) {
                         ForEach(chips) { c in
                             Button { model.searchText = SearchQuery.complete(model.searchText, with: c.insert); focused = true } label: {
-                                Text(c.label).font(.caption).monospaced()
-                                    .padding(.horizontal, 7).padding(.vertical, 3)
+                                Text(c.label).font(.caption2).monospaced().foregroundStyle(.secondary)
+                                    .padding(.horizontal, 6).padding(.vertical, 2)
                                     .background(.quaternary, in: Capsule())
                             }
                             .buttonStyle(.plain)

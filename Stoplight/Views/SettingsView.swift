@@ -10,6 +10,8 @@ struct SettingsView: View {
         TabView {
             GeneralTab(model: model)
                 .tabItem { Label("General", systemImage: "gearshape") }
+            DisplayTab(model: model)
+                .tabItem { Label("Display", systemImage: "paintpalette") }
             SourcesTab(model: model)
                 .tabItem { Label("Sources", systemImage: "person.2") }
             AgentSettingsTab(model: model)
@@ -27,83 +29,46 @@ private struct GeneralTab: View {
     var body: some View {
         @Bindable var prefs = model.prefs
         Form {
-            Section("Account") {
+            Section {
                 switch model.auth {
                 case .signedIn(let login, let source):
                     LabeledContent("Signed in as", value: "@\(login)")
                     LabeledContent("Source", value: source.rawValue)
                     Button("Sign out") { model.signOut() }
                 case .failed(let msg):
-                    Text(msg).foregroundStyle(.red)
+                    Text(msg).foregroundStyle(prefs.colorProfile.color(for: .failure))
                 default:
                     Text("Not signed in").foregroundStyle(.secondary)
                 }
-                // One control: the path it's using, and a picker to change it. Typing a path is what
-                // the open panel's Go to Folder (⇧⌘G) is for.
                 LabeledContent("GitHub CLI") {
                     HStack(spacing: 8) {
                         Text(TokenSource.ghPath() ?? "Not found")
                             .font(.system(.callout, design: .monospaced))
                             .lineLimit(1).truncationMode(.middle)
-                            .foregroundStyle(TokenSource.ghPath() == nil ? .red : .secondary)
+                            .foregroundStyle(TokenSource.ghPath() == nil ? prefs.colorProfile.color(for: .failure) : .secondary)
+                        if !prefs.ghPath.isEmpty { Button("Automatic") { prefs.ghPath = ""; reauth() } }
                         Button("Choose…") { chooseGH() }
                     }
                 }
-                if !prefs.ghPath.isEmpty {
-                    HStack {
-                        Text("Set manually").font(.caption).foregroundStyle(.secondary)
-                        Spacer()
-                        Button("Use automatic") { prefs.ghPath = ""; reauth() }.controlSize(.small)
-                    }
-                } else if TokenSource.ghPath() == nil {
-                    Text("Stoplight couldn't find gh on your shell's PATH. Choose it, or install the GitHub CLI.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
+            } header: {
+                Text("Account")
+            } footer: {
+                Text(TokenSource.ghPath() == nil
+                     ? "Stoplight couldn't find gh. Choose it, or install the GitHub CLI."
+                     : "Found on your shell's PATH. Choose another if gh lives somewhere unusual.")
             }
+
             Section("Notifications") {
                 Picker("Notify me", selection: $notifications) {
-                    Text("On fail and all-passing").tag("all")
-                    Text("On fail only").tag("failOnly")
+                    Text("When a PR fails or turns all-passing").tag("all")
+                    Text("Only when a PR fails").tag("failOnly")
                     Text("Never").tag("off")
                 }
                 .pickerStyle(.radioGroup)
             }
-            Section("Sections") {
-                Picker("Collapsed section counts", selection: $prefs.sectionCounts) {
-                    Text("Off").tag(UserPrefs.SectionCounts.off)
-                    Text("Only what needs attention").tag(UserPrefs.SectionCounts.attention)
-                    Text("Every state").tag(UserPrefs.SectionCounts.full)
-                }
-                Text("Attention: red and yellow counts plus a quiet total. The footer always shows the tally across all sections, which is also what lights the menu bar.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            Section("Row buttons") {
-                RowActionsEditor(prefs: prefs)
-                Text("The circles in an expanded PR. Check to show, drag to reorder. Buttons that don't apply to a row (no Actions run, nothing to fix) hide themselves.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            Section("Merged") {
-                Picker("Show recently merged", selection: $prefs.mergedDays) {
-                    Text("Off").tag(0)
-                    Text("Last 24 hours").tag(1)
-                    Text("Last 7 days").tag(7)
-                }
-                .onChange(of: prefs.mergedDays) { _, _ in model.sourcesChanged() }
-                Text("A collapsed section of your merged PRs. When checks run on the merge commit (deploys on main), their status shows there and a failure lights the dots.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            Section("Appearance") {
-                Picker("Color profile", selection: $prefs.colorProfile) {
-                    ForEach(ColorProfile.allCases) { profile in
-                        Text(profile.title).tag(profile)
-                    }
-                }
-                .onChange(of: prefs.colorProfile) { _, _ in model.colorProfileChanged() }
-            }
-            Section("Menu bar") {
-                Toggle("Dark housing behind the dots", isOn: $prefs.housing)
-                Toggle("Show count in menu bar", isOn: $prefs.showCount)
-                Toggle("Launch at login", isOn: $launchAtLogin)
+
+            Section("Startup") {
+                Toggle("Open Stoplight at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, on in
                         do {
                             if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
@@ -112,38 +77,89 @@ private struct GeneralTab: View {
                         }
                     }
             }
+
             Section {
-                HStack {
-                    Text("Guided tour").foregroundStyle(.secondary)
-                    Spacer()
+                LabeledContent("Version") {
+                    HStack(spacing: 8) {
+                        Text(model.updater.currentVersion).foregroundStyle(.secondary)
+                        updateControl
+                    }
+                }
+                LabeledContent("Guided tour") {
                     Button("Show Again") { model.prefs.tourSeen = false; model.openPanel?() }
                 }
-            }
-            Section("Legend") {
-                LegendRow("Failing. At least one check failed.") { StatusDot(state: .failure) }
-                LegendRow("Running. Checks still in progress.") { StatusDot(state: .pending) }
-                LegendRow("Passed. Every check passed, skipped, or neutral.") { StatusDot(state: .success) }
-                LegendRow("Nothing ran: no checks configured, or every check was skipped.") { StatusDot(state: .none) }
-                LegendRow("GitHub won't merge it as-is. Conflicts count as red, since nothing else can happen until they're fixed.") { HStack(spacing: 3) { Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 8, weight: .bold)).foregroundStyle(model.prefs.colorProfile.color(for: .failure)); Text("Conflicts").foregroundStyle(Color.secondary) }.font(.caption2).padding(.horizontal, 5).padding(.vertical, 1.5).background(.quaternary, in: Capsule()) }
-                LegendRow("Merged. The branch badge next to it is colored by the base branch's current CI state.") { Image(systemName: "checkmark.circle.fill").font(.caption).foregroundStyle(Color.githubMerged) }
-                LegendRow("Hollow dot: draft. Drafts never light the menu bar or notify.") { StatusDot(state: .success, hollow: true) }
-                LegendRow("Stacked on the PR above it. Right-click to copy the whole stack.") { Image(systemName: "arrow.turn.down.right").font(.caption2).foregroundStyle(.tertiary) }
-                LegendRow("In the merge queue at that position. \"Queue: blocked\" means GitHub can't merge it.") { legendTag("Queue #2", .blue) }
-                LegendRow("Based on a branch whose PR isn't in view.") { legendTag("on feat/x", .secondary) }
-                LegendRow("Click a PR to open it on GitHub. Double-click or ⌘-click to expand it: description, failing checks, and buttons for Open, Copy URL, Share, Pin, and Fix with your agent. Right-click for the rest.") { HStack(spacing: 6) { Image(systemName: "arrow.up.right"); Image(systemName: "doc.on.doc"); Image(systemName: "square.and.arrow.up"); Image(systemName: "pin"); Image(systemName: "sparkles") }.font(.caption).foregroundStyle(.secondary) }
-                LegendRow("Footer dots filter the list by status. Click to toggle, combine freely.") { Text("● 3").font(.caption).foregroundStyle(.secondary) }
-                LegendRow("Resize the panel and that height sticks, even with room to spare. Until you do, it shrinks to fit when you collapse sections. \"Reset Panel Position and Size\" in the right-click menu hands it back to auto-fit.") { Image(systemName: "arrow.up.and.down").font(.caption).foregroundStyle(.secondary) }
-                LegendRow("Pinned, the panel stays open above other windows. Clicking the menu bar dots pulses its edge so you can find it again, and pulls it back on screen if it drifted off. \"Bring Panel to the Menu Bar\" in the right-click menu moves it home without unpinning.") { Image(systemName: "pin.fill").font(.caption).foregroundStyle(.secondary) }
-                LegendRow("An agent you launched is waiting on you: orange dot beside the menu bar lights, orange badge on the row, and a notification. Click the badge to jump to its terminal window; right-click the row to dismiss it. Launching again just reopens that window rather than starting a second one.") { Circle().fill(.orange).frame(width: 7, height: 7) }
-                LegendRow("Search (⌘L). Bare words match titles. Prefixes narrow: author:dan  repo:web  branch:fix/  is:red|yellow|green|draft|merged|queued|mine  #439. Chips under the field complete them for you.") { Image(systemName: "magnifyingglass").font(.caption).foregroundStyle(.secondary) }
-            }
-            Section {
                 HStack {
-                    Text("Stoplight \(model.updater.currentVersion)").foregroundStyle(.secondary)
                     Spacer()
-                    updateControl
                     Button("Quit Stoplight") { NSApp.terminate(nil) }.keyboardShortcut("q")
                 }
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+/// How Stoplight looks. The bulky parts stay folded until asked for.
+private struct DisplayTab: View {
+    @Bindable var model: AppModel
+
+    var body: some View {
+        @Bindable var prefs = model.prefs
+        Form {
+            Section("Colors") {
+                Picker("Color profile", selection: $prefs.colorProfile) {
+                    ForEach(ColorProfile.allCases) { Text($0.title).tag($0) }
+                }
+                .onChange(of: prefs.colorProfile) { _, _ in model.colorProfileChanged() }
+            }
+
+            Section("Menu bar") {
+                Toggle("Dark housing behind the dots", isOn: $prefs.housing)
+                Toggle("Show a count beside the dots", isOn: $prefs.showCount)
+            }
+
+            Section {
+                Picker("Counts on collapsed sections", selection: $prefs.sectionCounts) {
+                    Text("Off").tag(UserPrefs.SectionCounts.off)
+                    Text("Only what needs attention").tag(UserPrefs.SectionCounts.attention)
+                    Text("Every state").tag(UserPrefs.SectionCounts.full)
+                }
+                DisclosureGroup("Row buttons") {
+                    RowActionsEditor(prefs: prefs)
+                    Text("The circles in an expanded PR. Check to show, drag to reorder.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Popover")
+            } footer: {
+                Text("The footer always tallies every section, which is what lights the menu bar.")
+            }
+
+            Section {
+                DisclosureGroup("What the dots and badges mean") {
+                    LegendRow("At least one check failed.") { StatusDot(state: .failure) }
+                    LegendRow("Checks still running.") { StatusDot(state: .pending) }
+                    LegendRow("Every check passed.") { StatusDot(state: .success) }
+                    LegendRow("Nothing ran: no checks, or all of them skipped.") { StatusDot(state: .none) }
+                    LegendRow("Draft. Never lights the menu bar or notifies.") { StatusDot(state: .success, hollow: true) }
+                    LegendRow("Can't merge until conflicts are fixed. Counts as red.") {
+                        Image(systemName: "exclamationmark.triangle.fill").font(.caption)
+                            .foregroundStyle(prefs.colorProfile.color(for: .failure))
+                    }
+                    LegendRow("Merged. The branch badge shows how that branch is doing now.") {
+                        Image(systemName: "checkmark.circle.fill").font(.caption).foregroundStyle(Color.githubMerged)
+                    }
+                    LegendRow("In the merge queue at that position.") {
+                        Image(systemName: "line.3.horizontal").font(.caption).foregroundStyle(.secondary)
+                    }
+                    LegendRow("Stacked on the PR above it.") {
+                        Image(systemName: "arrow.turn.down.right").font(.caption).foregroundStyle(.tertiary)
+                    }
+                    LegendRow("An agent you launched is waiting on you.") {
+                        Image(systemName: "sparkles").font(.caption).foregroundStyle(.orange)
+                    }
+                }
+            } footer: {
+                Text("Double-click a PR to expand it, right-click for the rest, ⌘/ for every shortcut.")
             }
         }
         .formStyle(.grouped)
@@ -303,6 +319,16 @@ private struct SourcesTab: View {
                 }
                 Text("Hidden users, repos, and PRs are removed everywhere: list, dots, widget, notifications. A hidden PR drops off this list once it merges or closes.")
                     .font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
+                Picker("Recently merged", selection: $prefs.mergedDays) {
+                    Text("Off").tag(0)
+                    Text("Last 24 hours").tag(1)
+                    Text("Last 7 days").tag(7)
+                }
+                .onChange(of: prefs.mergedDays) { _, _ in model.sourcesChanged() }
+            } footer: {
+                Text("Your merged PRs, collapsed. When checks run on the merge commit, a failure there lights the dots.")
             }
             Section("Watched PRs") {
                 if model.prefs.watched.isEmpty {

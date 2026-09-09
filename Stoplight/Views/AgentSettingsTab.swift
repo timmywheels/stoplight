@@ -10,7 +10,7 @@ struct AgentSettingsTab: View {
     var body: some View {
         @Bindable var prefs = model.prefs
         Form {
-            Section("Agent") {
+            Section {
                 Picker("Coding agent", selection: $prefs.agent) {
                     Text("Off").tag("")
                     ForEach(AgentLauncher.Agent.allCases) { a in
@@ -39,34 +39,40 @@ struct AgentSettingsTab: View {
                             .selectionDisabled(!t.isInstalled)
                     }
                 }
-                Text("Fixing edits code, so it defaults to asking. Reviewing only reports findings, so it defaults to plan mode and can't change anything. Extra arguments apply to both. With anything other than \"Ask every time\", the agent won't stop for approval, so you won't get a \"needs you\" notification.\n\nRow buttons hand a PR to this agent: Stoplight checks out the branch in a new worktree, opens your terminal there, and starts the agent with a prompt. Fix uses the failure; Adversarial review asks for findings. On a red followed branch (main is broken), Fix forks a fresh branch off it and asks for a PR. Your main checkout is never touched.")
-                    .font(.caption).foregroundStyle(.secondary)
+            } header: {
+                Text("Agent")
+            } footer: {
+                Text("Fix and Adversarial review hand a PR to this agent in its own worktree, so your checkout is untouched. Fixing edits code and defaults to asking; reviewing only reports and defaults to plan mode.")
             }
-            Section("Fix prompt") {
-                TextEditor(text: $prefs.promptTemplate)
-                    .font(.system(.callout, design: .monospaced))
-                    .frame(minHeight: 96)
-                    .scrollContentBackground(.hidden)
-                HStack {
-                    Text("{number} {title} {repo} {branch} {base} {sha} {url} {failing_checks} {check_urls} {description}")
-                        .font(.caption2).foregroundStyle(.secondary).textSelection(.enabled)
-                    Spacer()
-                    Button("Reset") { prefs.promptTemplate = AgentLauncher.defaultPrompt }.controlSize(.small)
+
+            Section("Prompts") {
+                DisclosureGroup("Fix prompt") {
+                    TextEditor(text: $prefs.promptTemplate)
+                        .font(.system(.callout, design: .monospaced))
+                        .frame(minHeight: 96)
+                        .scrollContentBackground(.hidden)
+                    HStack {
+                        Text("{number} {title} {repo} {branch} {base} {sha} {url} {failing_checks} {check_urls} {description}")
+                            .font(.caption2).foregroundStyle(.secondary).textSelection(.enabled)
+                        Spacer()
+                        Button("Reset") { prefs.promptTemplate = AgentLauncher.defaultPrompt }.controlSize(.small)
+                    }
+                }
+                DisclosureGroup("Review prompt") {
+                    TextEditor(text: $prefs.reviewTemplate)
+                        .font(.system(.callout, design: .monospaced))
+                        .frame(minHeight: 96)
+                        .scrollContentBackground(.hidden)
+                    HStack {
+                        Text("Same placeholders. Used by Adversarial review (⇧⌘F).")
+                            .font(.caption2).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Reset") { prefs.reviewTemplate = AgentLauncher.defaultReviewPrompt }.controlSize(.small)
+                    }
                 }
             }
-            Section("Review prompt") {
-                TextEditor(text: $prefs.reviewTemplate)
-                    .font(.system(.callout, design: .monospaced))
-                    .frame(minHeight: 96)
-                    .scrollContentBackground(.hidden)
-                HStack {
-                    Text("Used by the Adversarial review button (⇧⌘F). Same placeholders.")
-                        .font(.caption2).foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Reset") { prefs.reviewTemplate = AgentLauncher.defaultReviewPrompt }.controlSize(.small)
-                }
-            }
-            Section("Repos") {
+
+            Section {
                 HStack {
                     TextField("Folder to scan", text: $prefs.scanRoot).textFieldStyle(.roundedBorder)
                     Button(scanning ? "Scanning…" : "Scan") { scan() }.disabled(scanning)
@@ -86,8 +92,10 @@ struct AgentSettingsTab: View {
                         }
                     }
                 }
-                Text("A repo needs a local clone here before its PRs can be handed to the agent. Worktrees are created next to the clone as repo-branch; remove them with git worktree remove when you're done.")
-                    .font(.caption).foregroundStyle(.secondary)
+            } header: {
+                Text("Repos")
+            } footer: {
+                Text("A repo needs a clone here before its PRs can go to the agent. Worktrees are created beside it as repo-branch.")
             }
         }
         .formStyle(.grouped)
