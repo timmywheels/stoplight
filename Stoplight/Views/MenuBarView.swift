@@ -25,12 +25,7 @@ struct MenuBarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Grab handle: the only place to drag the panel around (US-027). Pin sits top-right: it's a window control.
-            // Same metrics as the footer: 22pt glyph boxes, 4pt vertical padding, 6pt from the right edge.
-            Capsule().fill(.quaternary).frame(width: 36, height: 4)
-                .frame(maxWidth: .infinity, minHeight: 22)
-                .overlay(DragHandle())
-                // Real HStack, not overlays: DragHandle is an AppKit view and would swallow clicks anywhere
+            // Real HStack, not overlays: DragHandle is an AppKit view and would swallow clicks anywhere
             // it covers, so it gets the middle only and the buttons keep their own space.
             HStack(spacing: 4) {
                 Button { model.isSearching.toggle(); if !model.isSearching { model.searchText = "" } } label: {
@@ -739,7 +734,7 @@ struct PRRow: View {
             if let symbol {
                 Image(systemName: symbol).font(.system(size: 8, weight: .bold)).foregroundStyle(tint)
             }
-            Text(text).foregroundStyle(.secondary)
+            Text(text).foregroundStyle(Color.secondary)
         }
         .font(.caption2)
         .padding(.horizontal, 5).padding(.vertical, 1.5)
