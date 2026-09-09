@@ -37,12 +37,16 @@ private struct GeneralTab: View {
                     LabeledContent("Signed in as", value: "@\(login)")
                     LabeledContent("Source", value: source.rawValue)
                         .help("Where the token came from: the GitHub CLI on your PATH, or one you pasted into Stoplight.")
-                    Button("Sign out") { model.signOut() }
-                        .help("Clears the token Stoplight stored in your keychain and stops fetching PRs.")
+                    LabeledContent("Session") {
+                        Button("Sign out") { model.signOut() }
+                            .help("Clears the token Stoplight stored in your keychain and stops fetching PRs.")
+                    }
                 case .failed(let msg):
-                    Text(msg).foregroundStyle(prefs.colorProfile.color(for: .failure))
+                    LabeledContent("Status") {
+                        Text(msg).foregroundStyle(prefs.colorProfile.color(for: .failure))
+                    }
                 default:
-                    Text("Not signed in").foregroundStyle(.secondary)
+                    LabeledContent("Status", value: "Not signed in")
                 }
                 LabeledContent("GitHub CLI") {
                     HStack(spacing: 8) {
