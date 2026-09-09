@@ -39,6 +39,10 @@ struct MenuBarView: View {
                     .overlay(DragHandle())
                     .help("Drag to move")
 
+                if model.hasQueues {
+                    tabGlyph("checklist", tab: .prs, help: "Your PRs (⌃⇥)")
+                    tabGlyph("line.3.horizontal", tab: .queue, help: "Merge queue (⌃⇥)")
+                }
                 Button { model.pinnedPanel.toggle() } label: {
                     Image(systemName: model.pinnedPanel ? "pin.fill" : "pin")
                         .foregroundStyle(model.pinnedPanel ? Color.accentColor : .secondary)
@@ -53,15 +57,6 @@ struct MenuBarView: View {
                 if model.isSearching {
                     SearchField(model: model)
                     Divider()
-                }
-                if model.hasQueues {
-                    Picker("", selection: $model.tab) {
-                        Label("PRs", systemImage: "checklist").tag(AppModel.Tab.prs)
-                        Label("Queue", systemImage: "line.3.horizontal").tag(AppModel.Tab.queue)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .padding(.horizontal, 8).padding(.bottom, 6)
                 }
             }
             .background(GeometryReader { g in Color.clear.onChange(of: g.size.height, initial: true) { _, h in if abs(midHeight - h) > 0.5 { midHeight = h; report() } } })
@@ -126,6 +121,17 @@ struct MenuBarView: View {
         }
     }
 
+    /// Two small glyphs rather than a segmented control: the panel is narrow and this is a view
+    /// switch, not a setting. The active one takes the accent colour.
+    private func tabGlyph(_ symbol: String, tab: AppModel.Tab, help: String) -> some View {
+        Button { model.tab = tab } label: {
+            Image(systemName: symbol)
+                .foregroundStyle(model.tab == tab ? Color.accentColor : .secondary)
+                .frame(width: 22, height: 22).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain).help(help)
+    }
+
     private var allSectionsCollapsed: Bool {
         !model.sections.isEmpty && model.sections.allSatisfy { model.prefs.collapsedSections.contains($0.id) }
     }
@@ -161,6 +167,7 @@ struct MenuBarView: View {
             if showHeader {
                 SectionHeader(id: sec.id, title: sec.title, prs: sec.prs, collapsed: collapsed, mode: model.prefs.sectionCounts,
                               allCollapsed: allSectionsCollapsed,
+                              url: sec.url,
                               toggle: { model.prefs.toggleCollapsed(sec.id) },
                               toggleAll: { _ = model.handle(.toggleSections) },
                               drop: { moving in
@@ -371,6 +378,8 @@ struct SectionHeader: View {
     let collapsed: Bool
     var mode: UserPrefs.SectionCounts = .off
     var allCollapsed = false
+    /// Where this section lives on GitHub, when it lives anywhere.
+    var url: URL? = nil
     let toggle: () -> Void
     var toggleAll: () -> Void = {}
     let drop: (String) -> Void
@@ -402,6 +411,13 @@ struct SectionHeader: View {
                 }
             }
             Spacer()
+            if let url {
+                Button { NSWorkspace.shared.open(url) } label: {
+                    Image(systemName: "arrow.up.right").font(.caption2).foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain).help("Open on GitHub")
+                .padding(.trailing, 2)
+            }
             Image(systemName: "line.3.horizontal").font(.caption2).foregroundStyle(.quaternary)
                 .help("Drag to reorder")
         }
@@ -449,6 +465,7 @@ struct PRRow: View {
     private var isMine: Bool { model.isMine(pr) }
     private var alias: String? { model.prefs.alias(for: pr.id) }
     private var expanded: Bool { model.expandedID == pr.id }
+    private var isQueueRow: Bool { pr.id.hasPrefix("queue:") }
     private var selected: Bool { model.selectedID == pr.id }
     private static let motion = Animation.snappy(duration: 0.2, extraBounce: 0)
 
@@ -478,6 +495,15 @@ struct PRRow: View {
                 Image(systemName: "arrow.turn.down.right")
                     .font(.caption2).foregroundStyle(.tertiary)
                     .padding(.leading, CGFloat(depth - 1) * 14)
+            }
+            if let q = pr.mergeQueue, isQueueRow {
+                // Position is the point of this list, so it reads as a number in the gutter
+                // rather than another badge. Red when this entry is what everything else waits on.
+                Text("\(q.position)")
+                    .font(.caption2.weight(.semibold)).monospacedDigit()
+                    .foregroundStyle(q.isBlocked ? AnyShapeStyle(stateColor(.failure)) : AnyShapeStyle(.tertiary))
+                    .frame(width: 16, alignment: .trailing)
+                    .help(q.isBlocked ? "Blocked: everything behind it waits" : "Position \(q.position) in the queue")
             }
             if pr.status == .merged {
                 // Landed. The branch badge says how the base branch is doing now.
@@ -519,14 +545,15 @@ struct PRRow: View {
                         tag(label, symbol: pr.mergeState.isBlocking ? "exclamationmark.triangle.fill" : nil,
                             tint: pr.mergeState.isBlocking ? stateColor(.failure) : .secondary)
                     }
-                    if pr.status == .open, !pr.isDraft, let symbol = pr.review.symbol {
+                    // A queued PR is approved by definition, so the seal would say nothing here.
+                    if pr.status == .open, !pr.isDraft, !isQueueRow, let symbol = pr.review.symbol {
                         Image(systemName: symbol)
                             .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(pr.review == .changesRequested ? stateColor(.failure)
                                              : pr.review == .approved ? stateColor(.success) : Color.secondary)
                             .help(pr.review.label)
                     }
-                    if let q = pr.mergeQueue {
+                    if let q = pr.mergeQueue, !isQueueRow {
                         tag("Queue \(q.position)",
                             symbol: q.isBlocked ? "exclamationmark.triangle.fill" : "line.3.horizontal",
                             tint: q.isBlocked ? stateColor(.failure) : .secondary)

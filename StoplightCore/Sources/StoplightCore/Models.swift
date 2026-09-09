@@ -254,10 +254,10 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
 
     /// The same PR as a queue row (US-041). A distinct id keeps selection, expansion, pins and
     /// aliases independent from the copy sitting in My PRs, which is the same PR twice on screen.
-    public func asQueueRow(position: Int? = nil, state: String? = nil) -> PullRequest {
+    public func asQueueRow(position: Int? = nil, state: String? = nil, checks: [CheckResult]? = nil) -> PullRequest {
         let entry = position.map { MergeQueueInfo(position: $0, state: state ?? "QUEUED") } ?? mergeQueue
         return PullRequest(id: "queue:\(id)", repo: repo, number: number, title: title, url: url, isDraft: isDraft,
-                           updatedAt: updatedAt, headSha: headSha, checks: checks, author: author, status: status,
+                           updatedAt: updatedAt, headSha: headSha, checks: checks ?? self.checks, author: author, status: status,
                            summary: summary, headRefName: headRefName, baseRefName: baseRefName, mergeQueue: entry,
                            mergeState: mergeState, mergedAt: mergedAt, note: note, baseState: baseState,
                            review: review)

@@ -114,11 +114,17 @@ public struct GitHubProvider: CIProvider {
         let fields = refs.enumerated().compactMap { i, r -> String? in
             let parts = r.repo.split(separator: "/", maxSplits: 1).map(String.init)
             guard parts.count == 2, Filters.isValidRepo(r.repo), Filters.isValidBranch(r.branch) else { return nil }
-            return "m\(i): repository(owner: \"\(parts[0])\", name: \"\(parts[1])\") { mergeQueue(branch: \"\(r.branch)\") { entries(first: \(min(max(limit, 1), 50))) { nodes { position state pullRequest { ...PRFields } } } } }"
+            return "m\(i): repository(owner: \"\(parts[0])\", name: \"\(parts[1])\") { mergeQueue(branch: \"\(r.branch)\") { entries(first: \(min(max(limit, 1), 50))) { nodes { position state headCommit { ...CommitChecks } pullRequest { ...PRFields } } } } }"
         }
         guard !fields.isEmpty else { return [:] }
         let data = try await post(["query": "query {\n" + fields.joined(separator: "\n") + "\n}\n" + Self.prFields])
-        struct Entry: Decodable { let position: Int?; let state: String?; let pullRequest: Node? }
+        struct Entry: Decodable {
+            let position: Int?
+            let state: String?
+            /// The merge group's commit: what CI is actually running while the PR sits in the queue.
+            let headCommit: Node.Commit?
+            let pullRequest: Node?
+        }
         struct Entries: Decodable { let nodes: [Entry] }
         struct Queue: Decodable { let entries: Entries? }
         struct Repo: Decodable { let mergeQueue: Queue? }
@@ -131,7 +137,11 @@ public struct GitHubProvider: CIProvider {
             // thinner (a blocked entry reports no position), so the entry wins.
             out[r.key] = nodes.compactMap { entry -> PullRequest? in
                 guard let node = entry.pullRequest, let pr = Self.map(node) else { return nil }
-                return pr.asQueueRow(position: entry.position, state: entry.state)
+                // The PR's own checks passed before it was enqueued; the queue is testing something
+                // else. Show the merge group's checks when GitHub has started them.
+                let merging = Self.checks(of: entry.headCommit?.statusCheckRollup)
+                return pr.asQueueRow(position: entry.position, state: entry.state,
+                                     checks: merging.isEmpty ? nil : merging)
             }.sorted { ($0.mergeQueue?.position ?? .max) < ($1.mergeQueue?.position ?? .max) }
         }
         return out

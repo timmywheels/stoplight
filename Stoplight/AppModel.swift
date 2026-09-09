@@ -78,6 +78,8 @@ final class AppModel {
         let prs: [PullRequest]
         /// The followed source this section came from; nil for Pinned / Mine / Watching.
         var query: PRQuery? = nil
+        /// Where the section itself lives on GitHub. Queue sections link to their queue.
+        var url: URL? = nil
 
         /// Rows drop whatever the header already says (US-005: no duplicated data).
         var hidesAuthor: Bool { if case .author = query { return true }; return false }
@@ -512,7 +514,9 @@ final class AppModel {
     /// PRs under thirty of someone else's. Rows stay in queue order, which is the whole point.
     var queueSections: [Section] {
         queues.map { q in
-            Section(id: Self.queueSectionID(q.ref), title: q.ref.branch.uppercased(), prs: q.prs.filter(matchesSearch))
+            Section(id: Self.queueSectionID(q.ref), title: q.ref.branch.uppercased(),
+                    prs: q.prs.filter(matchesSearch),
+                    url: URL(string: "https://github.com/\(q.ref.repo)/queue/\(q.ref.branch)"))
         }
         .filter { !$0.prs.isEmpty }
     }
