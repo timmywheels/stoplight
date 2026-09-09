@@ -174,7 +174,8 @@ final class AppModel {
             if prefs.collapsedSections.isSuperset(of: ids) { prefs.collapsedSections = [] } else { prefs.collapsedSections = Set(ids) }
         case .showHotkeys: showHotkeys.toggle()
         case .search: isSearching = true
-        case .toggleGlobal, .close, .refresh, .watch, .settings: return false
+        case .watch: isWatching = true
+        case .toggleGlobal, .close, .refresh, .settings: return false
         }
         return true
     }
@@ -182,6 +183,8 @@ final class AppModel {
     /// Text filter (US-032), GitHub-style: bare words, author:, repo:, branch:, is:, #n. Session-only.
     var searchText = ""
     var isSearching = false
+    /// The "watch a PR by URL" field. Opened by ⌘N or the dots' right-click menu (US-040).
+    var isWatching = false
     private var searchQuery: SearchQuery { SearchQuery(searchText) }
     var searchContext: SearchQuery.Context {
         let names = displayNames, labels = prefs.sources.userLabels, aliases = prefs.sources.prAliases

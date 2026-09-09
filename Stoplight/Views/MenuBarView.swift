@@ -6,7 +6,6 @@ import StoplightCore
 struct MenuBarView: View {
     @Bindable var model: AppModel
     @Environment(\.openSettings) private var openSettings
-    @State private var showWatchField = false
     @FocusState private var watchFieldFocused: Bool
 
     /// Tour shows once the panel has something real to point at.
@@ -34,11 +33,6 @@ struct MenuBarView: View {
                         .frame(width: 22, height: 22).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain).help("Search (⌘L)")
-                Button { withAnimation(.snappy(duration: 0.2, extraBounce: 0)) { model.showHotkeys.toggle() } } label: {
-                    Image(systemName: "keyboard").foregroundStyle(.secondary)
-                        .frame(width: 22, height: 22).contentShape(Rectangle())
-                }
-                .buttonStyle(.plain).help("Keyboard shortcuts (⌘/)")
 
                 Capsule().fill(.quaternary).frame(width: 36, height: 4)
                     .frame(maxWidth: .infinity, minHeight: 22)
@@ -82,16 +76,16 @@ struct MenuBarView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             VStack(spacing: 0) {
-                if showWatchField {
+                if model.isWatching {
                     Divider()
-                    WatchField(model: model, isPresented: $showWatchField, focused: $watchFieldFocused)
+                    WatchField(model: model, focused: $watchFieldFocused)
                 }
                 Divider()
                 footer
             }
             .background(GeometryReader { g in Color.clear.onChange(of: g.size.height, initial: true) { _, h in if abs(footerHeight - h) > 0.5 { footerHeight = h; report() } } })
         }
-        .onChange(of: model.panelVisible) { _, visible in if !visible { showWatchField = false; model.isSearching = false; model.searchText = "" } }
+        .onChange(of: model.panelVisible) { _, visible in if !visible { model.isWatching = false; model.isSearching = false; model.searchText = "" } }
     }
 
     @ViewBuilder
@@ -240,15 +234,11 @@ struct MenuBarView: View {
                 .disabled(model.updater.state == .downloading || model.updater.state == .installing)
                 .help("Download, verify, and relaunch")
             }
-            Button {
-                showWatchField.toggle()
-                if showWatchField { watchFieldFocused = true }
-            } label: { Image(systemName: showWatchField ? "minus" : "plus").frame(width: 22, height: 22) }
-                .keyboardShortcut("n").help("Watch a PR by URL (⌘N)")
-                .disabled(model.auth == .signedOut || model.auth == .unknown)
-            Button { Task { await model.refresh() } } label: { Image(systemName: "arrow.clockwise").frame(width: 22, height: 22) }
-                .keyboardShortcut("r").help("Refresh (⌘R)")
-                .disabled(model.isRefreshing)
+            // ⌘N and ⌘R still work; their buttons live in the dots' right-click menu now.
+            Button("Watch a PR") { model.isWatching = true }
+                .keyboardShortcut("n").hidden().frame(width: 0, height: 0)
+            Button("Refresh") { Task { await model.refresh() } }
+                .keyboardShortcut("r").hidden().frame(width: 0, height: 0)
             Button { showSettings() } label: { Image(systemName: "gearshape").frame(width: 22, height: 22) }
                 .keyboardShortcut(",").help("Settings (⌘,)")
             // ⌘Q still quits while the popover is open; the visible Quit button lives in Settings.
@@ -305,7 +295,6 @@ struct SearchField: View {
 /// US-011: paste a PR URL, press Return.
 struct WatchField: View {
     @Bindable var model: AppModel
-    @Binding var isPresented: Bool
     var focused: FocusState<Bool>.Binding
     @State private var text = ""
     @State private var error: String?
@@ -318,7 +307,7 @@ struct WatchField: View {
                     .textFieldStyle(.plain)
                     .focused(focused)
                     .onSubmit(submit)
-                    .onExitCommand { isPresented = false }
+                    .onExitCommand { model.isWatching = false }
             }
             if let error {
                 Text(error).font(.caption).foregroundStyle(.red).padding(.leading, 24)
@@ -330,7 +319,7 @@ struct WatchField: View {
     private func submit() {
         switch model.watch(urlString: text) {
         case .added:
-            text = ""; error = nil; isPresented = false
+            text = ""; error = nil; model.isWatching = false
         case .alreadyWatched:
             error = "Already watching that PR"
         case .invalid:

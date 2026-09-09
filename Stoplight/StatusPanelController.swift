@@ -118,6 +118,8 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
         close(reason: "right-click menu")
         let menu = NSMenu()
         menu.addItem(withTitle: "Show Tour", action: #selector(showTour), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Refresh Now", action: #selector(refreshNow), keyEquivalent: "r").target = self
+        menu.addItem(withTitle: "Watch a PR by URL…", action: #selector(watchPR), keyEquivalent: "n").target = self
         let hk = menu.addItem(withTitle: "Keyboard Shortcuts", action: #selector(showHotkeys), keyEquivalent: "/")
         hk.target = self
         menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",").target = self
@@ -161,6 +163,15 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
             panel.setContentSize(Self.defaultSize)
             position(panel)
         }
+        open()
+    }
+
+    @objc private func refreshNow() {
+        Task { await model.refresh() }
+    }
+
+    @objc private func watchPR() {
+        model.isWatching = true
         open()
     }
 
