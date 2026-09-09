@@ -130,6 +130,37 @@ public struct MergeQueueInfo: Codable, Sendable, Hashable {
     public var isBlocked: Bool { state == "UNMERGEABLE" }
 }
 
+/// Where a PR stands with its reviewers (US-042).
+public enum ReviewDecision: String, Codable, Sendable {
+    case approved, changesRequested, reviewRequired, none
+
+    public init(github: String?) {
+        switch github {
+        case "APPROVED": self = .approved
+        case "CHANGES_REQUESTED": self = .changesRequested
+        case "REVIEW_REQUIRED": self = .reviewRequired
+        default: self = .none
+        }
+    }
+    /// The glyph that carries it. No word needed on the row.
+    public var symbol: String? {
+        switch self {
+        case .approved: "checkmark.seal.fill"
+        case .changesRequested: "exclamationmark.bubble.fill"
+        case .reviewRequired: "person.crop.circle.dashed"
+        case .none: nil
+        }
+    }
+    public var label: String {
+        switch self {
+        case .approved: "Approved"
+        case .changesRequested: "Changes requested"
+        case .reviewRequired: "Review required"
+        case .none: "No review yet"
+        }
+    }
+}
+
 public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
     public let id: String
     /// "owner/repo"
@@ -156,13 +187,16 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
     public let note: String?
     /// For merged PRs: the current CI state of the base branch (US-028). Drives the branch badge.
     public let baseState: CIState?
+    /// Where the PR stands with reviewers (US-042).
+    public let review: ReviewDecision
 
     public init(id: String, repo: String, number: Int, title: String, url: URL,
                 isDraft: Bool, updatedAt: Date, headSha: String, checks: [CheckResult],
                 author: String = "", status: PRStatus = .open, summary: String = "",
                 headRefName: String = "", baseRefName: String = "", mergeQueue: MergeQueueInfo? = nil,
                 mergeState: MergeState = .unknown,
-                mergedAt: Date? = nil, note: String? = nil, baseState: CIState? = nil) {
+                mergedAt: Date? = nil, note: String? = nil, baseState: CIState? = nil,
+                review: ReviewDecision = .none) {
         self.id = id
         self.repo = repo
         self.number = number
@@ -182,6 +216,7 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
         self.mergedAt = mergedAt
         self.note = note
         self.baseState = baseState
+        self.review = review
     }
 
     // Tolerant decoding so an older prs.json still loads (author/status added in US-011).
@@ -202,6 +237,7 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
         headRefName = try c.decodeIfPresent(String.self, forKey: .headRefName) ?? ""
         baseRefName = try c.decodeIfPresent(String.self, forKey: .baseRefName) ?? ""
         mergeQueue = try c.decodeIfPresent(MergeQueueInfo.self, forKey: .mergeQueue)
+        review = try c.decodeIfPresent(ReviewDecision.self, forKey: .review) ?? .none
         mergeState = try c.decodeIfPresent(MergeState.self, forKey: .mergeState) ?? .unknown
         mergedAt = try c.decodeIfPresent(Date.self, forKey: .mergedAt)
         note = try c.decodeIfPresent(String.self, forKey: .note)
@@ -213,16 +249,18 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
         PullRequest(id: id, repo: repo, number: number, title: title, url: url, isDraft: isDraft, updatedAt: updatedAt,
                     headSha: headSha, checks: checks, author: author, status: status, summary: summary,
                     headRefName: headRefName, baseRefName: baseRefName, mergeQueue: mergeQueue, mergeState: mergeState,
-                    mergedAt: mergedAt, note: note, baseState: state)
+                    mergedAt: mergedAt, note: note, baseState: state, review: review)
     }
 
     /// The same PR as a queue row (US-041). A distinct id keeps selection, expansion, pins and
     /// aliases independent from the copy sitting in My PRs, which is the same PR twice on screen.
-    public func asQueueRow() -> PullRequest {
-        PullRequest(id: "queue:\(id)", repo: repo, number: number, title: title, url: url, isDraft: isDraft,
-                    updatedAt: updatedAt, headSha: headSha, checks: checks, author: author, status: status,
-                    summary: summary, headRefName: headRefName, baseRefName: baseRefName, mergeQueue: mergeQueue,
-                    mergeState: mergeState, mergedAt: mergedAt, note: note, baseState: baseState)
+    public func asQueueRow(position: Int? = nil, state: String? = nil) -> PullRequest {
+        let entry = position.map { MergeQueueInfo(position: $0, state: state ?? "QUEUED") } ?? mergeQueue
+        return PullRequest(id: "queue:\(id)", repo: repo, number: number, title: title, url: url, isDraft: isDraft,
+                           updatedAt: updatedAt, headSha: headSha, checks: checks, author: author, status: status,
+                           summary: summary, headRefName: headRefName, baseRefName: baseRefName, mergeQueue: entry,
+                           mergeState: mergeState, mergedAt: mergedAt, note: note, baseState: baseState,
+                           review: review)
     }
 
     /// A merged PR is a live problem only when its own merge commit is red AND the base branch is still red.

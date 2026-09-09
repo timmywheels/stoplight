@@ -8,6 +8,10 @@ public struct StackRow: Identifiable, Sendable, Equatable {
     public let stackID: String?
     public var id: String { pr.id }
     public var isStacked: Bool { stackID != nil }
+
+    public init(pr: PullRequest, depth: Int, stackID: String?) {
+        self.pr = pr; self.depth = depth; self.stackID = stackID
+    }
 }
 
 public enum Stacks {

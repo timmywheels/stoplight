@@ -63,3 +63,36 @@ final class StacksTests: XCTestCase {
         XCTAssertEqual(Transitions.events(previous: [queued], current: [base], mode: .off), [])
     }
 }
+
+// MARK: - Review decisions (US-042)
+
+final class ReviewTransitionTests: XCTestCase {
+    private func pr(_ review: ReviewDecision, sha: String = "s1") -> PullRequest {
+        PullRequest(id: "p1", repo: "o/r", number: 1, title: "T", url: URL(string: "https://github.com/o/r/pull/1")!,
+                    isDraft: false, updatedAt: .now, headSha: sha, checks: [], status: .open, review: review)
+    }
+
+    func testApprovalFiresOnlyInAllMode() {
+        let before = [pr(.reviewRequired)], after = [pr(.approved)]
+        XCTAssertEqual(Transitions.events(previous: before, current: after, mode: .all).map(\.kind), [.approved])
+        XCTAssertEqual(Transitions.events(previous: before, current: after, mode: .failOnly), [])
+    }
+
+    func testChangesRequestedFiresInBothModes() {
+        let before = [pr(.approved)], after = [pr(.changesRequested)]
+        XCTAssertEqual(Transitions.events(previous: before, current: after, mode: .all).map(\.kind), [.changesRequested])
+        XCTAssertEqual(Transitions.events(previous: before, current: after, mode: .failOnly).map(\.kind), [.changesRequested])
+    }
+
+    func testNoEventWhenTheDecisionHoldsStill() {
+        XCTAssertEqual(Transitions.events(previous: [pr(.approved)], current: [pr(.approved)], mode: .all), [])
+    }
+
+    func testGitHubStringsMap() {
+        XCTAssertEqual(ReviewDecision(github: "APPROVED"), .approved)
+        XCTAssertEqual(ReviewDecision(github: "CHANGES_REQUESTED"), .changesRequested)
+        XCTAssertEqual(ReviewDecision(github: "REVIEW_REQUIRED"), .reviewRequired)
+        XCTAssertEqual(ReviewDecision(github: nil), .none)
+        XCTAssertNil(ReviewDecision.none.symbol)
+    }
+}

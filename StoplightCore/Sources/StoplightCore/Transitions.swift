@@ -8,7 +8,7 @@ public enum NotificationMode: String, Codable, Sendable {
 
 /// Something worth telling the user about (US-006).
 public struct CIEvent: Equatable, Sendable, Identifiable {
-    public enum Kind: String, Sendable { case failed, passed, dequeued, deployFailed, deployed, branchMoved, agentAttention, agentDone }
+    public enum Kind: String, Sendable { case failed, passed, dequeued, deployFailed, deployed, branchMoved, agentAttention, agentDone, approved, changesRequested }
 
     public let pr: PullRequest
     public let kind: Kind
@@ -38,6 +38,10 @@ public struct CIEvent: Equatable, Sendable, Identifiable {
             return "\(pr.title)\nAll checks passed"
         case .dequeued:
             return "\(pr.title)\nRemoved from the merge queue"
+        case .approved:
+            return "\(pr.title)\nApproved"
+        case .changesRequested:
+            return "\(pr.title)\nChanges requested"
         case .deployFailed:
             if let first = pr.failingChecks.first { return "\(pr.title)\n\(first.name) failed after merge" }
             return "\(pr.title)\nChecks failed after merge"
@@ -78,6 +82,11 @@ public enum Transitions {
             // Unknown before now (first launch, newly opened, newly watched): nothing to compare against.
             guard let prev = prevByID[pr.id] else { continue }
 
+            // Review moved (US-042). Approval only in .all; changes requested is bad news, so both modes.
+            if prev.review != pr.review {
+                if pr.review == .changesRequested { out.append(CIEvent(pr: pr, kind: .changesRequested)) }
+                if pr.review == .approved, mode == .all { out.append(CIEvent(pr: pr, kind: .approved)) }
+            }
             // Merge queue kicked it out (US-016). Fires in both non-off modes; it's a failure in spirit.
             if prev.mergeQueue != nil, pr.mergeQueue == nil {
                 out.append(CIEvent(pr: pr, kind: .dequeued))

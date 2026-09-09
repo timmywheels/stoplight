@@ -272,11 +272,15 @@ enum AgentLauncher {
     static var sessionDir: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".stoplight/sessions")
     }
-    /// PR ids contain "/" and "#" for branch rows, so flatten to a filename-safe key.
-    static func sessionKey(_ prID: String) -> String {
-        String(prID.map { $0.isLetter || $0.isNumber ? $0 : "-" })
+    /// PR ids contain "/" and "#" for branch rows, so flatten to a filename-safe key. Fixing and
+    /// reviewing are separate jobs in separate windows, so the job is part of the key: otherwise
+    /// ⇧⌘F just focuses the window ⌘F already opened.
+    static func sessionKey(_ prID: String, job: Job = .fix) -> String {
+        String(prID.map { $0.isLetter || $0.isNumber ? $0 : "-" }) + (job == .review ? "-review" : "")
     }
-    static func sessionTitle(_ pr: PullRequest) -> String { "Stoplight · \(pr.shortRef)" }
+    static func sessionTitle(_ pr: PullRequest, job: Job = .fix) -> String {
+        "Stoplight · \(pr.shortRef)\(job == .review ? " · review" : "")"
+    }
 
     /// Liveness is the PID, not the file: a window that dies without running its trap still reads as gone.
     /// Dead files are deleted here so the directory stays clean and PIDs can't be mistaken after reuse.
@@ -290,8 +294,8 @@ enum AgentLauncher {
     }
 
     /// The session for this PR, or nil when there isn't one running.
-    static func session(for prID: String) -> Session? {
-        let key = sessionKey(prID)
+    static func session(for prID: String, job: Job = .fix) -> Session? {
+        let key = sessionKey(prID, job: job)
         guard isAlive(sessionDir.appendingPathComponent("\(key).pid")),
               let data = try? Data(contentsOf: sessionDir.appendingPathComponent("\(key).json")),
               let s = try? JSONDecoder().decode(Session.self, from: data) else { return nil }
@@ -387,7 +391,7 @@ enum AgentLauncher {
     @discardableResult
     static func fix(_ pr: PullRequest, config: Config, runAgent: Bool, task: Job = .fix) async throws -> Bool {
         // Idempotent: one terminal per PR. A second click goes to the window that's already open.
-        if let existing = session(for: pr.id) {
+        if let existing = session(for: pr.id, job: task) {
             await focus(existing)
             log.notice("reused session for \(pr.shortRef, privacy: .public)")
             return true
@@ -404,8 +408,8 @@ enum AgentLauncher {
             }
             command += " && " + config.agent.command(prompt: shq(p), custom: config.customCommand, args: config.args(for: task))
         }
-        let key = sessionKey(pr.id)
-        let title = sessionTitle(pr)
+        let key = sessionKey(pr.id, job: task)
+        let title = sessionTitle(pr, job: task)
         try? FileManager.default.createDirectory(at: sessionDir, withIntermediateDirectories: true)
         let meta = Session(worktree: path, terminal: config.terminal.rawValue, title: title, startedAt: .now)
         try? JSONEncoder().encode(meta).write(to: sessionDir.appendingPathComponent("\(key).json"))
@@ -506,12 +510,24 @@ enum AgentLauncher {
             var env = ProcessInfo.processInfo.environment
             env["PATH"] = extraPath + ":" + (env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin")
             env["TERM"] = "dumb"   // keep prompt frameworks quiet in a non-tty shell
-            let out = Pipe(); p.standardOutput = out; p.standardError = out
+            // Separate pipes: an interactive login shell complains about zle and job control in a
+            // non-tty ("can't change option: zle"), and that noise is not this command's output.
+            let out = Pipe(), err = Pipe()
+            p.standardOutput = out
+            p.standardError = err
             try p.run()
             let data = out.fileHandleForReading.readDataToEndOfFile()
+            let errData = err.fileHandleForReading.readDataToEndOfFile()
             p.waitUntilExit()
             let text = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-            guard p.terminationStatus == 0 else { throw ShellError(output: text) }
+            guard p.terminationStatus == 0 else {
+                let noise = String(decoding: errData, as: UTF8.self)
+                    .split(separator: "\n")
+                    .filter { !$0.contains("can't change option") && !$0.contains("no job control") }
+                    .joined(separator: "\n")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                throw ShellError(output: text.isEmpty ? noise : text)
+            }
             return text
         }.value
     }

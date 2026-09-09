@@ -54,6 +54,15 @@ struct MenuBarView: View {
                     SearchField(model: model)
                     Divider()
                 }
+                if model.hasQueues {
+                    Picker("", selection: $model.tab) {
+                        Label("PRs", systemImage: "checklist").tag(AppModel.Tab.prs)
+                        Label("Queue", systemImage: "line.3.horizontal").tag(AppModel.Tab.queue)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .padding(.horizontal, 8).padding(.bottom, 6)
+                }
             }
             .background(GeometryReader { g in Color.clear.onChange(of: g.size.height, initial: true) { _, h in if abs(midHeight - h) > 0.5 { midHeight = h; report() } } })
             ZStack {
@@ -104,7 +113,7 @@ struct MenuBarView: View {
                 // The panel has a user-chosen size; the list fills it and scrolls. Headers carry 8pt of their own; 4 more makes 12, matching the sides.
                 ScrollViewReader { proxy in
                     ScrollView {
-                        list
+                        (model.tab == .queue && model.hasQueues ? AnyView(queueList) : AnyView(list))
                             .background(GeometryReader { g in
                                 Color.clear.onChange(of: g.size.height, initial: true) { _, h in if abs(model.contentHeight - h) > 0.5 { model.contentHeight = h } }
                             })
@@ -125,6 +134,15 @@ struct MenuBarView: View {
         model.sections.reduce(0) { $0 + (model.isCollapsed($1.id) ? 0 : $1.prs.count) }
     }
 
+    /// The Queue tab: one section per queue, rows in position order.
+    private var queueList: some View {
+        VStack(spacing: 0) {
+            ForEach(model.queueSections) { s in
+                section(s, showHeader: true, stacked: false)
+            }
+        }
+    }
+
     private var list: some View {
         let sections = model.sections
         // With only "My PRs" there's nothing to distinguish, so no header at all (looks like v1).
@@ -137,7 +155,7 @@ struct MenuBarView: View {
     }
 
     @ViewBuilder
-    private func section(_ sec: AppModel.Section, showHeader: Bool) -> some View {
+    private func section(_ sec: AppModel.Section, showHeader: Bool, stacked: Bool = true) -> some View {
         if !sec.prs.isEmpty {
             let collapsed = showHeader && model.isCollapsed(sec.id)
             if showHeader {
@@ -153,7 +171,9 @@ struct MenuBarView: View {
                               })
             }
             if !collapsed {
-                let rows = Stacks.layout(sec.prs)
+                // Queue sections keep GitHub's order: position is the information. Stacks.layout
+                // regroups by state and recency, which would scramble exactly that.
+                let rows = stacked ? Stacks.layout(sec.prs) : sec.prs.map { StackRow(pr: $0, depth: 0, stackID: nil) }
                 ForEach(rows) { row in
                     PRRow(pr: row.pr, model: model, section: sec, depth: row.depth,
                           stack: row.stackID.map { Stacks.members(of: $0, in: rows) })
@@ -499,10 +519,19 @@ struct PRRow: View {
                         tag(label, symbol: pr.mergeState.isBlocking ? "exclamationmark.triangle.fill" : nil,
                             tint: pr.mergeState.isBlocking ? stateColor(.failure) : .secondary)
                     }
+                    if pr.status == .open, !pr.isDraft, let symbol = pr.review.symbol {
+                        Image(systemName: symbol)
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(pr.review == .changesRequested ? stateColor(.failure)
+                                             : pr.review == .approved ? stateColor(.success) : Color.secondary)
+                            .help(pr.review.label)
+                    }
                     if let q = pr.mergeQueue {
-                        tag(q.isBlocked ? "Queue: blocked" : "Queue #\(q.position)",
+                        tag("Queue \(q.position)",
                             symbol: q.isBlocked ? "exclamationmark.triangle.fill" : "line.3.horizontal",
                             tint: q.isBlocked ? stateColor(.failure) : .secondary)
+                        .help(q.isBlocked ? "Blocked: this one can't merge, and everything behind it waits"
+                                          : "Position \(q.position) in the merge queue")
                     }
                     if depth == 0, stack == nil, pr.hasNonTrunkBase {
                         // Based on a branch we can't see: part of a stack whose bottom isn't in view.

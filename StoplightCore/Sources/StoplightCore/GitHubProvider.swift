@@ -114,11 +114,11 @@ public struct GitHubProvider: CIProvider {
         let fields = refs.enumerated().compactMap { i, r -> String? in
             let parts = r.repo.split(separator: "/", maxSplits: 1).map(String.init)
             guard parts.count == 2, Filters.isValidRepo(r.repo), Filters.isValidBranch(r.branch) else { return nil }
-            return "m\(i): repository(owner: \"\(parts[0])\", name: \"\(parts[1])\") { mergeQueue(branch: \"\(r.branch)\") { entries(first: \(min(max(limit, 1), 50))) { nodes { pullRequest { ...PRFields } } } } }"
+            return "m\(i): repository(owner: \"\(parts[0])\", name: \"\(parts[1])\") { mergeQueue(branch: \"\(r.branch)\") { entries(first: \(min(max(limit, 1), 50))) { nodes { position state pullRequest { ...PRFields } } } } }"
         }
         guard !fields.isEmpty else { return [:] }
         let data = try await post(["query": "query {\n" + fields.joined(separator: "\n") + "\n}\n" + Self.prFields])
-        struct Entry: Decodable { let pullRequest: Node? }
+        struct Entry: Decodable { let position: Int?; let state: String?; let pullRequest: Node? }
         struct Entries: Decodable { let nodes: [Entry] }
         struct Queue: Decodable { let entries: Entries? }
         struct Repo: Decodable { let mergeQueue: Queue? }
@@ -127,7 +127,12 @@ public struct GitHubProvider: CIProvider {
         var out: [String: [PullRequest]] = [:]
         for (i, r) in refs.enumerated() {
             guard let nodes = repos["m\(i)"]??.mergeQueue?.entries?.nodes else { continue }
-            out[r.key] = nodes.compactMap { $0.pullRequest }.compactMap(Self.map)
+            // The entry knows its own position and state; the PR's own mergeQueueEntry can be
+            // thinner (a blocked entry reports no position), so the entry wins.
+            out[r.key] = nodes.compactMap { entry -> PullRequest? in
+                guard let node = entry.pullRequest, let pr = Self.map(node) else { return nil }
+                return pr.asQueueRow(position: entry.position, state: entry.state)
+            }.sorted { ($0.mergeQueue?.position ?? .max) < ($1.mergeQueue?.position ?? .max) }
         }
         return out
     }
@@ -245,6 +250,7 @@ public struct GitHubProvider: CIProvider {
       mergedAt
       mergeQueueEntry { position state }
       mergeStateStatus
+      reviewDecision
       repository { nameWithOwner }
       mergeCommit { ...CommitChecks }
       commits(last: 1) { nodes { commit { ...CommitChecks } } }
@@ -344,6 +350,7 @@ public struct GitHubProvider: CIProvider {
         let baseRefName: String?
         let mergeQueueEntry: MQ?
         let mergeStateStatus: String?
+        let reviewDecision: String?
         let mergedAt: Date?
         let mergeCommit: Commit?
         let repository: Repo?
@@ -371,7 +378,8 @@ public struct GitHubProvider: CIProvider {
             headRefName: n.headRefName ?? "", baseRefName: n.baseRefName ?? "",
             mergeQueue: n.mergeQueueEntry.map { MergeQueueInfo(position: $0.position ?? 0, state: $0.state ?? "QUEUED") },
             mergeState: MergeState(github: n.mergeStateStatus),
-            mergedAt: n.mergedAt
+            mergedAt: n.mergedAt,
+            review: ReviewDecision(github: n.reviewDecision)
         )
     }
 

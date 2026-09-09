@@ -180,6 +180,9 @@ final class AppModel {
         case .showHotkeys: showHotkeys.toggle()
         case .search: isSearching = true
         case .watch: isWatching = true
+        case .toggleTab:
+            guard hasQueues else { return false }
+            tab = tab == .prs ? .queue : .prs
         case .toggleGlobal, .close, .refresh, .settings: return false
         }
         return true
@@ -272,11 +275,6 @@ final class AppModel {
         }
         for f in inbound { out.append(Section(id: f.query.title, title: f.query.title, prs: take(f.prs), query: f.query)) }
         out.append(Section(id: "Branches", title: "Branches", prs: take(branches)))
-        for q in queues {
-            // Queue rows are informational, so they bypass `take`: no claiming, no dot filter.
-            let rows = q.prs.filter(matchesSearch)
-            out.append(Section(id: Self.queueSectionID(q.ref), title: "Queue → \(q.ref.branch)", prs: rows))
-        }
         // Merged rows aren't in `all` unless they have checks, so filter them directly here.
         let mergedFiltered = mergedRows.filter { pr in
             !claimed.contains(pr.id) && (filter.isEmpty || filter.contains(pr.effectiveState)) && matchesSearch(pr)
@@ -290,7 +288,6 @@ final class AppModel {
         applyOrder(["Pinned", "Mine", "Watching"].map { Section(id: $0, title: $0, prs: []) }
                    + followed.map { Section(id: $0.query.title, title: $0.query.title, prs: []) }
                    + inbound.map { Section(id: $0.query.title, title: $0.query.title, prs: []) }
-                   + queues.map { Section(id: Self.queueSectionID($0.ref), title: $0.ref.branch, prs: []) }
                    + [Section(id: "Branches", title: "Branches", prs: []), Section(id: "Merged", title: "Merged", prs: [])]).map(\.id)
     }
 
@@ -511,6 +508,21 @@ final class AppModel {
 
     static func queueSectionID(_ ref: BranchRef) -> String { "Queue \(ref.spec)" }
 
+    /// The Queue tab's sections. Kept out of `sections` so watching a queue doesn't bury your own
+    /// PRs under thirty of someone else's. Rows stay in queue order, which is the whole point.
+    var queueSections: [Section] {
+        queues.map { q in
+            Section(id: Self.queueSectionID(q.ref), title: q.ref.branch.uppercased(), prs: q.prs.filter(matchesSearch))
+        }
+        .filter { !$0.prs.isEmpty }
+    }
+
+    var hasQueues: Bool { !queues.isEmpty }
+
+    /// Which half of the panel is showing. Session-only: the panel always opens on your PRs.
+    enum Tab: Hashable { case prs, queue }
+    var tab: Tab = .prs
+
     /// Which queues to show is derived, not configured: a queue belongs to a base branch, and orgs
     /// queue into rc/*, develop, whatever. Any PR you can already see that is waiting in a queue
     /// names that queue exactly, so there is nothing to type in and nothing to keep in sync.
@@ -522,7 +534,7 @@ final class AppModel {
         guard let found = try? await provider.fetchMergeQueues(refs, limit: prefs.queueItems) else { return }
         queues = refs.sorted { $0.spec < $1.spec }.compactMap { ref in
             guard let prs = found[ref.key], !prs.isEmpty else { return nil }
-            return (ref, prs.map { $0.asQueueRow() })
+            return (ref, prs)
         }
     }
 
@@ -679,10 +691,13 @@ final class AppModel {
     }
     func clearAgentStatus(prID: String) { agentStatus[prID] = nil }
     /// Is there a terminal open for this PR right now?
-    func hasAgentSession(_ pr: PullRequest) -> Bool { AgentLauncher.session(for: pr.id) != nil }
+    func hasAgentSession(_ pr: PullRequest) -> Bool {
+        AgentLauncher.session(for: pr.id, job: .fix) != nil || AgentLauncher.session(for: pr.id, job: .review) != nil
+    }
     /// Jump to the agent's window and stop the badge nagging (US-038).
     func focusAgent(_ pr: PullRequest) {
-        guard let s = AgentLauncher.session(for: pr.id) else { clearAgentStatus(prID: pr.id); return }
+        guard let s = AgentLauncher.session(for: pr.id, job: .fix) ?? AgentLauncher.session(for: pr.id, job: .review)
+        else { clearAgentStatus(prID: pr.id); return }
         if agentStatus[pr.id]?.state != "working" { agentStatus[pr.id] = AgentStatus(state: "working", at: .now) }
         Task { await AgentLauncher.focus(s) }
     }
@@ -690,10 +705,14 @@ final class AppModel {
     /// Badges for windows that are gone shouldn't linger; sessions that outlived a restart should come back.
     func reconcileAgentSessions() {
         let live = AgentLauncher.liveSessionKeys()
-        for (id, st) in agentStatus where st.state == "working" && !live.contains(AgentLauncher.sessionKey(id)) {
+        for (id, st) in agentStatus where st.state == "working"
+            && !live.contains(AgentLauncher.sessionKey(id, job: .fix))
+            && !live.contains(AgentLauncher.sessionKey(id, job: .review)) {
             agentStatus[id] = nil
         }
-        for pr in all + mergedRows where agentStatus[pr.id] == nil && live.contains(AgentLauncher.sessionKey(pr.id)) {
+        for pr in all + mergedRows where agentStatus[pr.id] == nil
+            && (live.contains(AgentLauncher.sessionKey(pr.id, job: .fix))
+                || live.contains(AgentLauncher.sessionKey(pr.id, job: .review))) {
             agentStatus[pr.id] = AgentStatus(state: "working", at: .now)
         }
     }
