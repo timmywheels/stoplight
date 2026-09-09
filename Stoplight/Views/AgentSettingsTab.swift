@@ -25,6 +25,8 @@ struct AgentSettingsTab: View {
                     LabeledContent {
                         TextField("myagent {args} {prompt}", text: $prefs.agentCustomCommand)
                             .font(.system(.body, design: .monospaced))
+                            .textFieldStyle(.roundedBorder)
+                            .frame(maxWidth: .infinity)
                     } label: {
                         InfoLabel("Command", "The exact command to run. {prompt} is replaced by the filled-in template, {args} by the extra arguments below.")
                     }
@@ -44,6 +46,8 @@ struct AgentSettingsTab: View {
                 LabeledContent {
                     TextField("--model opus", text: $prefs.agentExtraArgs)
                         .font(.system(.body, design: .monospaced))
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: .infinity)
                 } label: {
                     InfoLabel("Extra arguments", "Appended to every agent command, for flags like a model choice or a config path.")
                 }
@@ -95,7 +99,9 @@ struct AgentSettingsTab: View {
             Section {
                 LabeledContent {
                     HStack {
-                        TextField("~/dev", text: $prefs.scanRoot).textFieldStyle(.roundedBorder)
+                        TextField("~/dev", text: $prefs.scanRoot)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(maxWidth: .infinity)
                         Button(scanning ? "Scanning…" : "Scan") { scan() }.disabled(scanning)
                     }
                 } label: {
