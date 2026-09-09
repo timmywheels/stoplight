@@ -30,27 +30,42 @@ struct MenuBarView: View {
             Capsule().fill(.quaternary).frame(width: 36, height: 4)
                 .frame(maxWidth: .infinity, minHeight: 22)
                 .overlay(DragHandle())
-                // Pin left, collapse right: the handle sits centered between them.
+                // Finding things on the left, shaping the panel on the right, handle centered between them.
                 .overlay(alignment: .leading) {
-                    Button { model.pinnedPanel.toggle() } label: {
-                        Image(systemName: model.pinnedPanel ? "pin.fill" : "pin")
-                            .foregroundStyle(model.pinnedPanel ? Color.accentColor : .secondary)
-                            .frame(width: 22, height: 22).contentShape(Rectangle())
+                    HStack(spacing: 4) {
+                        Button { model.isSearching.toggle(); if !model.isSearching { model.searchText = "" } } label: {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundStyle(model.isSearching || !model.searchText.isEmpty ? Color.accentColor : .secondary)
+                                .frame(width: 22, height: 22).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain).help("Search (⌘L)")
+                        Button { withAnimation(.snappy(duration: 0.2, extraBounce: 0)) { model.showHotkeys.toggle() } } label: {
+                            Image(systemName: "keyboard").foregroundStyle(.secondary)
+                                .frame(width: 22, height: 22).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain).help("Keyboard shortcuts (⌘/)")
                     }
-                    .buttonStyle(.plain)
                     .padding(.leading, 6)
-                    .help(model.pinnedPanel ? "Unpin: close on click outside again" : "Pin: stay open above other windows")
                 }
                 .overlay(alignment: .trailing) {
-                    let allCollapsed = !model.sections.isEmpty && model.sections.allSatisfy { model.prefs.collapsedSections.contains($0.id) }
-                    Button { _ = model.handle(.toggleSections) } label: {
-                        Image(systemName: allCollapsed ? "rectangle.expand.vertical" : "rectangle.compress.vertical")
-                            .foregroundStyle(.secondary)
-                            .frame(width: 22, height: 22).contentShape(Rectangle())
+                    HStack(spacing: 4) {
+                        let allCollapsed = !model.sections.isEmpty && model.sections.allSatisfy { model.prefs.collapsedSections.contains($0.id) }
+                        Button { _ = model.handle(.toggleSections) } label: {
+                            Image(systemName: allCollapsed ? "rectangle.expand.vertical" : "rectangle.compress.vertical")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 22, height: 22).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help(allCollapsed ? "Expand all sections (⇧⌘E)" : "Collapse all sections (⇧⌘E)")
+                        Button { model.pinnedPanel.toggle() } label: {
+                            Image(systemName: model.pinnedPanel ? "pin.fill" : "pin")
+                                .foregroundStyle(model.pinnedPanel ? Color.accentColor : .secondary)
+                                .frame(width: 22, height: 22).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help(model.pinnedPanel ? "Unpin: close on click outside again" : "Pin: stay open above other windows")
                     }
-                    .buttonStyle(.plain)
                     .padding(.trailing, 6)
-                    .help(allCollapsed ? "Expand all sections (⇧⌘E)" : "Collapse all sections (⇧⌘E)")
                 }
                 .padding(.top, 4).padding(.bottom, 4)
                 .help("Drag to move")
@@ -232,11 +247,6 @@ struct MenuBarView: View {
                 .disabled(model.updater.state == .downloading || model.updater.state == .installing)
                 .help("Download, verify, and relaunch")
             }
-            Button { model.isSearching.toggle(); if !model.isSearching { model.searchText = "" } } label: {
-                Image(systemName: "magnifyingglass").frame(width: 22, height: 22)
-                    .foregroundStyle(model.isSearching || !model.searchText.isEmpty ? Color.accentColor : .secondary)
-            }
-            .help("Search (⌘L)")
             Button {
                 showWatchField.toggle()
                 if showWatchField { watchFieldFocused = true }
@@ -246,8 +256,6 @@ struct MenuBarView: View {
             Button { Task { await model.refresh() } } label: { Image(systemName: "arrow.clockwise").frame(width: 22, height: 22) }
                 .keyboardShortcut("r").help("Refresh (⌘R)")
                 .disabled(model.isRefreshing)
-            Button { withAnimation(.snappy(duration: 0.2, extraBounce: 0)) { model.showHotkeys.toggle() } } label: { Image(systemName: "keyboard").frame(width: 22, height: 22) }
-                .help("Keyboard shortcuts (⌘/)")
             Button { showSettings() } label: { Image(systemName: "gearshape").frame(width: 22, height: 22) }
                 .keyboardShortcut(",").help("Settings (⌘,)")
             // ⌘Q still quits while the popover is open; the visible Quit button lives in Settings.
