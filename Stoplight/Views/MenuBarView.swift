@@ -729,6 +729,9 @@ struct PRRow: View {
             case .review: RowButton(symbol: a.symbol, help: "Adversarial review with \(model.agentTitle) (⇧⌘F)", tint: nil) {
                 model.review(pr)
             }
+            case .pairprogram: RowButton(symbol: a.symbol, help: a.title, tint: nil) {
+                PRActions.openInPairProgram(pr)
+            }
             }
         }
     }

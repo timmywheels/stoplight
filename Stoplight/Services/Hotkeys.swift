@@ -149,6 +149,20 @@ final class GlobalHotkey: @unchecked Sendable {
 
 /// Clipboard actions shared by the row buttons, the context menu, and the hotkeys.
 enum PRActions {
+    /// PairProgram (the diff/review app) is installed: offer "Review in PairProgram".
+    static var pairProgramInstalled: Bool {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.timwheeler.pairprogram") != nil
+    }
+
+    /// Open the PR in PairProgram (as a tab; it finds your local clone).
+    static func openInPairProgram(_ pr: PullRequest) {
+        var c = URLComponents()
+        c.scheme = "pairprogram"
+        c.host = "pr"
+        c.queryItems = [URLQueryItem(name: "repo", value: pr.repo), URLQueryItem(name: "number", value: String(pr.number))]
+        if let url = c.url { NSWorkspace.shared.open(url) }
+    }
+
     static func copyURL(_ pr: PullRequest) { copy(pr.url.absoluteString) }
     static func copyBranch(_ pr: PullRequest) { copy(pr.headRefName) }
     /// Full 40-char SHA of the PR's head commit (for branch rows, the commit shown).
