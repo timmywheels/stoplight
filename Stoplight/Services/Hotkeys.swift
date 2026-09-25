@@ -154,6 +154,9 @@ enum PRActions {
         NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.timwheeler.onramp") != nil
     }
 
+    /// Where to get Onramp (Settings → Row buttons links here while it isn't installed).
+    static let onrampDownload = URL(string: "https://github.com/timmywheels/onramp/releases/latest")!
+
     /// Open the PR in Onramp (as a tab; it finds your local clone).
     static func openInOnramp(_ pr: PullRequest) {
         var c = URLComponents()

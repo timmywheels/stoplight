@@ -310,6 +310,17 @@ private struct RowActionsEditor: View {
                     Image(systemName: a.symbol).frame(width: 18).foregroundStyle(on ? .primary : .secondary)
                     Text(a.title).foregroundStyle(on ? .primary : .secondary)
                     Spacer()
+                    if a == .onramp, !PRActions.onrampInstalled {
+                        // The button only shows once Onramp is installed; say where to get it.
+                        Link(destination: PRActions.onrampDownload) {
+                            HStack(spacing: 2) {
+                                Text("Get Onramp")
+                                Image(systemName: "arrow.up.right").imageScale(.small)
+                            }
+                            .font(.caption)
+                        }
+                        .help("Onramp is a Mac app for reviewing a PR's full diff with your agents. Install it and this button appears on PRs.")
+                    }
                     if on { Image(systemName: "line.3.horizontal").foregroundStyle(.quaternary) }
                 }
                 .moveDisabled(!on)
