@@ -563,6 +563,8 @@ struct PRRow: View {
                     if depth == 0, stack == nil, pr.hasNonTrunkBase {
                         // Based on a branch we can't see: part of a stack whose bottom isn't in view.
                         tag("on \(pr.baseRefName)")
+                            .frame(maxWidth: 150, alignment: .leading) // long stack branches shorten in the middle
+                            .help("Stacked on \(pr.baseRefName)")
                     }
                     if pinned { Image(systemName: "pin.fill").font(.caption2).foregroundStyle(.secondary) }
                 }
@@ -826,6 +828,7 @@ struct PRRow: View {
                 Image(systemName: symbol).font(.system(size: 8, weight: .bold)).foregroundStyle(tint)
             }
             Text(text).foregroundStyle(Color.secondary)
+                .lineLimit(1).truncationMode(.middle) // a long branch name shortens; it never wraps into a blob
         }
         .font(.caption2)
         .padding(.horizontal, 5).padding(.vertical, 1.5)
