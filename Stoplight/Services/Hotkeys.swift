@@ -149,15 +149,15 @@ final class GlobalHotkey: @unchecked Sendable {
 
 /// Clipboard actions shared by the row buttons, the context menu, and the hotkeys.
 enum PRActions {
-    /// PairProgram (the diff/review app) is installed: offer "Review in PairProgram".
-    static var pairProgramInstalled: Bool {
-        NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.timwheeler.pairprogram") != nil
+    /// Onramp (the diff/review app) is installed: offer "Review in Onramp".
+    static var onrampInstalled: Bool {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.timwheeler.onramp") != nil
     }
 
-    /// Open the PR in PairProgram (as a tab; it finds your local clone).
-    static func openInPairProgram(_ pr: PullRequest) {
+    /// Open the PR in Onramp (as a tab; it finds your local clone).
+    static func openInOnramp(_ pr: PullRequest) {
         var c = URLComponents()
-        c.scheme = "pairprogram"
+        c.scheme = "onramp"
         c.host = "pr"
         c.queryItems = [URLQueryItem(name: "repo", value: pr.repo), URLQueryItem(name: "number", value: String(pr.number))]
         if let url = c.url { NSWorkspace.shared.open(url) }
