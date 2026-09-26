@@ -740,7 +740,7 @@ struct PRRow: View {
 
     private func circle(_ symbol: String, help: String, tint: Color? = nil, focused: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: symbol)
+            RowAction.symbolImage(symbol)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(tint ?? .secondary)
                 .frame(width: 32, height: 32)

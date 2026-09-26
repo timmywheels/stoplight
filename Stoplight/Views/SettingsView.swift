@@ -307,7 +307,7 @@ private struct RowActionsEditor: View {
                 let on = prefs.rowActions.contains(a)
                 HStack(spacing: 8) {
                     Toggle(isOn: Binding(get: { on }, set: { set(a, enabled: $0) })) { EmptyView() }.labelsHidden()
-                    Image(systemName: a.symbol).frame(width: 18).foregroundStyle(on ? .primary : .secondary)
+                    RowAction.symbolImage(a.symbol).frame(width: 18).foregroundStyle(on ? .primary : .secondary)
                     Text(a.title).foregroundStyle(on ? .primary : .secondary)
                     Spacer()
                     if a == .onramp, !PRActions.onrampInstalled {
