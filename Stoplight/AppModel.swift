@@ -328,10 +328,10 @@ final class AppModel {
         loop = Task { [weak self] in
             await self?.signIn()
             while !Task.isCancelled {
-                await self?.refresh()
-                await self?.updater.checkIfDue()
-                let interval = self?.nextInterval ?? 60
-                try? await Task.sleep(for: .seconds(interval))
+                guard let self else { return }
+                if self.fullRefreshDue { await self.refresh() } else { await self.refreshPending() }
+                await self.updater.checkIfDue()
+                try? await Task.sleep(for: .seconds(self.nextInterval))
             }
         }
     }
@@ -365,15 +365,58 @@ final class AppModel {
         ]
     }
 
-    /// US-003 adaptive polling.
-    private var nextInterval: TimeInterval {
+    /// US-003 polling, easy on GitHub's hourly budget (it's shared with gh and every other tool):
+    /// everything every 5 minutes (or your chosen rate), and again when you open the panel on
+    /// data over 30 s old; while CI runs, only those PRs, once a minute. A full refresh costs
+    /// ~10-15 points; checking a few running PRs ~1-2.
+    private var fullInterval: TimeInterval {
         let chosen = TimeInterval(prefs.refreshRate.rawValue)   // 0 = automatic
-        if lastError != nil { return chosen == 0 ? 15 : min(chosen, 60) }   // a failed fetch retries soon, never "5 minutes because the list looks empty"
-        if let rl = GitHubProvider.lastRateLimit, rl.remaining < 100 { return max(chosen, 300) }
-        if all.contains(where: { $0.state == .pending }) { return chosen == 0 ? 20 : min(chosen, 20) }
-        if chosen > 0 { return chosen }
-        if all.isEmpty { return 300 }
-        return 60
+        if let rl = GitHubProvider.lastRateLimit, rl.remaining < 1000 { return max(chosen, 900) } // running low: back off
+        if lastError != nil { return 60 }   // a failed fetch retries soon, never "5 minutes because the list looks empty"
+        return chosen > 0 ? chosen : 300
+    }
+
+    private var fullRefreshDue: Bool {
+        guard let last = lastRefresh else { return true }
+        return Date.now.timeIntervalSince(last) >= fullInterval - 1
+    }
+
+    private var nextInterval: TimeInterval {
+        let untilFull = max(5, fullInterval - Date.now.timeIntervalSince(lastRefresh ?? .distantPast))
+        let ciRunning = all.contains { $0.state == .pending && $0.ref != nil }
+        return ciRunning ? min(60, untilFull) : untilFull
+    }
+
+    /// The panel opened: show fresh data if what's there is over 30 s old.
+    func refreshIfStale() {
+        guard Date.now.timeIntervalSince(lastRefresh ?? .distantPast) > 30 else { return }
+        Task { await refresh() }
+    }
+
+    /// Between full refreshes: re-fetch only PRs whose CI is still running (one small request),
+    /// so a check going green or red still shows up within a minute.
+    func refreshPending() async {
+        guard let provider, !isRefreshing else { return }
+        let refs = all.filter { $0.state == .pending }.compactMap(\.ref)
+        guard !refs.isEmpty else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
+        do {
+            let fresh = try await provider.fetchPullRequests(refs: Array(Set(refs)))
+            let byID = Dictionary(fresh.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            func swap(_ list: [PullRequest]) -> [PullRequest] { list.map { byID[$0.id] ?? $0 } }
+            let previous = all
+            mine = swap(mine)
+            watched = swap(watched)
+            merged = swap(merged)
+            followed = followed.map { ($0.query, swap($0.prs)) }
+            inbound = inbound.map { ($0.query, swap($0.prs)) }
+            publishSnapshot()
+            await notify(previous: previous)
+            bobIfJustTurnedGreen()
+        } catch {
+            log.error("pending refresh failed: \(String(describing: error), privacy: .public)")
+        }
     }
 
     // MARK: Auth (US-001)

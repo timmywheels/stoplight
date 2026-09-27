@@ -265,6 +265,7 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
         panel.makeKeyAndOrderFront(nil)
         statusItem.button?.highlight(true)
         model.panelVisible = true
+        model.refreshIfStale() // you're looking: make it current
         fitToContent()
         if !model.pinnedPanel { installClickOutside() }
         // Keyboard: dispatch through the Hotkey table while the panel is key. Text fields keep their keys.
