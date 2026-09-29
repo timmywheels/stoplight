@@ -642,7 +642,11 @@ final class AppModel {
     private func notify(previous: [PullRequest]) async {
         await notifier.requestAuthorizationIfNeeded()
         let current = all
-        let events = Transitions.events(previous: previous, current: current, mode: NotificationService.mode)
+        let activity = Transitions.activityEvents(previous: previous, current: current, me: login, rules: prefs.activityRules(login: login))
+        // A new approval or change request already says what the decision change would: don't say it twice.
+        let reviewed = Set(activity.filter { $0.activity.contains { [.approved, .changesRequested].contains($0.kind) } }.map(\.pr.id))
+        let events = (Transitions.events(previous: previous, current: current, mode: NotificationService.mode)
+            .filter { !([.approved, .changesRequested].contains($0.kind) && reviewed.contains($0.pr.id)) } + activity)
             .filter { !sentEvents.contains($0.key) }
         for e in events {
             sentEvents.insert(e.key)

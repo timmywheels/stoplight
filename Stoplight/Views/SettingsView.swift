@@ -14,6 +14,8 @@ struct SettingsView: View {
                 .tabItem { Label("Display", systemImage: "paintpalette") }
             SourcesTab(model: model)
                 .tabItem { Label("Sources", systemImage: "person.2") }
+            NotificationsTab(model: model)
+                .tabItem { Label("Notifications", systemImage: "bell") }
             AgentSettingsTab(model: model)
                 .tabItem { Label("Agent", systemImage: "cpu") }
         }
@@ -25,7 +27,6 @@ private struct GeneralTab: View {
     static let repo = URL(string: "https://github.com/timmywheels/stoplight")!
 
     @Bindable var model: AppModel
-    @AppStorage(Prefs.notifications) private var notifications = "all"
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -79,17 +80,6 @@ private struct GeneralTab: View {
                 Text("Refreshing")
             } footer: {
                 Text("⌘R, the refresh button in the panel, and Refresh Now in the menu bar icon's menu all refresh straight away.")
-            }
-
-            Section("Notifications") {
-                Picker(selection: $notifications) {
-                    Text("When a PR fails or turns all-passing").tag("all")
-                    Text("Only when a PR fails").tag("failOnly")
-                    Text("Never").tag("off")
-                } label: {
-                    InfoLabel("Notify me", "Fires when a PR changes state, not on every refresh. A PR that stays red stays quiet.")
-                }
-                .pickerStyle(.radioGroup)
             }
 
             Section("Startup") {

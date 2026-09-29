@@ -189,6 +189,8 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
     public let baseState: CIState?
     /// Where the PR stands with reviewers (US-042).
     public let review: ReviewDecision
+    /// Recent reviews and comments, newest last, for "new comment" notifications.
+    public let activity: [Activity]
 
     public init(id: String, repo: String, number: Int, title: String, url: URL,
                 isDraft: Bool, updatedAt: Date, headSha: String, checks: [CheckResult],
@@ -196,7 +198,7 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
                 headRefName: String = "", baseRefName: String = "", mergeQueue: MergeQueueInfo? = nil,
                 mergeState: MergeState = .unknown,
                 mergedAt: Date? = nil, note: String? = nil, baseState: CIState? = nil,
-                review: ReviewDecision = .none) {
+                review: ReviewDecision = .none, activity: [Activity] = []) {
         self.id = id
         self.repo = repo
         self.number = number
@@ -217,6 +219,7 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
         self.note = note
         self.baseState = baseState
         self.review = review
+        self.activity = activity
     }
 
     // Tolerant decoding so an older prs.json still loads (author/status added in US-011).
@@ -242,6 +245,7 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
         mergedAt = try c.decodeIfPresent(Date.self, forKey: .mergedAt)
         note = try c.decodeIfPresent(String.self, forKey: .note)
         baseState = try c.decodeIfPresent(CIState.self, forKey: .baseState)
+        activity = try c.decodeIfPresent([Activity].self, forKey: .activity) ?? []
     }
 
     /// Same PR, annotated with how its base branch is doing right now (US-028).
@@ -249,7 +253,7 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
         PullRequest(id: id, repo: repo, number: number, title: title, url: url, isDraft: isDraft, updatedAt: updatedAt,
                     headSha: headSha, checks: checks, author: author, status: status, summary: summary,
                     headRefName: headRefName, baseRefName: baseRefName, mergeQueue: mergeQueue, mergeState: mergeState,
-                    mergedAt: mergedAt, note: note, baseState: state, review: review)
+                    mergedAt: mergedAt, note: note, baseState: state, review: review, activity: activity)
     }
 
     /// The same PR as a queue row (US-041). A distinct id keeps selection, expansion, pins and

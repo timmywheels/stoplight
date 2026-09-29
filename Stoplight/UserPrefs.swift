@@ -115,6 +115,11 @@ final class UserPrefs {
         static let showQueues = "showQueues"
         static let queueItems = "queueItems"
         static let refreshSeconds = "refreshSeconds"
+        static let notifyReviews = "notifyReviews"
+        static let notifyComments = "notifyComments"
+        static let notifyActivityOn = "notifyActivityOn"
+        static let ignoreBotActivity = "ignoreBotActivity"
+        static let mutedAuthors = "mutedAuthors"
     }
 
 
@@ -198,6 +203,41 @@ final class UserPrefs {
     /// Which circular buttons an expanded row shows, in order (US-031). Local only.
     var rowActions: [RowAction] { didSet { defaults.set(rowActions.map(\.rawValue), forKey: Key.rowActions) } }
 
+    // Review and comment notifications. Local only.
+    /// Tell me about new reviews (approved, changes requested, a review with a summary).
+    var notifyReviews: Bool { didSet { defaults.set(notifyReviews, forKey: Key.notifyReviews) } }
+    /// Tell me about new comments (conversation and inline replies).
+    var notifyComments: Bool { didSet { defaults.set(notifyComments, forKey: Key.notifyComments) } }
+    enum ActivityScope: String, CaseIterable, Identifiable {
+        case mine, everything
+        var id: String { rawValue }
+        var title: String { self == .mine ? "My pull requests" : "Every pull request in Stoplight" }
+    }
+    /// Whose PRs: only yours, or everything you follow and watch.
+    var notifyActivityOn: ActivityScope { didSet { defaults.set(notifyActivityOn.rawValue, forKey: Key.notifyActivityOn) } }
+    /// Skip reviews and comments from bots (GitHub apps, "[bot]" accounts).
+    var ignoreBotActivity: Bool { didSet { defaults.set(ignoreBotActivity, forKey: Key.ignoreBotActivity) } }
+    /// People and bots whose reviews and comments never notify you.
+    var mutedAuthors: [String] { didSet { defaults.set(mutedAuthors, forKey: Key.mutedAuthors) } }
+
+    /// Adds a login to the mute list: trims, strips "@", checks it's a login, dedupes.
+    @discardableResult
+    func mute(_ raw: String) -> AddResult {
+        var value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.hasPrefix("@") { value.removeFirst() }
+        guard Filters.isValidAuthor(value) else { return .invalid }
+        if mutedAuthors.contains(where: { $0.caseInsensitiveCompare(value) == .orderedSame }) { return .duplicate }
+        mutedAuthors.append(value)
+        return .added
+    }
+
+    /// What the notification rules are right now, for `login` (you).
+    func activityRules(login: String?) -> ActivityRules {
+        guard NotificationService.mode != .off else { return .off }
+        return ActivityRules(reviews: notifyReviews, comments: notifyComments, ignoreBots: ignoreBotActivity,
+                             ignoredAuthors: mutedAuthors, onlyAuthor: notifyActivityOn == .mine ? (login ?? "") : nil)
+    }
+
     /// First-run tour dismissed (US-024). Local only.
     var tourSeen: Bool { didSet { defaults.set(tourSeen, forKey: Key.tourSeen) } }
     /// How many recent commits each followed branch shows (US-035). 1 = just the latest.
@@ -273,6 +313,11 @@ final class UserPrefs {
             ?? defaults.string(forKey: Key.scanRoot).map { [$0] }
             ?? [NSHomeDirectory() + "/dev"]
         repoPaths = (defaults.dictionary(forKey: Key.repoPaths) as? [String: String]) ?? [:]
+        notifyReviews = defaults.object(forKey: Key.notifyReviews) as? Bool ?? true
+        notifyComments = defaults.object(forKey: Key.notifyComments) as? Bool ?? true
+        notifyActivityOn = ActivityScope(rawValue: defaults.string(forKey: Key.notifyActivityOn) ?? "") ?? .mine
+        ignoreBotActivity = defaults.object(forKey: Key.ignoreBotActivity) as? Bool ?? true
+        mutedAuthors = defaults.stringArray(forKey: Key.mutedAuthors) ?? []
 
         if let cloud {
             observer = NotificationCenter.default.addObserver(

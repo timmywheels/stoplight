@@ -264,6 +264,8 @@ public struct GitHubProvider: CIProvider {
       repository { nameWithOwner }
       mergeCommit { ...CommitChecks }
       commits(last: 1) { nodes { commit { ...CommitChecks } } }
+      reviews(last: 10) { nodes { databaseId state bodyText submittedAt url author { __typename login } } }
+      comments(last: 10) { nodes { databaseId bodyText createdAt url author { __typename login } } }
     }
     \(commitChecksFragment)
     """
@@ -319,8 +321,19 @@ public struct GitHubProvider: CIProvider {
     }
 
     private struct Node: Decodable {
-        struct Author: Decodable { let login: String }
+        struct Author: Decodable { let login: String; let __typename: String? }
         struct Repo: Decodable { let nameWithOwner: String }
+        /// A review or a comment (reviews have `state` and `submittedAt`, comments `createdAt`).
+        struct Talk: Decodable {
+            let databaseId: Int?
+            let state: String?
+            let bodyText: String?
+            let submittedAt: Date?
+            let createdAt: Date?
+            let url: URL?
+            let author: Author?
+        }
+        struct Talks: Decodable { let nodes: [Talk?]? }
         struct Commits: Decodable { let nodes: [CommitNode] }
         struct CommitNode: Decodable { let commit: Commit }
         struct Commit: Decodable { let statusCheckRollup: RollupNode? }
@@ -364,6 +377,8 @@ public struct GitHubProvider: CIProvider {
         let mergedAt: Date?
         let mergeCommit: Commit?
         let repository: Repo?
+        let reviews: Talks?
+        let comments: Talks?
         struct MQ: Decodable { let position: Int?; let state: String? }
         let commits: Commits?
     }
@@ -389,8 +404,35 @@ public struct GitHubProvider: CIProvider {
             mergeQueue: n.mergeQueueEntry.map { MergeQueueInfo(position: $0.position ?? 0, state: $0.state ?? "QUEUED") },
             mergeState: MergeState(github: n.mergeStateStatus),
             mergedAt: n.mergedAt,
-            review: ReviewDecision(github: n.reviewDecision)
+            review: ReviewDecision(github: n.reviewDecision),
+            activity: activity(of: n)
         )
+    }
+
+    /// Reviews and conversation comments, oldest first. Every comment on a line of code (a reply
+    /// too) arrives inside a review of its own, so reviews cover those without fetching each
+    /// thread: nesting threads in the search cost ~3x the rate limit. They come without their text.
+    private static func activity(of n: Node) -> [Activity] {
+        func item(_ t: Node.Talk?, prefix: String, kind: Activity.Kind) -> Activity? {
+            guard let t, let id = t.databaseId, let url = t.url, let at = t.submittedAt ?? t.createdAt else { return nil }
+            let login = t.author?.login ?? "ghost"
+            return Activity(id: "\(prefix):\(id)", kind: kind, author: login, isBot: t.author?.__typename == "Bot",
+                            body: t.bodyText ?? "", at: at, url: url)
+        }
+        var out: [Activity] = []
+        for r in n.reviews?.nodes ?? [] {
+            let kind: Activity.Kind
+            switch r?.state {
+            case "APPROVED": kind = .approved
+            case "CHANGES_REQUESTED": kind = .changesRequested
+            // No summary: it's a comment (or reply) on a line of code.
+            case "COMMENTED": kind = (r?.bodyText ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .comment : .reviewed
+            default: continue // PENDING (a draft), DISMISSED
+            }
+            if let a = item(r, prefix: "review", kind: kind) { out.append(a) }
+        }
+        for c in n.comments?.nodes ?? [] { if let a = item(c, prefix: "comment", kind: .comment) { out.append(a) } }
+        return out.sorted { $0.at < $1.at }
     }
 
     /// Collapse whitespace, cap at 300 chars.

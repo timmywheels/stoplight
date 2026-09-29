@@ -8,17 +8,34 @@ public enum NotificationMode: String, Codable, Sendable {
 
 /// Something worth telling the user about (US-006).
 public struct CIEvent: Equatable, Sendable, Identifiable {
-    public enum Kind: String, Sendable { case failed, passed, dequeued, deployFailed, deployed, branchMoved, agentAttention, agentDone, approved, changesRequested }
+    public enum Kind: String, Sendable { case failed, passed, dequeued, deployFailed, deployed, branchMoved, agentAttention, agentDone, approved, changesRequested, activity }
 
     public let pr: PullRequest
     public let kind: Kind
     /// Extra context for kinds that need it (branchMoved: the previous branch name).
     public let detail: String?
 
-    public init(pr: PullRequest, kind: Kind, detail: String? = nil) { self.pr = pr; self.kind = kind; self.detail = detail }
+    /// New reviews and comments (kind .activity), oldest first.
+    public let activity: [Activity]
 
-    /// One notification per (PR, head commit, kind). A new push changes the sha and resets this.
-    public var key: String { "\(pr.id)|\(pr.headSha)|\(kind.rawValue)" }
+    public init(pr: PullRequest, kind: Kind, detail: String? = nil) { self.pr = pr; self.kind = kind; self.detail = detail; self.activity = [] }
+
+    /// Reviews and comments that just arrived on `pr`.
+    public init(pr: PullRequest, activity: [Activity]) {
+        self.pr = pr; self.kind = .activity; self.detail = nil; self.activity = activity.sorted { $0.at < $1.at }
+    }
+
+    /// One notification per (PR, head commit, kind); for activity, per newest item. A new push changes the sha and resets this.
+    public var key: String { "\(pr.id)|\(pr.headSha)|\(kind.rawValue)" + (activity.last.map { "|\($0.id)" } ?? "") }
+
+    /// Changes requested (by decision or in a review) makes a sound; other review news arrives quietly.
+    public var urgent: Bool {
+        switch kind {
+        case .passed, .branchMoved, .agentDone: false
+        case .activity: activity.contains { $0.kind == .changesRequested }
+        default: true
+        }
+    }
     public var id: String { key }
 
     public var title: String {
@@ -26,6 +43,7 @@ public struct CIEvent: Equatable, Sendable, Identifiable {
         case .branchMoved: "New release branch in \(pr.repo)"
         case .agentAttention: "Agent needs you · \(pr.shortRef)"
         case .agentDone: "Agent done · \(pr.shortRef)"
+        case .activity where activity.count == 1: "\(activity[0].author) \(Self.verb(activity[0].kind)) · \(pr.shortRef)"
         default: pr.shortRef
         }
     }
@@ -53,9 +71,36 @@ public struct CIEvent: Equatable, Sendable, Identifiable {
             return "\(detail ?? "Your agent") needs your input on \(pr.title)"
         case .agentDone:
             return "\(detail ?? "Your agent") finished on \(pr.title)"
+        case .activity:
+            if activity.count == 1 {
+                let words = Self.excerpt(activity[0].body)
+                return words.isEmpty ? pr.title : "\(pr.title)\n\u{201C}\(words)\u{201D}"
+            }
+            var who: [String] = []
+            for a in activity where !who.contains(a.author) { who.append(a.author) }
+            let reviews = activity.filter { $0.kind != .comment }.count, comments = activity.count - reviews
+            let what = [reviews > 0 ? "\(reviews) review\(reviews == 1 ? "" : "s")" : nil,
+                        comments > 0 ? "\(comments) comment\(comments == 1 ? "" : "s")" : nil].compactMap { $0 }.joined(separator: " and ")
+            return "\(pr.title)\n\(what) from \(who.prefix(3).joined(separator: ", "))" + (who.count > 3 ? " and \(who.count - 3) more" : "")
         }
     }
-    public var url: URL { pr.url }
+    /// A single comment opens right at it; several open the PR.
+    public var url: URL { activity.count == 1 ? activity[0].url : pr.url }
+
+    static func verb(_ k: Activity.Kind) -> String {
+        switch k {
+        case .approved: "approved"
+        case .changesRequested: "requested changes"
+        case .reviewed: "reviewed"
+        case .comment: "commented"
+        }
+    }
+
+    /// One line, at most ~140 characters.
+    static func excerpt(_ s: String) -> String {
+        let line = s.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.joined(separator: " ")
+        return line.count > 140 ? String(line.prefix(140)).trimmingCharacters(in: .whitespaces) + "…" : line
+    }
 }
 
 /// Pure transition table. No side effects, fully unit-tested.
