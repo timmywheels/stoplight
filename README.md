@@ -1,7 +1,5 @@
 # Stoplight
 
-> **Stoplight is now [Station](https://github.com/timmywheels/station).** Station is Onramp and Stoplight in one app: your PRs' checks in the menu bar, plus review windows for the diff and your agents. This repo is archived; [download Station](https://github.com/timmywheels/station/releases/latest).
-
 macOS menu bar app + widget showing CI status for your open pull requests as three dots: red, yellow, green. Nothing else.
 
 Spec: [tasks/prd-stoplight.md](tasks/prd-stoplight.md)
