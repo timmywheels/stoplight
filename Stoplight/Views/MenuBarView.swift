@@ -718,9 +718,15 @@ struct PRRow: View {
                 .font(model.prefs.density == .comfortable ? .body : .callout)
                 .layoutPriority(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            trailingStatus.lineLimit(1).fixedSize()
-            if model.prefs.showsDetail(.age) {
-                Text((pr.mergedAt ?? pr.updatedAt).compactAgo).font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+            // Hovering swaps status and age for the quick actions, in the same spot: nothing floats
+            // over the title, and the tooltip and expanded row still say what status and age said.
+            if showsQuickActions {
+                quickActions
+            } else {
+                trailingStatus.lineLimit(1).fixedSize()
+                if model.prefs.showsDetail(.age) {
+                    Text((pr.mergedAt ?? pr.updatedAt).compactAgo).font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+                }
             }
         }
         .padding(.horizontal, 12).padding(.vertical, model.prefs.density.rowPadding)
@@ -738,23 +744,20 @@ struct PRRow: View {
                     if NSEvent.modifierFlags.contains(.command) { secondaryClick() } else { primaryClick() }
                 })
         )
-        // Quick actions on hover. Attached AFTER the tap gesture so the buttons own their clicks.
-        .overlay(alignment: .trailing) {
-            if hovering && !expanded && !editingAlias {
-                HStack(spacing: 12) {
-                    glyph("arrow.up.right", help: "Open on GitHub") { openURL(pr.url) }
-                    glyph(copied == "url" ? "checkmark" : "doc.on.doc", help: "Copy URL", tint: copied == "url" ? stateColor(.success) : nil) {
-                        flash("url") { copy(pr.url.absoluteString) }
-                    }
-                    glyph(copied == "share" ? "checkmark" : "square.and.arrow.up", help: "Share: title as a link",
-                          tint: copied == "share" ? stateColor(.success) : nil) { flash("share") { copyRichLink() } }
-                }
-                .padding(.horizontal, 10).padding(.vertical, 6)
-                .background(.regularMaterial, in: Capsule())
-                .padding(.trailing, 10)
-                .transition(.opacity)
+    }
+
+    private var showsQuickActions: Bool { hovering && !expanded && !editingAlias }
+
+    private var quickActions: some View {
+        HStack(spacing: 10) {
+            glyph("arrow.up.right", help: "Open on GitHub") { openURL(pr.url) }
+            glyph(copied == "url" ? "checkmark" : "doc.on.doc", help: "Copy URL", tint: copied == "url" ? stateColor(.success) : nil) {
+                flash("url") { copy(pr.url.absoluteString) }
             }
+            glyph(copied == "share" ? "checkmark" : "square.and.arrow.up", help: "Share: title as a link",
+                  tint: copied == "share" ? stateColor(.success) : nil) { flash("share") { copyRichLink() } }
         }
+        .fixedSize()
     }
 
     /// The row's status as glyphs, most urgent first; hover one for its words.
