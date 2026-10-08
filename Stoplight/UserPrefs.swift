@@ -255,8 +255,6 @@ final class UserPrefs {
             case .comfortable: 12
             }
         }
-        /// Between the details line and the title.
-        var lineSpacing: CGFloat { self == .comfortable ? 4 : 2 }
     }
     /// Local only.
     var density: Density { didSet { defaults.set(density.rawValue, forKey: Key.density) } }
@@ -268,7 +266,7 @@ final class UserPrefs {
         var title: String {
             switch self {
             case .ref: "Repository and number"
-            case .author: "Author (when it isn't you)"
+            case .author: "Avatars"
             case .status: "Status: conflicts, reviews, queue"
             case .age: "Last updated"
             }

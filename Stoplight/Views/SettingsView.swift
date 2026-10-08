@@ -148,7 +148,7 @@ private struct DisplayTab: View {
                 Picker(selection: $prefs.density) {
                     ForEach(UserPrefs.Density.allCases) { Text($0.title).tag($0) }
                 } label: {
-                    InfoLabel("Density", "Room around each row. Compact puts the details on the title's line.")
+                    InfoLabel("Density", "Room around each row. Every density shows the same things.")
                 }
                 .pickerStyle(.segmented)
                 ForEach(UserPrefs.RowDetail.allCases) { d in

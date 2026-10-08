@@ -538,20 +538,22 @@ struct PRRow: View {
 
     /// The small line above the title: where the PR lives, who wrote it, how it's doing. Each part
     /// can be turned off (Settings → Display → On each row); with all of them off the line goes away.
-    private var hasMeta: Bool {
-        let p = model.prefs
-        return p.showsDetail(.ref) || p.showsDetail(.author) || p.showsDetail(.status) || pinned
+    /// Who wrote it, as a picture, yours included. Branch rows keep the space blank so titles line up.
+    private var showsAvatar: Bool {
+        guard model.prefs.showsDetail(.author) else { return false }
+        return section.map { $0.prs.contains { !$0.isBranch } } ?? !pr.isBranch
     }
 
-    private var meta: some View {
+    static func middleTruncated(_ s: String, max: Int) -> String {
+        guard s.count > max else { return s }
+        let head = (max - 1) / 2, tail = max - 1 - head
+        return s.prefix(head) + "…" + s.suffix(tail)
+    }
+    private var avatarSize: CGFloat { model.prefs.density == .comfortable ? 18 : 16 }
+
+    /// After the title: how the PR is doing, then the pin.
+    private var trailingStatus: some View {
         HStack(spacing: 6) {
-            if model.prefs.showsDetail(.ref) {
-                Text(section?.refLabel(for: pr) ?? pr.shortRef)
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-            }
-            if model.prefs.showsDetail(.author), !isMine && !pr.isBranch && !pr.author.isEmpty && !(section?.hidesAuthor ?? false) {
-                Text("· @\(pr.author)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            }
             if !model.prefs.showsDetail(.status) {
                 EmptyView()
             } else if model.prefs.statusGlyphs {
@@ -647,19 +649,25 @@ struct PRRow: View {
             } else {
                 StatusDot(state: pr.state, hollow: pr.isDraft)
             }
-            let density = model.prefs.density
-            AnyLayout(density == .compact ? AnyLayout(HStackLayout(spacing: 8)) : AnyLayout(VStackLayout(alignment: .leading, spacing: density.lineSpacing))) {
-                // Compact: one line, the title first and the details trailing it.
-                if density == .compact {
-                    // The title keeps at least half the line; the details give way first.
-                    titleView.layoutPriority(1).frame(minWidth: 120, alignment: .leading)
-                    if hasMeta { meta.lineLimit(1) }
-                } else {
-                    if hasMeta { meta }
-                    titleView
+            // One line, in reading order: dot, who, which, what, how it's doing, when.
+            if showsAvatar {
+                Group {
+                    if pr.isBranch || pr.author.isEmpty { Color.clear } else { Avatar(login: pr.author, size: avatarSize) }
                 }
+                .frame(width: avatarSize, height: avatarSize)
+                .help(model.displayName(for: pr.author).map { "\($0) (@\(pr.author))" } ?? "@\(pr.author)")
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            if model.prefs.showsDetail(.ref) {
+                // Sized to its text: "#801" never shortens, a long "repo #3" is shortened in the middle here.
+                Text(Self.middleTruncated(section?.refLabel(for: pr) ?? pr.shortRef, max: 18))
+                    .font(.callout).monospacedDigit().foregroundStyle(.secondary)
+                    .lineLimit(1).fixedSize()
+            }
+            titleView
+                .font(model.prefs.density == .comfortable ? .body : .callout)
+                .layoutPriority(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            trailingStatus.lineLimit(1).fixedSize()
             if model.prefs.showsDetail(.age) {
                 Text((pr.mergedAt ?? pr.updatedAt).compactAgo).font(.caption).foregroundStyle(.tertiary).monospacedDigit()
             }
