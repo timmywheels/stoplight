@@ -11,7 +11,7 @@ enum StatusGlyph {
     static let housingPad: CGFloat = 4
 
     /// - housing: draw a dark rounded pill behind the dots (🚥 style) for contrast on busy wallpapers.
-    static func image(for presence: StatusPresence, count: Int?, pop: CGFloat = 0, housing: Bool = false,
+    static func image(for presence: StatusPresence, pop: CGFloat = 0, housing: Bool = false,
                       colorProfile: ColorProfile = .standard) -> NSImage {
         let dotsWidth = dot * 3 + gap * 2
         let pad: CGFloat = housing ? housingPad : 0
@@ -40,8 +40,7 @@ enum StatusGlyph {
         }
         img.isTemplate = false
         img.accessibilityDescription = describe(presence)
-        guard let count else { return img }
-        return withBadge(img, text: "\(count)")
+        return img
     }
 
     private static func describe(_ p: StatusPresence) -> String {
@@ -50,20 +49,5 @@ enum StatusGlyph {
         if p.pending { parts.append("running") }
         if p.success { parts.append("passing") }
         return parts.isEmpty ? "No PRs" : "PRs " + parts.joined(separator: ", ")
-    }
-
-    private static func withBadge(_ img: NSImage, text: String) -> NSImage {
-        let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
-        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.labelColor]
-        let str = NSAttributedString(string: text, attributes: attrs)
-        let textSize = str.size()
-        let size = NSSize(width: img.size.width + 4 + textSize.width, height: max(img.size.height, textSize.height))
-        let out = NSImage(size: size, flipped: false) { rect in
-            img.draw(in: NSRect(x: 0, y: (rect.height - img.size.height) / 2, width: img.size.width, height: img.size.height))
-            str.draw(at: NSPoint(x: img.size.width + 4, y: (rect.height - textSize.height) / 2))
-            return true
-        }
-        out.isTemplate = false
-        return out
     }
 }

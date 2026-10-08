@@ -93,7 +93,7 @@ func stateColor(_ s: CIState, profile: ColorProfile) -> Color {
 
 struct SmallView: View {
     let snapshot: Snapshot
-    private var live: [PullRequest] { snapshot.counted.filter { !$0.isDraft } }
+    private var live: [PullRequest] { snapshot.prs.filter(\.isCounted) }
     private func count(_ s: CIState) -> Int { live.filter { $0.effectiveState == s }.count }
 
     var body: some View {

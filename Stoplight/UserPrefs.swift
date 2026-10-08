@@ -88,7 +88,6 @@ final class UserPrefs {
         static let watched = "watchedRefs"
         static let pinned = "pinnedIDs"
         static let all = [sources, watched, pinned]
-        static let showCount = Prefs.showCount
         static let ghPath = Prefs.ghPath
         static let housing = Prefs.housing
         static let colorProfile = Prefs.colorProfile
@@ -127,7 +126,6 @@ final class UserPrefs {
     var ghPath: String { didSet { defaults.set(ghPath, forKey: Key.ghPath) } }
 
     // Appearance. Local only, not synced.
-    var showCount: Bool { didSet { defaults.set(showCount, forKey: Key.showCount) } }
     var housing: Bool { didSet { defaults.set(housing, forKey: Key.housing) } }
     var colorProfile: ColorProfile { didSet { defaults.set(colorProfile.rawValue, forKey: Key.colorProfile) } }
     /// Recently-merged window in days (US-022). 0 = off. Local only.
@@ -357,7 +355,6 @@ final class UserPrefs {
         watched = load(Key.watched).compactMap(PRRef.init(key:))
         pinned = Set(load(Key.pinned))
         ghPath = defaults.string(forKey: Key.ghPath) ?? ""
-        showCount = defaults.bool(forKey: Key.showCount)
         housing = defaults.bool(forKey: Key.housing)
         colorProfile = defaults.string(forKey: Key.colorProfile).flatMap(ColorProfile.init(rawValue:)) ?? .standard
         // Merged starts collapsed: a one-line count until you ask for it.
@@ -390,6 +387,7 @@ final class UserPrefs {
         rememberedQueues = defaults.dictionary(forKey: Key.rememberedQueues) as? [String: Double] ?? [:]
         pinnedQueues = defaults.stringArray(forKey: Key.pinnedQueues) ?? []
         // The agent launcher is gone (0.15); drop what it saved.
+        defaults.removeObject(forKey: "showCountInMenuBar")   // the menu bar number is gone too
         for k in ["agent", "agentCustomCommand", "agentPermissionMode", "agentReviewPermissionMode", "agentExtraArgs", "terminal",
                   "agentPrompt", "agentReviewPrompt", "repoScanRoot", "repoScanRoots", "repoPaths"] { defaults.removeObject(forKey: k) }
         notifyReviews = defaults.object(forKey: Key.notifyReviews) as? Bool ?? true

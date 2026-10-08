@@ -212,7 +212,7 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
     /// Re-render the dots whenever anything they depend on changes.
     private func observeGlyph() {
         withObservationTracking {
-            statusItem.button?.image = StatusGlyph.image(for: model.presence, count: model.badgeCount,
+            statusItem.button?.image = StatusGlyph.image(for: model.presence,
                                                          pop: model.bob, housing: model.prefs.housing,
                                                          colorProfile: model.prefs.colorProfile)
             statusItem.button?.toolTip = statusItem.button?.image?.accessibilityDescription

@@ -48,9 +48,6 @@ public struct Snapshot: Codable, Sendable {
         return sections.flatMap { sec in sec.prIDs.compactMap { byID[$0] }.map { (sec, $0) } }
     }
 
-    /// PRs that count toward the dots: open PRs, plus merged ones only while unresolved.
-    public var counted: [PullRequest] { prs.filter { $0.status != .merged || $0.isUnresolvedMerge } }
-
     public var isStale: Bool { Date.now.timeIntervalSince(writtenAt) > 5 * 60 }
 }
 

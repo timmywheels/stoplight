@@ -31,13 +31,13 @@ final class RollupTests: XCTestCase {
         XCTAssertEqual(Rollup.state(for: [check(.skipped), check(.pending)]), .pending)
     }
 
-    func testConflictsMakeAnOpenPRRed() {
+    func testConflictsLeaveTheDotAlone() {
         let green = PullRequest(id: "a", repo: "o/r", number: 1, title: "t", url: URL(string: "https://github.com/o/r/pull/1")!,
                                 isDraft: false, updatedAt: .now, headSha: "s",
                                 checks: [CheckResult(name: "ci", state: .success, url: nil)],
                                 mergeState: MergeState(github: "DIRTY"))
         XCTAssertEqual(green.state, .success)          // CI really did pass
-        XCTAssertEqual(green.effectiveState, .failure) // but you can't merge it
+        XCTAssertEqual(green.effectiveState, .success) // the dot is CI; the conflict is the row's ▲
         XCTAssertEqual(MergeState(github: "DIRTY").label, "Conflicts")
         XCTAssertEqual(MergeState(github: "BLOCKED").label, "Blocked")
         XCTAssertNil(MergeState(github: "CLEAN").label)

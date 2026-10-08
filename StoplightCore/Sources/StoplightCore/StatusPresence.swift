@@ -1,7 +1,7 @@
 import Foundation
 
 /// Which of the three lights are on. Drives the menu bar dots and the small widget.
-/// Drafts don't light anything (same rule as `Rollup.aggregate`).
+/// The same PRs the panel's footer counts: open ones, drafts included, by the color of their dot.
 public struct StatusPresence: Equatable, Sendable {
     public let failure: Bool
     public let pending: Bool
@@ -14,7 +14,7 @@ public struct StatusPresence: Equatable, Sendable {
     }
 
     public init(_ prs: [PullRequest]) {
-        let states = Set(prs.filter { !$0.isDraft }.map(\.state))
+        let states = Set(prs.filter(\.isCounted).map(\.effectiveState))
         failure = states.contains(.failure)
         pending = states.contains(.pending)
         success = states.contains(.success)

@@ -502,7 +502,7 @@ struct SectionHeader: View {
                 // Full: one count per state, worst first, zeros omitted.
                 let states: [CIState] = mode == .full ? CIState.allCases : [.failure, .pending]
                 ForEach(states, id: \.self) { state in
-                    let n = prs.filter { $0.effectiveState == state }.count
+                    let n = prs.filter { $0.isCounted && $0.effectiveState == state }.count
                     if n > 0 {
                         HStack(spacing: 3) {
                             StatusDot(state: state)
@@ -1031,7 +1031,7 @@ struct FilterDot: View {
         case .success: "passed"
         case .none: "no checks"
         }
-        return "\(count) \(what) across every section, the same tally as the menu bar dots. Landed merges aren't counted. Click to filter."
+        return "\(count) open \(count == 1 ? "PR" : "PRs") \(what), drafts included: the rows with this dot. The menu bar lights this color when it's above zero. Click to show only these."
     }
 }
 

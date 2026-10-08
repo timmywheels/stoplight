@@ -386,7 +386,8 @@ final class AppModel {
         if statusFilter.contains(state) { statusFilter.remove(state) } else { statusFilter.insert(state) }
     }
     /// Counts per state across everything visible, for the filter buttons.
-    func count(_ state: CIState) -> Int { all.filter { $0.effectiveState == state }.count }
+    /// Open PRs with that color dot: what the footer and the menu bar dots both show.
+    func count(_ state: CIState) -> Int { all.filter { $0.isCounted && $0.effectiveState == state }.count }
 
     /// login (lowercased) → display name, for followed users (US-013).
     private(set) var displayNames: [String: String] = [:]
@@ -429,7 +430,7 @@ final class AppModel {
         func take(_ prs: [PullRequest], pinnedOnly: Bool = false, skipPinned: Bool = true) -> [PullRequest] {
             let picked = prs.filter { pr in
                 guard allowed.contains(pr.id), !claimed.contains(pr.id) else { return false }
-                guard filter.isEmpty || filter.contains(pr.effectiveState) else { return false }
+                guard filter.isEmpty || (pr.isCounted && filter.contains(pr.effectiveState)) else { return false }
                 guard matchesSearch(pr) else { return false }
                 let isPinned = prefs.pinned.contains(pr.id)
                 return pinnedOnly ? isPinned : (!skipPinned || !isPinned)
@@ -448,10 +449,8 @@ final class AppModel {
         }
         for f in inbound { out.append(Section(id: f.query.title, title: f.query.title, prs: take(f.prs), query: f.query)) }
         out.append(Section(id: "Branches", title: "Branches", prs: take(branches)))
-        // Merged rows aren't in `all` unless they have checks, so filter them directly here.
-        let mergedFiltered = mergedRows.filter { pr in
-            !claimed.contains(pr.id) && (filter.isEmpty || filter.contains(pr.effectiveState)) && matchesSearch(pr)
-        }
+        // Merged rows have no dot, so a color filter hides them along with the other uncounted rows.
+        let mergedFiltered = filter.isEmpty ? mergedRows.filter { !claimed.contains($0.id) && matchesSearch($0) } : []
         out.append(Section(id: "Merged", title: "Merged", prs: mergedFiltered))
         return applyOrder(out).filter { !$0.prs.isEmpty }
     }
@@ -479,11 +478,6 @@ final class AppModel {
 
     var aggregate: CIState { Rollup.aggregate(all) }
     var presence: StatusPresence { StatusPresence(all) }
-    var badgeCount: Int? {
-        guard prefs.showCount else { return nil }
-        let n = all.filter { !$0.isDraft && $0.state != .success && $0.state != .none }.count
-        return n > 0 ? n : nil
-    }
     func isWatched(_ pr: PullRequest) -> Bool { pr.ref.map { prefs.watched.contains($0) } ?? false }
     func isMine(_ pr: PullRequest) -> Bool { login.map { $0.caseInsensitiveCompare(pr.author) == .orderedSame } ?? false }
     func isPinned(_ pr: PullRequest) -> Bool { prefs.pinned.contains(pr.id) }
@@ -975,7 +969,6 @@ final class AppModel {
 }
 
 enum Prefs {
-    static let showCount = "showCountInMenuBar"
     static let ghPath = "ghPath"
     static let housing = "menuBarHousing"
     static let colorProfile = "colorProfile"
