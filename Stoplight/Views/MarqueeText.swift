@@ -18,15 +18,15 @@ struct MarqueeText: View {
     private var overflow: CGFloat { max(0, fullWidth - boxWidth) }
 
     var body: some View {
-        ZStack(alignment: .leading) {
-            if sliding {
-                Text(text).lineLimit(1).fixedSize().offset(x: offset)
-            } else {
-                Text(text).lineLimit(1).truncationMode(.tail)
+        // The truncated title always sets the size. The sliding copy is an overlay, which can't
+        // change layout: drawn in-line at full width it widened the row, and the whole list shifted.
+        Text(text).lineLimit(1).truncationMode(.tail)
+            .opacity(sliding ? 0 : 1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(alignment: .leading) {
+                if sliding { Text(text).lineLimit(1).fixedSize().offset(x: offset) }
             }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .clipped()
+            .clipped()
         .background(alignment: .leading) {
             // The width the text would like, measured off screen; and the width it's given.
             Text(text).lineLimit(1).fixedSize().hidden()
