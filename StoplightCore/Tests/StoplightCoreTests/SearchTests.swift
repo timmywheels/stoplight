@@ -3,9 +3,9 @@ import XCTest
 
 final class SearchTests: XCTestCase {
     private func pr(_ id: String, title: String, repo: String = "acme/api", author: String = "bob", branch: String = "feat/x",
-                    state: CheckState = .success, draft: Bool = false, status: PRStatus = .open, number: Int = 1) -> PullRequest {
+                    state: CheckState = .success, draft: Bool = false, status: PRStatus = .open, number: Int = 1, sha: String = "s") -> PullRequest {
         PullRequest(id: id, repo: repo, number: number, title: title, url: URL(string: "https://github.com/\(repo)/pull/\(number)")!,
-                    isDraft: draft, updatedAt: .now, headSha: "s", checks: [CheckResult(name: "ci", state: state, url: nil)],
+                    isDraft: draft, updatedAt: .now, headSha: sha, checks: [CheckResult(name: "ci", state: state, url: nil)],
                     author: author, status: status, headRefName: branch)
     }
     private let ctx = SearchQuery.Context(names: { $0 == "dholliday3" ? ["Daniel Holliday", "Daniel"] : [] },
@@ -33,6 +33,20 @@ final class SearchTests: XCTestCase {
         XCTAssertEqual(link.pullRequest?.key, "acme/api#439")
         XCTAssertTrue(SearchQuery("acme/api#439").matches(target, ctx))
         XCTAssertNil(SearchQuery("deploy #439").pullRequest)
+    }
+
+    func testCommitHash() {
+        let target = pr("t", title: "t", repo: "acme/api", number: 7, sha: "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678")
+        let other = pr("o", title: "t", repo: "acme/api", number: 8, sha: "ffffffffffffffffffffffffffffffffffffffff")
+        for text in ["a1b2c3d", "A1B2C3D4E5", "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"] {
+            let q = SearchQuery(text)
+            XCTAssertEqual(q.shas.count, 1, text)
+            XCTAssertTrue(q.matches(target, ctx), text)
+            XCTAssertFalse(q.matches(other, ctx), text)
+        }
+        XCTAssertTrue(SearchQuery("1234567").shas.isEmpty)   // a number, not a hash
+        XCTAssertTrue(SearchQuery("abc123").shas.isEmpty)    // too short
+        XCTAssertTrue(SearchQuery("deploy").shas.isEmpty)    // not hex
     }
 
     func testFlagsAndNumbers() {

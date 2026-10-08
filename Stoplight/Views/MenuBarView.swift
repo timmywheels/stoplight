@@ -108,6 +108,8 @@ struct MenuBarView: View {
                 }
             } else if model.isEmpty {
                 centered("No open PRs")
+            } else if rowCount == 0, let sha = model.searchedCommit {
+                commitResults(sha)
             } else if rowCount == 0, let ref = model.searchedPullRequest {
                 UnlistedPullRequest(ref: ref, model: model)
             } else if rowCount == 0 && (!model.statusFilter.isEmpty || !model.searchText.isEmpty) {
@@ -115,6 +117,36 @@ struct MenuBarView: View {
             } else {
                 scrolling(list)
             }
+        }
+    }
+
+    /// A hash none of your rows has as its head: what GitHub found with it, in your repos.
+    @ViewBuilder private func commitResults(_ sha: String) -> some View {
+        let short = String(sha.prefix(7))
+        let found = model.commitResults
+        if !found.isEmpty {
+            scrolling(VStack(spacing: 0) {
+                HStack(spacing: 6) {
+                    Text("COMMIT").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                    Text(short).font(.caption2).monospaced().foregroundStyle(.tertiary)
+                    Spacer()
+                }
+                .padding(.horizontal, 12).padding(.top, 8).padding(.bottom, 2)
+                ForEach(found) { pr in
+                    PRRow(pr: pr, model: model)
+                    Divider()
+                }
+            }
+            .transition(.opacity))
+        } else if model.commitLoading || model.commitQuery != sha {
+            VStack(spacing: 0) {
+                ForEach(0..<3, id: \.self) { i in SkeletonRow(index: i); Divider() }
+                Text("Looking for \(short) in your repos…").font(.caption).foregroundStyle(.tertiary).padding(.top, 10)
+                Spacer()
+            }
+            .onAppear { model.contentHeight = 160 }
+        } else {
+            centered("No PR in your repos has commit \(short)")
         }
     }
 
@@ -345,9 +377,7 @@ struct SearchField: View {
                         }
                         ForEach(chips) { c in
                             Button { model.searchText = SearchQuery.complete(model.searchText, with: c.insert); focused = true } label: {
-                                Text(c.label).font(.caption2).monospaced().foregroundStyle(.secondary)
-                                    .padding(.horizontal, 6).padding(.vertical, 2)
-                                    .background(.quaternary, in: Capsule())
+                                SearchChip(label: c.label)
                             }
                             .buttonStyle(.plain)
                         }
@@ -659,7 +689,7 @@ struct PRRow: View {
             }
             if model.prefs.showsDetail(.ref) {
                 // Sized to its text: "#801" never shortens, a long "repo #3" is shortened in the middle here.
-                Text(Self.middleTruncated(section?.refLabel(for: pr) ?? pr.shortRef, max: 18))
+                Text(Self.middleTruncated(section?.refLabel(for: pr) ?? "\(pr.repo.split(separator: "/").last.map(String.init) ?? pr.repo) #\(pr.number)", max: 18))
                     .font(.callout).monospacedDigit().foregroundStyle(.secondary)
                     .lineLimit(1).fixedSize()
             }
@@ -1088,5 +1118,54 @@ struct UnlistedPullRequest: View {
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { model.contentHeight = 120 }
+    }
+}
+
+/// A completion under the search field. The system font, not monospace: these are words to tap,
+/// and a ":" prefix reads fine in the UI face.
+struct SearchChip: View {
+    let label: String
+    @State private var hovering = false
+
+    var body: some View {
+        Text(label)
+            .font(.caption.weight(.medium))
+            .foregroundStyle(hovering ? .primary : .secondary)
+            .padding(.horizontal, 8).padding(.vertical, 3)
+            .background(Capsule().fill(.primary.opacity(hovering ? 0.12 : 0.06)))
+            .overlay(Capsule().strokeBorder(.primary.opacity(0.08), lineWidth: 0.5))
+            .contentShape(Capsule())
+            .onHover { hovering = $0 }
+            .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+}
+
+/// A row-shaped placeholder while something loads: dot, avatar, number and title as soft bars
+/// that breathe. Widths vary by index so a stack of them doesn't look like a barcode.
+struct SkeletonRow: View {
+    var index = 0
+    @State private var dim = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        let widths: [CGFloat] = [0.62, 0.48, 0.7, 0.55, 0.66]
+        HStack(spacing: 10) {
+            Circle().fill(.quaternary).frame(width: 8, height: 8)
+            Circle().fill(.quaternary).frame(width: 16, height: 16)
+            Capsule().fill(.quaternary).frame(width: 34, height: 9)
+            GeometryReader { g in
+                Capsule().fill(.quaternary).frame(width: g.size.width * widths[index % widths.count], height: 9)
+                    .frame(maxHeight: .infinity)
+            }
+            .frame(height: 16)
+            Capsule().fill(.quaternary).frame(width: 18, height: 9)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .opacity(dim ? 0.45 : 1)
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.easeInOut(duration: 0.9).repeatForever().delay(Double(index) * 0.12)) { dim = true }
+        }
+        .accessibilityHidden(true)
     }
 }

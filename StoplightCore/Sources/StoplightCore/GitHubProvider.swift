@@ -60,6 +60,23 @@ public struct GitHubProvider: CIProvider {
         return repos.values.compactMap { $0?.pullRequest }.compactMap(Self.map)
     }
 
+    /// Pull requests with `sha` among their commits (or as their merge commit), in repos owned by
+    /// `owners`. Short hashes collide across GitHub, so the search is kept to people and orgs you follow.
+    public func pullRequests(containingCommit sha: String, owners: [String]) async throws -> [PullRequest] {
+        let sha = sha.lowercased()
+        guard SearchQuery.isCommitHash(sha) else { return [] }
+        let scope = owners.filter(Filters.isValidLogin)
+            .prefix(20).map { "user:\($0)" }.joined(separator: " ")
+        let field = "q0: search(query: \"\(sha) is:pr \(scope)\", type: ISSUE, first: 10) { nodes { ... on PullRequest { ...PRFields } } }"
+        let data = try await post(["query": "query {\n" + field + "\n}\n" + Self.prFields])
+        let env = try Self.decoder.decode(SearchEnvelope.self, from: data)
+        guard let results = env.data else { throw Error.graphQL(env.errors?.first?.message ?? "Empty response") }
+        let found = (results["q0"]??.nodes ?? []).compactMap(Self.map)
+        // The PR whose head is this commit first; then the ones that merely contain it.
+        let isHead = { (pr: PullRequest) in pr.headSha.lowercased().hasPrefix(sha) }
+        return found.filter(isHead) + found.filter { !isHead($0) }
+    }
+
     public func fetchDisplayNames(logins: [String]) async throws -> [String: String] {
         guard !logins.isEmpty else { return [:] }
         let fields = logins.enumerated().map { i, l in "u\(i): user(login: \"\(l)\") { login name }" }

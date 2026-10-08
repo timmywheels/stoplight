@@ -301,8 +301,59 @@ final class AppModel {
     private(set) var peopleLoading = false
     @ObservationIgnored private var peopleTask: Task<Void, Never>?
 
+    // MARK: Commit hash search
+
+    /// The hash being searched for, when the search is one.
+    var searchedCommit: String? { searchQuery.shas.first }
+    /// PRs GitHub says contain `commitQuery`, for when none of the loaded rows has it as its head.
+    private(set) var commitMatches: [PullRequest] = []
+    private(set) var commitQuery: String?
+    private(set) var commitLoading = false
+    @ObservationIgnored private var commitTask: Task<Void, Never>?
+
+    /// What a hash search found on GitHub, with the loaded copy of any PR that's already in a list.
+    var commitResults: [PullRequest] {
+        guard let sha = searchedCommit, sha == commitQuery else { return [] }
+        let loaded = Dictionary((all + mergedRows).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        return commitMatches.map { loaded[$0.id] ?? $0 }
+    }
+
+    /// Every owner Stoplight already looks at: yours, the ones you follow, and the loaded rows'.
+    private var knownOwners: [String] {
+        let s = prefs.sources
+        var owners = Set((all + mergedRows).compactMap { $0.repo.split(separator: "/").first.map(String.init) })
+        owners.formUnion(s.followOrgs + s.followUsers + s.followRepos.compactMap { $0.split(separator: "/").first.map(String.init) })
+        if let login { owners.insert(login) }
+        return owners.sorted()
+    }
+
+    /// A hash: select the row whose head it is, right away. None loaded → ask GitHub (after 300ms; the latest wins).
+    private func commitSearchChanged() {
+        guard let sha = searchedCommit else {
+            commitTask?.cancel(); commitLoading = false; commitMatches = []; commitQuery = nil
+            return
+        }
+        let local = (all + mergedRows).filter(matchesSearch)
+        if local.count == 1 { selectedID = local[0].id }
+        guard local.isEmpty, let provider, sha != commitQuery else { return }
+        commitTask?.cancel()
+        commitLoading = true
+        let owners = knownOwners
+        commitTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            let found = (try? await provider.pullRequests(containingCommit: sha, owners: owners)) ?? []
+            guard !Task.isCancelled, let self else { return }
+            self.commitMatches = found
+            self.commitQuery = sha
+            self.commitLoading = false
+            if let first = found.first { self.selectedID = first.id }
+        }
+    }
+
     /// Look people up on GitHub as you type author:… (after a 250ms pause; the latest wins).
     private func searchTextChanged() {
+        commitSearchChanged()
         guard let partial = authorPartial, let provider else { peopleTask?.cancel(); peopleLoading = false; return }
         guard partial != peopleQuery else { return }
         peopleTask?.cancel()

@@ -11,6 +11,14 @@ public struct SearchQuery: Equatable, Sendable {
     public var numbers: [Int] = []
     /// A pasted PR link (or owner/repo#123): the PR it names, which may not be in any list.
     public var pullRequest: PRRef?
+    /// Commit hashes (7–40 hex characters): a row matches when its head commit starts with one.
+    public var shas: [String] = []
+
+    /// "a1b2c3d" … a full 40-character SHA. Needs a letter a–f, so a plain number stays a PR number,
+    /// and 7 characters, like `git log --oneline`.
+    public static func isCommitHash(_ t: String) -> Bool {
+        (7...40).contains(t.count) && t.allSatisfy(\.isHexDigit) && t.contains(where: { ("a"..."f").contains($0) })
+    }
 
     public static let prefixes = ["author:", "repo:", "branch:", "is:"]
     public static let flagValues = ["red", "yellow", "green", "draft", "merged", "queued", "mine", "branch"]
@@ -28,12 +36,13 @@ public struct SearchQuery: Equatable, Sendable {
             else if t.hasPrefix("branch:") { let v = String(t.dropFirst(7)); if !v.isEmpty { branches.append(v) } }
             else if t.hasPrefix("is:") { let v = String(t.dropFirst(3)); if !v.isEmpty { flags.append(v) } }
             else if t.hasPrefix("#"), let n = Int(t.dropFirst()) { numbers.append(n) }
+            else if Self.isCommitHash(t) { shas.append(t) }
             else if let n = Int(t) { numbers.append(n) }
             else { words.append(t) }
         }
     }
 
-    public var isEmpty: Bool { words.isEmpty && authors.isEmpty && repos.isEmpty && branches.isEmpty && flags.isEmpty && numbers.isEmpty }
+    public var isEmpty: Bool { shas.isEmpty && words.isEmpty && authors.isEmpty && repos.isEmpty && branches.isEmpty && flags.isEmpty && numbers.isEmpty }
 
     /// What the app knows that the PR record doesn't: display names, labels, nicknames, who "mine" is.
     public struct Context: Sendable {
@@ -50,6 +59,8 @@ public struct SearchQuery: Equatable, Sendable {
         if isEmpty { return true }
         let title = (pr.title + " " + (ctx.nickname(pr.id) ?? "")).lowercased()
         for w in words where !title.contains(w) && !pr.repo.lowercased().contains(w) && !pr.headRefName.lowercased().contains(w) { return false }
+        // A hash is the head commit's prefix, or (rarely, "defaced") just a word in the title.
+        for h in shas where !pr.headSha.lowercased().hasPrefix(h) && !title.contains(h) { return false }
         if !numbers.isEmpty && !numbers.contains(pr.number) { return false }
         let authorHay = ([pr.author] + ctx.names(pr.author)).joined(separator: " ").lowercased()
         for a in authors where !authorHay.contains(a) { return false }

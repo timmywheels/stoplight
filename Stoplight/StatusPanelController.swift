@@ -259,6 +259,12 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
     }
 
     func open() {
+        // Already up (a second deep link, a widget tap): bring it forward. Installing the monitors
+        // again would stack a second key handler and click-outside on top of the first.
+        if let panel, panel.isVisible, keyMonitor != nil {
+            panel.makeKeyAndOrderFront(nil)
+            return
+        }
         let panel = self.panel ?? makePanel()
         self.panel = panel
         if !userMoved { position(panel) }
