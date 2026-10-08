@@ -211,7 +211,7 @@ final class UserPrefs {
 
     /// A row says its status as a few glyphs (hover for the words) instead of a row of tags. Local only.
     var statusGlyphs: Bool { didSet { defaults.set(statusGlyphs, forKey: Key.statusGlyphs) } }
-    /// Trackpad ticks on drag, copy and pick (see `Haptics`).
+    /// Trackpad haptics on buttons, drag and pick (see `Haptics`).
     var haptics: Bool { didSet { defaults.set(haptics, forKey: Key.haptics) } }
 
     /// How much room each row gets. Only spacing and layout: what a row says is `hiddenRowDetails`.

@@ -94,8 +94,8 @@ private struct GeneralTab: View {
 
             Section("Trackpad") {
                 Toggle(isOn: $prefs.haptics) {
-                    InfoLabel("Trackpad ticks",
-                              "A light tick under your finger when a dragged section lines up, something is copied, or you ⇧-click to pick a PR. Force Touch trackpads only.")
+                    InfoLabel("Trackpad haptics",
+                              "Light feedback under your finger when you click a PR's buttons, drag a section into place, or ⇧-click to pick a PR. Force Touch trackpads only.")
                 }
             }
 

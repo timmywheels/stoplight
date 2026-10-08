@@ -9,7 +9,7 @@ enum Haptics {
     static func tick() { perform(.generic) }
 
     private static func perform(_ pattern: NSHapticFeedbackManager.FeedbackPattern) {
-        // Settings → General → Trackpad ticks (UserPrefs.haptics), read here so callers needn't pass prefs.
+        // Settings → General → Trackpad haptics (UserPrefs.haptics), read here so callers needn't pass prefs.
         guard UserDefaults.standard.object(forKey: "haptics") as? Bool ?? true else { return }
         NSHapticFeedbackManager.defaultPerformer.perform(pattern, performanceTime: .now)
     }
