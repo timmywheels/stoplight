@@ -1026,9 +1026,8 @@ struct FilterDot: View {
     var body: some View {
         Button(action: toggle) {
             HStack(spacing: 4) {
-                // Nothing in this state: no pulse, and dimmed, so the eye skips it.
+                // Nothing in this state: no pulse. Same color as the others, so the three read as a set.
                 StatusDot(state: state, pulses: count > 0)
-                    .opacity(count == 0 ? 0.45 : 1)
                 Text("\(count)").font(.caption).monospacedDigit().fixedSize()
                     .foregroundStyle(selected ? .primary : .secondary)
             }
