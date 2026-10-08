@@ -30,7 +30,7 @@ struct MenuBarView: View {
                 Button { model.isSearching.toggle(); if !model.isSearching { model.searchText = "" } } label: {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(model.isSearching || !model.searchText.isEmpty ? Color.accentColor : .secondary)
+                        .foregroundStyle(model.isSearching || !model.searchText.isEmpty ? .primary : .secondary)
                         .frame(width: 22, height: 22).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain).help("Search (⌘F)")
@@ -47,7 +47,7 @@ struct MenuBarView: View {
                 Button { model.pinnedPanel.toggle() } label: {
                     Image(systemName: model.pinnedPanel ? "pin.fill" : "pin")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(model.pinnedPanel ? Color.accentColor : .secondary)
+                        .foregroundStyle(model.pinnedPanel ? .primary : .secondary)
                         .frame(width: 22, height: 22).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -355,19 +355,25 @@ struct SearchField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Search", text: $model.searchText)
+            // A real input: the top bar's magnifier already says "search", so no second one in here.
+            HStack(spacing: 6) {
+                TextField("Search, or paste a link or hash", text: $model.searchText)
                     .textFieldStyle(.plain)
                     .focused($focused)
                     .onExitCommand {
                         if model.searchText.isEmpty { model.isSearching = false } else { model.searchText = "" }
                     }
                 if !model.searchText.isEmpty {
-                    Button { model.searchText = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
-                        .buttonStyle(.plain)
+                    Button { model.searchText = "" } label: {
+                        Image(systemName: "xmark.circle.fill").font(.system(size: 12)).foregroundStyle(.tertiary)
+                    }
+                    .buttonStyle(.plain).help("Clear")
                 }
             }
+            .padding(.horizontal, 9).padding(.vertical, 6)
+            .background(RoundedRectangle(cornerRadius: 7).fill(.primary.opacity(0.05)))
+            .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(.primary.opacity(focused ? 0.22 : 0.1), lineWidth: 1))
+            .animation(.easeOut(duration: 0.12), value: focused)
             // Completion chips: prefixes when idle, matching values once a prefix is typed. Click to insert.
             let chips = model.searchSuggestions
             if !chips.isEmpty || model.peopleLoading {
