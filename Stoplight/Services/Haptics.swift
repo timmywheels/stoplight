@@ -1,4 +1,7 @@
 import AppKit
+import OSLog
+
+private let log = Logger(subsystem: "com.timwheeler.stoplight", category: "Haptics")
 
 /// Feedback on a Force Touch trackpad, felt only while a finger is on it, so it confirms what you just
 /// clicked or dragged and nothing else. People who turned trackpad feedback off in System Settings get none.
@@ -15,7 +18,9 @@ enum Haptics {
 
     private static func perform(_ pattern: NSHapticFeedbackManager.FeedbackPattern) {
         // Settings → General → Trackpad haptics (UserPrefs.haptics), read here so callers needn't pass prefs.
-        guard UserDefaults.standard.object(forKey: "haptics") as? Bool ?? true else { return }
+        let on = UserDefaults.standard.object(forKey: "haptics") as? Bool ?? true
+        log.notice("haptic \(String(describing: pattern.rawValue)) on=\(on) appActive=\(NSApp.isActive) keyWindow=\(NSApp.keyWindow != nil)")
+        guard on else { return }
         NSHapticFeedbackManager.defaultPerformer.perform(pattern, performanceTime: .now)
     }
 }
