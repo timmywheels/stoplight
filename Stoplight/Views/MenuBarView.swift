@@ -32,7 +32,7 @@ struct MenuBarView: View {
                         .foregroundStyle(model.isSearching || !model.searchText.isEmpty ? Color.accentColor : .secondary)
                         .frame(width: 22, height: 22).contentShape(Rectangle())
                 }
-                .buttonStyle(.plain).help("Search (⌘L)")
+                .buttonStyle(.plain).help("Search (⌘F)")
 
                 Capsule().fill(.quaternary).frame(width: 36, height: 4)
                     .frame(maxWidth: .infinity, minHeight: 22)
@@ -102,6 +102,8 @@ struct MenuBarView: View {
                 centered("Loading…")
             } else if model.isEmpty {
                 centered("No open PRs")
+            } else if rowCount == 0, let ref = model.searchedPullRequest {
+                UnlistedPullRequest(ref: ref, model: model)
             } else if rowCount == 0 && (!model.statusFilter.isEmpty || !model.searchText.isEmpty) {
                 centered(model.searchText.isEmpty ? "No PRs match the filter" : "No PRs match “\(model.searchText)”")
             } else {
@@ -312,9 +314,13 @@ struct SearchField: View {
             }
             // Completion chips: prefixes when idle, matching values once a prefix is typed. Click to insert.
             let chips = model.searchSuggestions
-            if !chips.isEmpty {
+            if !chips.isEmpty || model.peopleLoading {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
+                        if model.peopleLoading {
+                            // GitHub is looking people up: say so, don't just sit there.
+                            ProgressView().controlSize(.mini).help("Looking on GitHub…")
+                        }
                         ForEach(chips) { c in
                             Button { model.searchText = SearchQuery.complete(model.searchText, with: c.insert); focused = true } label: {
                                 Text(c.label).font(.caption2).monospaced().foregroundStyle(.secondary)
@@ -479,7 +485,7 @@ struct PRRow: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .clipped()
-        .background(selected ? AnyShapeStyle(Color.accentColor.opacity(0.18))
+        .background(selected || model.picked.contains(pr.id) ? AnyShapeStyle(Color.accentColor.opacity(0.18))
                     : hovering || expanded ? AnyShapeStyle(.quaternary.opacity(0.5)) : AnyShapeStyle(.clear))
         .id(pr.id)
         .onHover { hovering = $0 }
@@ -518,53 +524,57 @@ struct PRRow: View {
                     if !isMine && !pr.isBranch && !pr.author.isEmpty && !(section?.hidesAuthor ?? false) {
                         Text("· @\(pr.author)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
-                    if pr.isDraft { tag("Draft") }
-                    if pr.status == .merged && section?.id != "Merged" { tag("Merged", symbol: "arrow.triangle.merge", tint: .githubMerged) }
-                    if pr.status == .merged, let bs = pr.baseState {
-                        // Base branch health: red / yellow / green by its latest CI run.
-                        tag(pr.baseRefName, symbol: "arrow.triangle.branch", tint: stateColor(bs))
-                        .help("\(pr.baseRefName) is \(bs == .failure ? "failing" : bs == .pending ? "running" : "passing") right now")
-                    }
-                    if let note = pr.note { tag(note) }
-                    if pr.id.hasPrefix("queue:"), model.isMine(pr) {
-                        tag("yours", symbol: "person.fill")
-                            .help("Your PR, also listed in its own section above")
-                    }
-                    if let st = model.agentStatus[pr.id] {
-                        // Agent status from hooks / callbacks (US-034). Click to dismiss.
-                        Button { model.focusAgent(pr) } label: {
-                            tag(st.state == "attention" ? "needs you" : st.state == "done" ? "agent done" : "agent working",
-                                symbol: "cpu",
-                                tint: st.state == "attention" ? .orange : st.state == "done" ? stateColor(.success) : .secondary)
+                    if model.prefs.statusGlyphs {
+                        statusLine
+                    } else {
+                        if pr.isDraft { tag("Draft") }
+                        if pr.status == .merged && section?.id != "Merged" { tag("Merged", symbol: "arrow.triangle.merge", tint: .githubMerged) }
+                        if pr.status == .merged, let bs = pr.baseState {
+                            // Base branch health: red / yellow / green by its latest CI run.
+                            tag(pr.baseRefName, symbol: "arrow.triangle.branch", tint: stateColor(bs))
+                            .help("\(pr.baseRefName) is \(bs == .failure ? "failing" : bs == .pending ? "running" : "passing") right now")
                         }
-                        .buttonStyle(.plain)
-                        .help("Reported by your agent \(st.at.compactAgo) ago. Click to jump to its terminal window; right-click the row to dismiss.")
-                    }
-                    if pr.status == .closed { tag("Closed", symbol: "xmark", tint: stateColor(.failure)) }
-                    if pr.status == .open, !pr.isDraft, let label = pr.mergeState.label {
-                        tag(label, symbol: pr.mergeState.isBlocking ? "exclamationmark.triangle.fill" : nil,
-                            tint: pr.mergeState.isBlocking ? stateColor(.failure) : .secondary)
-                    }
-                    // A queued PR is approved by definition, so the seal would say nothing here.
-                    if pr.status == .open, !pr.isDraft, !isQueueRow, let symbol = pr.review.symbol {
-                        Image(systemName: symbol)
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(pr.review == .changesRequested ? stateColor(.failure)
-                                             : pr.review == .approved ? stateColor(.success) : Color.secondary)
-                            .help(pr.review.label)
-                    }
-                    if let q = pr.mergeQueue, !isQueueRow {
-                        tag("Queue \(q.position)",
-                            symbol: q.isBlocked ? "exclamationmark.triangle.fill" : "line.3.horizontal",
-                            tint: q.isBlocked ? stateColor(.failure) : .secondary)
-                        .help(q.isBlocked ? "Blocked: this one can't merge, and everything behind it waits"
-                                          : "Position \(q.position) in the merge queue")
-                    }
-                    if depth == 0, stack == nil, pr.hasNonTrunkBase {
-                        // Based on a branch we can't see: part of a stack whose bottom isn't in view.
-                        tag("on \(pr.baseRefName)")
-                            .frame(maxWidth: 150, alignment: .leading) // long stack branches shorten in the middle
-                            .help("Stacked on \(pr.baseRefName)")
+                        if let note = pr.note { tag(note) }
+                        if pr.id.hasPrefix("queue:"), model.isMine(pr) {
+                            tag("yours", symbol: "person.fill")
+                                .help("Your PR, also listed in its own section above")
+                        }
+                        if let st = model.agentStatus[pr.id] {
+                            // Agent status from hooks / callbacks (US-034). Click to dismiss.
+                            Button { model.focusAgent(pr) } label: {
+                                tag(st.state == "attention" ? "needs you" : st.state == "done" ? "agent done" : "agent working",
+                                    symbol: "cpu",
+                                    tint: st.state == "attention" ? .orange : st.state == "done" ? stateColor(.success) : .secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Reported by your agent \(st.at.compactAgo) ago. Click to jump to its terminal window; right-click the row to dismiss.")
+                        }
+                        if pr.status == .closed { tag("Closed", symbol: "xmark", tint: stateColor(.failure)) }
+                        if pr.status == .open, !pr.isDraft, let label = pr.mergeState.label {
+                            tag(label, symbol: pr.mergeState.isBlocking ? "exclamationmark.triangle.fill" : nil,
+                                tint: pr.mergeState.isBlocking ? stateColor(.failure) : .secondary)
+                        }
+                        // A queued PR is approved by definition, so the seal would say nothing here.
+                        if pr.status == .open, !pr.isDraft, !isQueueRow, let symbol = pr.review.symbol {
+                            Image(systemName: symbol)
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(pr.review == .changesRequested ? stateColor(.failure)
+                                                 : pr.review == .approved ? stateColor(.success) : Color.secondary)
+                                .help(pr.review.label)
+                        }
+                        if let q = pr.mergeQueue, !isQueueRow {
+                            tag("Queue \(q.position)",
+                                symbol: q.isBlocked ? "exclamationmark.triangle.fill" : "line.3.horizontal",
+                                tint: q.isBlocked ? stateColor(.failure) : .secondary)
+                            .help(q.isBlocked ? "Blocked: this one can't merge, and everything behind it waits"
+                                              : "Position \(q.position) in the merge queue")
+                        }
+                        if depth == 0, stack == nil, pr.hasNonTrunkBase {
+                            // Based on a branch we can't see: part of a stack whose bottom isn't in view.
+                            tag("on \(pr.baseRefName)")
+                                .frame(maxWidth: 150, alignment: .leading) // long stack branches shorten in the middle
+                                .help("Stacked on \(pr.baseRefName)")
+                        }
                     }
                     if pinned { Image(systemName: "pin.fill").font(.caption2).foregroundStyle(.secondary) }
                 }
@@ -590,6 +600,9 @@ struct PRRow: View {
             TapGesture(count: 2).onEnded { model.selectedID = pr.id; secondaryClick() }
                 .exclusively(before: TapGesture().onEnded {
                     guard !editingAlias else { return }
+                    // ⇧-click picks your own open PRs to close together; ⌘-click keeps doing the other action.
+                    if NSEvent.modifierFlags.contains(.shift) { return model.togglePicked(pr) }
+                    model.picked = []
                     model.selectedID = pr.id
                     if NSEvent.modifierFlags.contains(.command) { secondaryClick() } else { primaryClick() }
                 })
@@ -610,6 +623,47 @@ struct PRRow: View {
                 .padding(.trailing, 10)
                 .transition(.opacity)
             }
+        }
+    }
+
+    /// The row's status as glyphs, most urgent first; hover one for its words.
+    @ViewBuilder private var statusLine: some View {
+        let status = RowStatus.of(pr, reported: model.agentStatus[pr.id]?.state, isQueueRow: isQueueRow)
+        if !status.parts.isEmpty {
+            let glyphs = HStack(spacing: 5) {
+                ForEach(status.parts, id: \.symbol) { part in
+                    HStack(spacing: 2) {
+                        Image(systemName: part.symbol)
+                        if let n = part.count { Text("\(n)").monospacedDigit() }
+                    }
+                    .foregroundStyle(color(part.level))
+                    .help(part.help)
+                    .accessibilityLabel(part.help)
+                }
+            }
+            .font(.system(size: 10, weight: .semibold))
+            .fixedSize()
+            if status.agentLeads {
+                Button { model.focusAgent(pr) } label: { glyphs }
+                    .buttonStyle(.plain)
+                    .help("Jump to your agent's terminal")
+            } else {
+                glyphs
+            }
+        }
+        if pr.id.hasPrefix("queue:"), model.isMine(pr) {
+            Image(systemName: "person.fill").font(.system(size: 9)).foregroundStyle(.secondary)
+                .help("Your PR, also listed in its own section above")
+        }
+    }
+
+    /// Only what needs someone gets a color; the rest stays quiet so the dot keeps meaning CI.
+    private func color(_ level: RowStatus.Level) -> Color {
+        switch level {
+        case .needsYou: .orange
+        case .blocking: stateColor(.failure)
+        case .good: stateColor(.success)
+        case .waiting, .info: .secondary
         }
     }
 
@@ -805,6 +859,11 @@ struct PRRow: View {
                 copy(Stacks.markdown(stack, topFirst: model.prefs.stackOrder == .topFirst))
             }
         }
+        let closing = model.closeTargets(for: pr)
+        if !closing.isEmpty {
+            Divider()
+            Button(closing.count == 1 ? "Close Pull Request…" : "Close \(closing.count) Pull Requests…") { model.confirmAndClose(closing) }
+        }
     }
 
     private func startEditingAlias() {
@@ -922,5 +981,32 @@ struct SignInView: View {
             }
         }
         .padding(16)
+    }
+}
+
+/// A pasted link to a PR that isn't in any of your lists: open it anyway, or keep it in the list.
+struct UnlistedPullRequest: View {
+    let ref: PRRef
+    @Bindable var model: AppModel
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Text("\(ref.repo) #\(ref.number) isn't in your lists").foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                Button("Open on GitHub") {
+                    model.searchText = ""
+                    if let u = URL(string: "https://github.com/\(ref.repo)/pull/\(ref.number)") { NSWorkspace.shared.open(u) }
+                }
+                .keyboardShortcut(.defaultAction)
+                Button("Watch It") {
+                    let link = "https://github.com/\(ref.repo)/pull/\(ref.number)"
+                    if model.watch(urlString: link) != .invalid { model.searchText = "" }
+                }
+                .help("Adds it to Watching, where it stays until it closes")
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear { model.contentHeight = 120 }
     }
 }

@@ -156,6 +156,10 @@ private struct DisplayTab: View {
             }
 
             Section {
+                Toggle(isOn: $prefs.statusGlyphs) {
+                    InfoLabel("Show each PR's status as glyphs",
+                              "The most urgent first, hover for the words: conflicts, changes requested, waiting for review. Off brings back the row of tags.")
+                }
                 Picker(selection: $prefs.primaryClick) {
                     ForEach(UserPrefs.PrimaryClick.allCases) { Text($0.title).tag($0) }
                 } label: {

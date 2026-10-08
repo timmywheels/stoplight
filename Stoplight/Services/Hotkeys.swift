@@ -28,7 +28,7 @@ enum Hotkey: CaseIterable {
         case .copyBranch: Combo(key: "b", symbol: "B", mods: [.command])
         case .copyHash: Combo(key: "b", symbol: "B", mods: [.shift, .command])
         case .pin: Combo(key: "p", symbol: "P", mods: [.command])
-        case .fix: Combo(key: "f", symbol: "F", mods: [.command])
+        case .fix: Combo(key: "f", symbol: "F", mods: [.option, .command])
         case .review: Combo(key: "f", symbol: "F", mods: [.shift, .command])
         case .hide: Combo(key: "h", symbol: "H", mods: [.command])
         case .checks: Combo(key: "k", symbol: "K", mods: [.command])
@@ -41,7 +41,7 @@ enum Hotkey: CaseIterable {
         case .watch: Combo(key: "n", symbol: "N", mods: [.command])
         case .settings: Combo(key: ",", symbol: ",", mods: [.command])
         case .showHotkeys: Combo(key: "/", symbol: "/", mods: [.command])
-        case .search: Combo(key: "l", symbol: "L", mods: [.command])
+        case .search: Combo(key: "f", symbol: "F", mods: [.command])
         case .toggleTab: Combo(key: "⇥", symbol: "Tab", mods: [.control])
         }
     }
@@ -102,6 +102,8 @@ enum Hotkey: CaseIterable {
     static func match(_ e: NSEvent) -> Hotkey? {
         let mods = e.modifierFlags.intersection([.command, .shift, .option, .control])
         let chars = e.charactersIgnoringModifiers?.lowercased() ?? ""
+        // ⌘L was search before ⌘F; it still is.
+        if mods == .command, chars == "l" { return .search }
         for h in allCases where h != .toggleGlobal {
             let c = h.combo
             guard c.mods == mods else { continue }

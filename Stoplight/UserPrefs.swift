@@ -99,6 +99,7 @@ final class UserPrefs {
         static let rowActions = "rowActions"
         static let rowActionsSeen = "rowActionsSeen"
         static let sectionCounts = "sectionCounts"
+        static let statusGlyphs = "statusGlyphs"
         static let agent = "agent"
         static let agentCustom = "agentCustomCommand"
         static let agentPermission = "agentPermissionMode"
@@ -200,6 +201,9 @@ final class UserPrefs {
     /// What a collapsed header shows next to its title (US-018). Local only.
     var sectionCounts: SectionCounts { didSet { defaults.set(sectionCounts.rawValue, forKey: Key.sectionCounts) } }
 
+    /// A row says its status as a few glyphs (hover for the words) instead of a row of tags. Local only.
+    var statusGlyphs: Bool { didSet { defaults.set(statusGlyphs, forKey: Key.statusGlyphs) } }
+
     /// Which circular buttons an expanded row shows, in order (US-031). Local only.
     var rowActions: [RowAction] { didSet { defaults.set(rowActions.map(\.rawValue), forKey: Key.rowActions) } }
 
@@ -294,6 +298,7 @@ final class UserPrefs {
         }
         defaults.set(RowAction.allCases.map(\.rawValue), forKey: Key.rowActionsSeen)
         sectionCounts = SectionCounts(rawValue: defaults.string(forKey: Key.sectionCounts) ?? "") ?? .off
+        statusGlyphs = defaults.object(forKey: Key.statusGlyphs) as? Bool ?? true
         primaryClick = PrimaryClick(rawValue: defaults.string(forKey: Key.primaryClick) ?? "") ?? .open
         refreshRate = RefreshRate(rawValue: defaults.integer(forKey: Key.refreshSeconds)) ?? .automatic
         stackOrder = StackOrder(rawValue: defaults.string(forKey: Key.stackOrder) ?? "") ?? .bottomFirst

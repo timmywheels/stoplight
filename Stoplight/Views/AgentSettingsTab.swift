@@ -37,7 +37,7 @@ struct AgentSettingsTab: View {
                     Picker(selection: $prefs.agentPermissionMode) {
                         ForEach(agent.permissionModes, id: \.id) { Text($0.title).tag($0.id) }
                     } label: {
-                        InfoLabel("Permissions when fixing", "How much the agent may do on its own with ⌘F. It edits code, so asking first is safest.")
+                        InfoLabel("Permissions when fixing", "How much the agent may do on its own with ⌥⌘F. It edits code, so asking first is safest.")
                     }
                     Picker(selection: $prefs.agentReviewPermissionMode) {
                         ForEach(agent.permissionModes, id: \.id) { Text($0.title).tag($0.id) }
@@ -79,7 +79,7 @@ struct AgentSettingsTab: View {
                         Button("Reset") { prefs.promptTemplate = AgentLauncher.defaultPrompt }.controlSize(.small)
                     }
                 } label: {
-                    InfoLabel("Fix prompt", "Sent with ⌘F. Placeholders below are filled in from that PR.")
+                    InfoLabel("Fix prompt", "Sent with ⌥⌘F. Placeholders below are filled in from that PR.")
                 }
                 DisclosureGroup {
                     TextEditor(text: $prefs.reviewTemplate)
