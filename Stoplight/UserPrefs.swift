@@ -276,12 +276,11 @@ final class UserPrefs {
             case .dark: NSAppearance(named: .darkAqua)
             }
         }
-        /// The panel and Settings. Never the menu bar's own windows: the dots sit on the menu bar
-        /// and have to match it, whatever this says.
+        /// App-wide, so every window redraws all of itself (a per-window appearance left the Settings
+        /// toolbar behind). The status item draws in the menu bar's appearance regardless.
         @MainActor func apply() {
-            for w in NSApp.windows where !String(describing: type(of: w)).contains("StatusBar") {
-                w.appearance = nsAppearance
-            }
+            NSApp.appearance = nsAppearance
+            for w in NSApp.windows { w.appearance = nil } // drop any per-window override from before
         }
     }
     /// Local only.

@@ -256,7 +256,6 @@ struct MenuBarView: View {
         DispatchQueue.main.async {
             let win = NSApp.windows.first { $0.identifier?.rawValue.contains("Settings") == true }
                 ?? NSApp.windows.first { $0.title == "Settings" || $0.title.hasPrefix("Stoplight") && $0.isVisible }
-            win?.appearance = model.prefs.appearance.nsAppearance
             win?.makeKeyAndOrderFront(nil)
         }
     }

@@ -21,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let model = AppModel.shared
+        model.prefs.appearance.apply()
         model.start()  // polling + snapshot server, at launch, not on first click
         statusPanel = StatusPanelController(model: model)
     }

@@ -20,8 +20,6 @@ struct SettingsView: View {
                 .tabItem { Label("Agent", systemImage: "cpu") }
         }
         .frame(minWidth: 520, idealWidth: 560, minHeight: 480, idealHeight: 680)
-        // However this window was opened (panel, right-click menu, ⌘,): take the chosen appearance.
-        .onAppear { DispatchQueue.main.async { model.prefs.appearance.apply() } }
     }
 }
 
