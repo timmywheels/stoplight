@@ -34,13 +34,14 @@ struct MenuBarView: View {
                 }
                 .buttonStyle(.plain).help("Search (⌘F)")
 
-                Capsule().fill(.quaternary).frame(width: 36, height: 4)
-                    .frame(maxWidth: .infinity, minHeight: 22)
-                    .overlay(DragHandle())
-                    .help("Drag to move")
-
                 if model.hasQueues {
+                    // The toggle takes the middle; the space either side of it is the handle. The
+                    // buttons at each end are the same width, so the toggle sits dead centre.
+                    dragArea(grip: false)
                     TabToggle(model: model)
+                    dragArea(grip: false)
+                } else {
+                    dragArea(grip: true)
                 }
                 Button { model.pinnedPanel.toggle() } label: {
                     Image(systemName: model.pinnedPanel ? "pin.fill" : "pin")
@@ -162,6 +163,16 @@ struct MenuBarView: View {
                 if let id { withAnimation(.snappy(duration: 0.15)) { proxy.scrollTo(id, anchor: .center) } }
             }
         }
+    }
+
+    /// Empty top-bar space that moves the panel. `grip` draws the little bar that says so.
+    private func dragArea(grip: Bool) -> some View {
+        Group {
+            if grip { Capsule().fill(.quaternary).frame(width: 36, height: 4) } else { Color.clear }
+        }
+        .frame(maxWidth: .infinity).frame(height: 22) // Color.clear would take all the height it's offered
+        .overlay(DragHandle())
+        .help("Drag to move")
     }
 
     private var allSectionsCollapsed: Bool {
