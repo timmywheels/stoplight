@@ -759,12 +759,12 @@ struct PRRow: View {
 
     private var quickActions: some View {
         HStack(spacing: 10) {
-            glyph("arrow.up.right", help: "Open on GitHub") { openURL(pr.url) }
-            glyph(copied == "url" ? "checkmark" : "doc.on.doc", help: "Copy URL", tint: copied == "url" ? stateColor(.success) : nil) {
+            glyph("arrow.up.right", help: "Open on GitHub") { Haptics.tick(); openURL(pr.url) }
+            glyph(copied == "url" ? "checkmark" : "doc.on.doc", help: "Copy URL", tint: nil) {
                 flash("url") { copy(pr.url.absoluteString) }
             }
             glyph(copied == "share" ? "checkmark" : "square.and.arrow.up", help: "Share: title as a link",
-                  tint: copied == "share" ? stateColor(.success) : nil) { flash("share") { copyRichLink() } }
+                  tint: nil) { flash("share") { copyRichLink() } }
         }
         .fixedSize()
     }
@@ -892,26 +892,27 @@ struct PRRow: View {
     private var buttons: [RowButton] {
         model.prefs.rowActions.filter { $0.isAvailable(for: pr, model: model) }.map { a in
             switch a {
-            case .open: RowButton(symbol: a.symbol, help: pr.isBranch ? "Open commit on GitHub" : a.title, tint: nil) { openURL(pr.url) }
-            case .run: RowButton(symbol: a.symbol, help: "\(a.title) (⌘K)", tint: nil) { if let u = pr.actionsRunURL { openURL(u) } }
-            case .checks: RowButton(symbol: a.symbol, help: a.title, tint: nil) { openURL(pr.checksURL) }
+            case .open: RowButton(symbol: a.symbol, help: pr.isBranch ? "Open commit on GitHub" : a.title, tint: nil) { Haptics.tick(); openURL(pr.url) }
+            case .run: RowButton(symbol: a.symbol, help: "\(a.title) (⌘K)", tint: nil) { if let u = pr.actionsRunURL { Haptics.tick(); openURL(u) } }
+            case .checks: RowButton(symbol: a.symbol, help: a.title, tint: nil) { Haptics.tick(); openURL(pr.checksURL) }
             // A `let` here would break the switch's implicit return, so the position is inline.
             case .queue: RowButton(symbol: a.symbol,
                                    help: "\(a.title)\(pr.mergeQueue.map { " · position \($0.position)" } ?? "")",
-                                   tint: nil) { if let u = pr.queueURL { openURL(u) } }
-            case .copyURL: RowButton(symbol: copied == a.id ? "checkmark" : a.symbol, help: "\(a.title) (⌘C)", tint: copied == a.id ? stateColor(.success) : nil) {
+                                   tint: nil) { if let u = pr.queueURL { Haptics.tick(); openURL(u) } }
+            case .copyURL: RowButton(symbol: copied == a.id ? "checkmark" : a.symbol, help: "\(a.title) (⌘C)", tint: nil) {
                 flash(a.id) { PRActions.copyURL(pr) }
             }
-            case .share: RowButton(symbol: copied == a.id ? "checkmark" : a.symbol, help: "\(a.title) (⇧⌘C)", tint: copied == a.id ? stateColor(.success) : nil) {
+            case .share: RowButton(symbol: copied == a.id ? "checkmark" : a.symbol, help: "\(a.title) (⇧⌘C)", tint: nil) {
                 flash(a.id) { PRActions.share(pr) }
             }
-            case .copyBranch: RowButton(symbol: copied == a.id ? "checkmark" : a.symbol, help: "\(a.title) (⌘B)", tint: copied == a.id ? stateColor(.success) : nil) {
+            case .copyBranch: RowButton(symbol: copied == a.id ? "checkmark" : a.symbol, help: "\(a.title) (⌘B)", tint: nil) {
                 flash(a.id) { PRActions.copyBranch(pr) }
             }
-            case .copyHash: RowButton(symbol: copied == a.id ? "checkmark" : a.symbol, help: "Copy commit hash \(pr.headSha.prefix(7)) (⇧⌘B)", tint: copied == a.id ? stateColor(.success) : nil) {
+            case .copyHash: RowButton(symbol: copied == a.id ? "checkmark" : a.symbol, help: "Copy commit hash \(pr.headSha.prefix(7)) (⇧⌘B)", tint: nil) {
                 flash(a.id) { PRActions.copyHash(pr) }
             }
             case .pin: RowButton(symbol: pinned ? "pin.fill" : "pin", help: pinned ? "Unpin" : "Pin", tint: pinned ? .primary : nil) {
+                Haptics.tick()
                 withAnimation(Self.motion) { model.togglePin(pr) }
             }
             }
