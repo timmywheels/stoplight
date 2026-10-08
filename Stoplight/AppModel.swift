@@ -88,9 +88,28 @@ final class AppModel {
         func refLabel(for pr: PullRequest) -> String {
             switch query {
             case .repo, .base: return "#\(pr.number)"
-            case .org(let o) where pr.repo.lowercased().hasPrefix(o.lowercased() + "/"):
-                return "\(pr.repo.dropFirst(o.count + 1)) #\(pr.number)"
-            default: return pr.shortRef
+            default:
+                // Say only what tells the rows apart: the section's main repo → "#801" (the header
+                // names it once), any other → "stoplight #3". The owner is on hover.
+                if pr.isBranch { return pr.shortRef }
+                if let main = mainRepo, pr.repo.lowercased() == main.lowercased() { return "#\(pr.number)" }
+                return "\(pr.repo.split(separator: "/").last.map(String.init) ?? pr.repo) #\(pr.number)"
+            }
+        }
+
+        /// The repo at least half the rows are in, when there's more than one row.
+        var mainRepo: String? {
+            let repos = prs.filter { !$0.isBranch }.map(\.repo)
+            guard repos.count > 1 else { return nil }
+            let counts = Dictionary(repos.map { ($0.lowercased(), 1) }, uniquingKeysWith: +)
+            guard let top = counts.max(by: { $0.value < $1.value }), top.value * 2 >= repos.count else { return nil }
+            return repos.first { $0.lowercased() == top.key }
+        }
+        /// What the header adds after the title when the rows dropped it: "servicepro".
+        var headerNote: String? {
+            switch query {
+            case .repo, .base: return nil // the title already names it
+            default: return mainRepo.flatMap { $0.split(separator: "/").last.map(String.init) }
             }
         }
     }

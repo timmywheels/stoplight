@@ -180,6 +180,7 @@ struct MenuBarView: View {
                 SectionHeader(id: sec.id, title: sec.title, prs: sec.prs, collapsed: collapsed, mode: model.prefs.sectionCounts,
                               allCollapsed: allSectionsCollapsed,
                               url: sec.url,
+                              note: sec.headerNote,
                               queue: sec.queue,
                               queuePinned: sec.queue.map { model.prefs.isQueuePinned($0.spec) } ?? false,
                               toggleQueuePin: { if let q = sec.queue { model.toggleQueuePin(q) } },
@@ -407,6 +408,8 @@ struct SectionHeader: View {
     var allCollapsed = false
     /// Where this section lives on GitHub, when it lives anywhere.
     var url: URL? = nil
+    /// The repo every row shares, said once here instead of on each row.
+    var note: String? = nil
     /// Set on a merge queue's header: pin it, or stop showing it.
     var queue: BranchRef? = nil
     var queuePinned = false
@@ -424,6 +427,9 @@ struct SectionHeader: View {
                 .rotationEffect(.degrees(collapsed ? -90 : 0))
                 .frame(width: 10)
             Text(title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+            if let note {
+                Text(note).font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
+            }
             if let queue {
                 Text(queue.repo.split(separator: "/").last.map(String.init) ?? queue.repo)
                     .font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
@@ -530,6 +536,94 @@ struct PRRow: View {
 
     // MARK: Header row. Click does whatever Settings → Display says; double-click or ⌘-click does the other.
 
+    /// The small line above the title: where the PR lives, who wrote it, how it's doing. Each part
+    /// can be turned off (Settings → Display → On each row); with all of them off the line goes away.
+    private var hasMeta: Bool {
+        let p = model.prefs
+        return p.showsDetail(.ref) || p.showsDetail(.author) || p.showsDetail(.status) || pinned
+    }
+
+    private var meta: some View {
+        HStack(spacing: 6) {
+            if model.prefs.showsDetail(.ref) {
+                Text(section?.refLabel(for: pr) ?? pr.shortRef)
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+            }
+            if model.prefs.showsDetail(.author), !isMine && !pr.isBranch && !pr.author.isEmpty && !(section?.hidesAuthor ?? false) {
+                Text("· @\(pr.author)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+            if !model.prefs.showsDetail(.status) {
+                EmptyView()
+            } else if model.prefs.statusGlyphs {
+                statusLine
+            } else {
+                if pr.isDraft { tag("Draft") }
+                if pr.status == .merged && section?.id != "Merged" { tag("Merged", symbol: "arrow.triangle.merge", tint: .githubMerged) }
+                if pr.status == .merged, let bs = pr.baseState {
+                    // Base branch health: red / yellow / green by its latest CI run.
+                    tag(pr.baseRefName, symbol: "arrow.triangle.branch", tint: stateColor(bs))
+                    .help("\(pr.baseRefName) is \(bs == .failure ? "failing" : bs == .pending ? "running" : "passing") right now")
+                }
+                if let note = pr.note { tag(note) }
+                if pr.id.hasPrefix("queue:"), model.isMine(pr) {
+                    tag("yours", symbol: "person.fill")
+                        .help("Your PR, also listed in its own section above")
+                }
+                if let st = model.agentStatus[pr.id] {
+                    // Agent status from hooks / callbacks (US-034). Click to dismiss.
+                    Button { model.focusAgent(pr) } label: {
+                        tag(st.state == "attention" ? "needs you" : st.state == "done" ? "agent done" : "agent working",
+                            symbol: "cpu",
+                            tint: st.state == "attention" ? .orange : st.state == "done" ? stateColor(.success) : .secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Reported by your agent \(st.at.compactAgo) ago. Click to jump to its terminal window; right-click the row to dismiss.")
+                }
+                if pr.status == .closed { tag("Closed", symbol: "xmark", tint: stateColor(.failure)) }
+                if pr.status == .open, !pr.isDraft, let label = pr.mergeState.label {
+                    tag(label, symbol: pr.mergeState.isBlocking ? "exclamationmark.triangle.fill" : nil,
+                        tint: pr.mergeState.isBlocking ? stateColor(.failure) : .secondary)
+                }
+                // A queued PR is approved by definition, so the seal would say nothing here.
+                if pr.status == .open, !pr.isDraft, !isQueueRow, let symbol = pr.review.symbol {
+                    Image(systemName: symbol)
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(pr.review == .changesRequested ? stateColor(.failure)
+                                         : pr.review == .approved ? stateColor(.success) : Color.secondary)
+                        .help(pr.review.label)
+                }
+                if let q = pr.mergeQueue, !isQueueRow {
+                    tag("Queue \(q.position)",
+                        symbol: q.isBlocked ? "exclamationmark.triangle.fill" : "line.3.horizontal",
+                        tint: q.isBlocked ? stateColor(.failure) : .secondary)
+                    .help(q.isBlocked ? "Blocked: this one can't merge, and everything behind it waits"
+                                      : "Position \(q.position) in the merge queue")
+                }
+                if depth == 0, stack == nil, pr.hasNonTrunkBase {
+                    // Based on a branch we can't see: part of a stack whose bottom isn't in view.
+                    tag("on \(pr.baseRefName)")
+                        .frame(maxWidth: 150, alignment: .leading) // long stack branches shorten in the middle
+                        .help("Stacked on \(pr.baseRefName)")
+                }
+            }
+            if pinned { Image(systemName: "pin.fill").font(.caption2).foregroundStyle(.secondary) }
+    }
+    }
+
+    @ViewBuilder private var titleView: some View {
+        if editingAlias {
+            TextField(pr.title, text: $aliasDraft)
+                .textFieldStyle(.plain)
+                .focused($aliasFocused)
+                .onSubmit { model.prefs.setAlias(aliasDraft, for: pr.id); editingAlias = false }
+                .onExitCommand { editingAlias = false }
+                .onChange(of: aliasFocused) { _, f in if !f { editingAlias = false } }
+        } else {
+            Text(model.displayTitle(pr)).lineLimit(1).truncationMode(.tail)
+                .help(pr.isBranch ? pr.shortRef : "\(pr.shortRef) · @\(pr.author)")
+        }
+    }
+
     private var header: some View {
         HStack(spacing: 10) {
             if depth > 0 {
@@ -553,82 +647,24 @@ struct PRRow: View {
             } else {
                 StatusDot(state: pr.state, hollow: pr.isDraft)
             }
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(section?.refLabel(for: pr) ?? pr.shortRef)
-                        .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                    if !isMine && !pr.isBranch && !pr.author.isEmpty && !(section?.hidesAuthor ?? false) {
-                        Text("· @\(pr.author)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                    }
-                    if model.prefs.statusGlyphs {
-                        statusLine
-                    } else {
-                        if pr.isDraft { tag("Draft") }
-                        if pr.status == .merged && section?.id != "Merged" { tag("Merged", symbol: "arrow.triangle.merge", tint: .githubMerged) }
-                        if pr.status == .merged, let bs = pr.baseState {
-                            // Base branch health: red / yellow / green by its latest CI run.
-                            tag(pr.baseRefName, symbol: "arrow.triangle.branch", tint: stateColor(bs))
-                            .help("\(pr.baseRefName) is \(bs == .failure ? "failing" : bs == .pending ? "running" : "passing") right now")
-                        }
-                        if let note = pr.note { tag(note) }
-                        if pr.id.hasPrefix("queue:"), model.isMine(pr) {
-                            tag("yours", symbol: "person.fill")
-                                .help("Your PR, also listed in its own section above")
-                        }
-                        if let st = model.agentStatus[pr.id] {
-                            // Agent status from hooks / callbacks (US-034). Click to dismiss.
-                            Button { model.focusAgent(pr) } label: {
-                                tag(st.state == "attention" ? "needs you" : st.state == "done" ? "agent done" : "agent working",
-                                    symbol: "cpu",
-                                    tint: st.state == "attention" ? .orange : st.state == "done" ? stateColor(.success) : .secondary)
-                            }
-                            .buttonStyle(.plain)
-                            .help("Reported by your agent \(st.at.compactAgo) ago. Click to jump to its terminal window; right-click the row to dismiss.")
-                        }
-                        if pr.status == .closed { tag("Closed", symbol: "xmark", tint: stateColor(.failure)) }
-                        if pr.status == .open, !pr.isDraft, let label = pr.mergeState.label {
-                            tag(label, symbol: pr.mergeState.isBlocking ? "exclamationmark.triangle.fill" : nil,
-                                tint: pr.mergeState.isBlocking ? stateColor(.failure) : .secondary)
-                        }
-                        // A queued PR is approved by definition, so the seal would say nothing here.
-                        if pr.status == .open, !pr.isDraft, !isQueueRow, let symbol = pr.review.symbol {
-                            Image(systemName: symbol)
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(pr.review == .changesRequested ? stateColor(.failure)
-                                                 : pr.review == .approved ? stateColor(.success) : Color.secondary)
-                                .help(pr.review.label)
-                        }
-                        if let q = pr.mergeQueue, !isQueueRow {
-                            tag("Queue \(q.position)",
-                                symbol: q.isBlocked ? "exclamationmark.triangle.fill" : "line.3.horizontal",
-                                tint: q.isBlocked ? stateColor(.failure) : .secondary)
-                            .help(q.isBlocked ? "Blocked: this one can't merge, and everything behind it waits"
-                                              : "Position \(q.position) in the merge queue")
-                        }
-                        if depth == 0, stack == nil, pr.hasNonTrunkBase {
-                            // Based on a branch we can't see: part of a stack whose bottom isn't in view.
-                            tag("on \(pr.baseRefName)")
-                                .frame(maxWidth: 150, alignment: .leading) // long stack branches shorten in the middle
-                                .help("Stacked on \(pr.baseRefName)")
-                        }
-                    }
-                    if pinned { Image(systemName: "pin.fill").font(.caption2).foregroundStyle(.secondary) }
-                }
-                if editingAlias {
-                    TextField(pr.title, text: $aliasDraft)
-                        .textFieldStyle(.plain)
-                        .focused($aliasFocused)
-                        .onSubmit { model.prefs.setAlias(aliasDraft, for: pr.id); editingAlias = false }
-                        .onExitCommand { editingAlias = false }
-                        .onChange(of: aliasFocused) { _, f in if !f { editingAlias = false } }
+            let density = model.prefs.density
+            AnyLayout(density == .compact ? AnyLayout(HStackLayout(spacing: 8)) : AnyLayout(VStackLayout(alignment: .leading, spacing: density.lineSpacing))) {
+                // Compact: one line, the title first and the details trailing it.
+                if density == .compact {
+                    // The title keeps at least half the line; the details give way first.
+                    titleView.layoutPriority(1).frame(minWidth: 120, alignment: .leading)
+                    if hasMeta { meta.lineLimit(1) }
                 } else {
-                    Text(model.displayTitle(pr)).lineLimit(1).truncationMode(.tail)
+                    if hasMeta { meta }
+                    titleView
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Text((pr.mergedAt ?? pr.updatedAt).compactAgo).font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+            if model.prefs.showsDetail(.age) {
+                Text((pr.mergedAt ?? pr.updatedAt).compactAgo).font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+            }
         }
-        .padding(.horizontal, 12).padding(.vertical, 8)
+        .padding(.horizontal, 12).padding(.vertical, model.prefs.density.rowPadding)
         .contentShape(Rectangle())
         .gesture(
             // Whichever action isn't on the single click lives on the double click, so both are

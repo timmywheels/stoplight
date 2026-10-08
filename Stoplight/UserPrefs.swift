@@ -100,6 +100,8 @@ final class UserPrefs {
         static let rowActionsSeen = "rowActionsSeen"
         static let sectionCounts = "sectionCounts"
         static let statusGlyphs = "statusGlyphs"
+        static let density = "density"
+        static let hiddenRowDetails = "hiddenRowDetails"
         static let agent = "agent"
         static let agentCustom = "agentCustomCommand"
         static let agentPermission = "agentPermissionMode"
@@ -234,6 +236,51 @@ final class UserPrefs {
     /// A row says its status as a few glyphs (hover for the words) instead of a row of tags. Local only.
     var statusGlyphs: Bool { didSet { defaults.set(statusGlyphs, forKey: Key.statusGlyphs) } }
 
+    /// How much room each row gets. Only spacing and layout: what a row says is `hiddenRowDetails`.
+    enum Density: String, CaseIterable, Identifiable {
+        case compact, standard, comfortable
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .compact: "Compact"
+            case .standard: "Default"
+            case .comfortable: "Comfortable"
+            }
+        }
+        /// Above and below each row's content.
+        var rowPadding: CGFloat {
+            switch self {
+            case .compact: 5
+            case .standard: 8
+            case .comfortable: 12
+            }
+        }
+        /// Between the details line and the title.
+        var lineSpacing: CGFloat { self == .comfortable ? 4 : 2 }
+    }
+    /// Local only.
+    var density: Density { didSet { defaults.set(density.rawValue, forKey: Key.density) } }
+
+    /// The parts of a row besides its dot and title, each one switchable.
+    enum RowDetail: String, CaseIterable, Identifiable {
+        case ref, author, status, age
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .ref: "Repository and number"
+            case .author: "Author (when it isn't you)"
+            case .status: "Status: conflicts, reviews, queue"
+            case .age: "Last updated"
+            }
+        }
+    }
+    /// Stored as what's hidden, so a detail added later shows up by default. Local only.
+    var hiddenRowDetails: Set<String> { didSet { defaults.set(Array(hiddenRowDetails).sorted(), forKey: Key.hiddenRowDetails) } }
+    func showsDetail(_ d: RowDetail) -> Bool { !hiddenRowDetails.contains(d.rawValue) }
+    func setDetail(_ d: RowDetail, shown: Bool) {
+        if shown { hiddenRowDetails.remove(d.rawValue) } else { hiddenRowDetails.insert(d.rawValue) }
+    }
+
     /// Which circular buttons an expanded row shows, in order (US-031). Local only.
     var rowActions: [RowAction] { didSet { defaults.set(rowActions.map(\.rawValue), forKey: Key.rowActions) } }
 
@@ -329,6 +376,8 @@ final class UserPrefs {
         defaults.set(RowAction.allCases.map(\.rawValue), forKey: Key.rowActionsSeen)
         sectionCounts = SectionCounts(rawValue: defaults.string(forKey: Key.sectionCounts) ?? "") ?? .off
         statusGlyphs = defaults.object(forKey: Key.statusGlyphs) as? Bool ?? true
+        density = Density(rawValue: defaults.string(forKey: Key.density) ?? "") ?? .standard
+        hiddenRowDetails = Set(defaults.stringArray(forKey: Key.hiddenRowDetails) ?? [])
         primaryClick = PrimaryClick(rawValue: defaults.string(forKey: Key.primaryClick) ?? "") ?? .open
         refreshRate = RefreshRate(rawValue: defaults.integer(forKey: Key.refreshSeconds)) ?? .automatic
         stackOrder = StackOrder(rawValue: defaults.string(forKey: Key.stackOrder) ?? "") ?? .bottomFirst

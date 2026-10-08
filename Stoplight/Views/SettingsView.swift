@@ -144,6 +144,22 @@ private struct DisplayTab: View {
                 Text("Deuteranopia swaps green for blue, which stays distinct from red and amber.")
             }
 
+            Section {
+                Picker(selection: $prefs.density) {
+                    ForEach(UserPrefs.Density.allCases) { Text($0.title).tag($0) }
+                } label: {
+                    InfoLabel("Density", "Room around each row. Compact puts the details on the title's line.")
+                }
+                .pickerStyle(.segmented)
+                ForEach(UserPrefs.RowDetail.allCases) { d in
+                    Toggle(d.title, isOn: Binding(get: { prefs.showsDetail(d) }, set: { prefs.setDetail(d, shown: $0) }))
+                }
+            } header: {
+                Text("Rows")
+            } footer: {
+                Text("Every row keeps its dot and title. Turn the rest off for a quieter list: hover a title for its repo and author, click it for the checks.")
+            }
+
             Section("Menu bar") {
                 Toggle(isOn: $prefs.housing) {
                     InfoLabel("Dark housing behind the dots",
