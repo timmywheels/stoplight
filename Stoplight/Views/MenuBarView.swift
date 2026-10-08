@@ -450,7 +450,7 @@ private struct Reorderable: ViewModifier {
                 .dropDestination(for: String.self) { items, _ in
                     guard let moving = items.first else { return false }
                     drop(moving)
-                    Haptics.tick()
+                    Haptics.drop()
                     return true
                 } isTargeted: { over in
                     if over && !targeted { Haptics.snap() }
