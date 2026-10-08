@@ -36,7 +36,7 @@ While the app runs:
 curl -s http://127.0.0.1:47391/status.json
 ```
 
-Auth state, last error, per-source counts, agent config. No secrets.
+Auth state, last error, per-source counts. No secrets.
 
 ## Layout
 

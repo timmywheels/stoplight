@@ -147,23 +147,6 @@ final class GlobalHotkey: @unchecked Sendable {
 
 /// Clipboard actions shared by the row buttons, the context menu, and the hotkeys.
 enum PRActions {
-    /// Onramp (the diff/review app) is installed: offer "Review in Onramp".
-    static var onrampInstalled: Bool {
-        NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.timwheeler.onramp") != nil
-    }
-
-    /// Where to get Onramp (Settings → Row buttons links here while it isn't installed).
-    static let onrampDownload = URL(string: "https://github.com/timmywheels/onramp/releases/latest")!
-
-    /// Open the PR in Onramp (as a tab; it finds your local clone).
-    static func openInOnramp(_ pr: PullRequest) {
-        var c = URLComponents()
-        c.scheme = "onramp"
-        c.host = "pr"
-        c.queryItems = [URLQueryItem(name: "repo", value: pr.repo), URLQueryItem(name: "number", value: String(pr.number))]
-        if let url = c.url { NSWorkspace.shared.open(url) }
-    }
-
     static func copyURL(_ pr: PullRequest) { copy(pr.url.absoluteString) }
     static func copyBranch(_ pr: PullRequest) { copy(pr.headRefName) }
     /// Full 40-char SHA of the PR's head commit (for branch rows, the commit shown).

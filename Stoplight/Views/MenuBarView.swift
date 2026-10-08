@@ -902,16 +902,13 @@ struct PRRow: View {
             case .pin: RowButton(symbol: pinned ? "pin.fill" : "pin", help: pinned ? "Unpin" : "Pin", tint: pinned ? .primary : nil) {
                 withAnimation(Self.motion) { model.togglePin(pr) }
             }
-            case .onramp: RowButton(symbol: a.symbol, help: a.title, tint: nil) {
-                PRActions.openInOnramp(pr)
-            }
             }
         }
     }
 
     private func circle(_ symbol: String, help: String, tint: Color? = nil, focused: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            RowAction.symbolImage(symbol)
+            Image(systemName: symbol)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(tint ?? .secondary)
                 .frame(width: 32, height: 32)
