@@ -20,7 +20,7 @@ public struct SearchQuery: Equatable, Sendable {
         (7...40).contains(t.count) && t.allSatisfy(\.isHexDigit) && t.contains(where: { ("a"..."f").contains($0) })
     }
 
-    public static let prefixes = ["author:", "repo:", "branch:", "is:"]
+    public static let prefixes = ["author:", "repo:", "branch:", "is:", "sha:"]
     public static let flagValues = ["red", "yellow", "green", "draft", "merged", "queued", "mine", "branch"]
 
     public init(_ text: String) {
@@ -34,6 +34,11 @@ public struct SearchQuery: Equatable, Sendable {
             else if t.hasPrefix("author:") { let v = String(t.dropFirst(7)).trimmingCharacters(in: CharacterSet(charactersIn: "@")); if !v.isEmpty { authors.append(v) } }
             else if t.hasPrefix("repo:") { let v = String(t.dropFirst(5)); if !v.isEmpty { repos.append(v) } }
             else if t.hasPrefix("branch:") { let v = String(t.dropFirst(7)); if !v.isEmpty { branches.append(v) } }
+            else if t.hasPrefix("sha:") {
+                // Said outright, so any hex counts: all digits, or as short as 4.
+                let v = String(t.dropFirst(4))
+                if v.count >= 4, v.count <= 40, v.allSatisfy(\.isHexDigit) { shas.append(v) }
+            }
             else if t.hasPrefix("is:") { let v = String(t.dropFirst(3)); if !v.isEmpty { flags.append(v) } }
             else if t.hasPrefix("#"), let n = Int(t.dropFirst()) { numbers.append(n) }
             else if Self.isCommitHash(t) { shas.append(t) }
@@ -114,6 +119,7 @@ public struct SearchQuery: Equatable, Sendable {
         if lower.hasPrefix("repo:") { return pick("repo:", prs.map { $0.repo.split(separator: "/").last.map(String.init) ?? $0.repo }) }
         if lower.hasPrefix("branch:") { return pick("branch:", prs.map(\.headRefName)) }
         if lower.hasPrefix("is:") { return pick("is:", flagValues) }
+        if lower.hasPrefix("sha:") { return [] } // a hash is pasted, not picked
         // Nothing typed, or a plain word: offer the prefixes.
         return prefixes.map { Suggestion(label: $0, insert: $0) }
     }

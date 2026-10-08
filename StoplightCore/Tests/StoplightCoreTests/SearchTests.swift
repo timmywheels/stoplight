@@ -47,6 +47,9 @@ final class SearchTests: XCTestCase {
         XCTAssertTrue(SearchQuery("1234567").shas.isEmpty)   // a number, not a hash
         XCTAssertTrue(SearchQuery("abc123").shas.isEmpty)    // too short
         XCTAssertTrue(SearchQuery("deploy").shas.isEmpty)    // not hex
+        XCTAssertEqual(SearchQuery("sha:1234567").shas, ["1234567"])   // said outright: digits are fine
+        XCTAssertTrue(SearchQuery("sha:a1b2").matches(target, ctx))
+        XCTAssertTrue(SearchQuery("sha:zz12").shas.isEmpty)
     }
 
     func testFlagsAndNumbers() {

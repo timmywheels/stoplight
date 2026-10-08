@@ -64,7 +64,8 @@ public struct GitHubProvider: CIProvider {
     /// `owners`. Short hashes collide across GitHub, so the search is kept to people and orgs you follow.
     public func pullRequests(containingCommit sha: String, owners: [String]) async throws -> [PullRequest] {
         let sha = sha.lowercased()
-        guard SearchQuery.isCommitHash(sha) else { return [] }
+        // GitHub needs 7 characters to search by hash.
+        guard (7...40).contains(sha.count), sha.allSatisfy(\.isHexDigit) else { return [] }
         let scope = owners.filter(Filters.isValidLogin)
             .prefix(20).map { "user:\($0)" }.joined(separator: " ")
         let field = "q0: search(query: \"\(sha) is:pr \(scope)\", type: ISSUE, first: 10) { nodes { ... on PullRequest { ...PRFields } } }"
