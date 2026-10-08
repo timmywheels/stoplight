@@ -1026,7 +1026,9 @@ struct FilterDot: View {
     var body: some View {
         Button(action: toggle) {
             HStack(spacing: 4) {
-                StatusDot(state: state)
+                // Nothing in this state: no pulse, and dimmed, so the eye skips it.
+                StatusDot(state: state, pulses: count > 0)
+                    .opacity(count == 0 ? 0.45 : 1)
                 Text("\(count)").font(.caption).monospacedDigit().fixedSize()
                     .foregroundStyle(selected ? .primary : .secondary)
             }
@@ -1053,21 +1055,25 @@ struct FilterDot: View {
 struct StatusDot: View {
     let state: CIState
     var hollow = false
+    /// Off where "running" is a category, not something happening (a footer tally of zero).
+    var pulses = true
     @Environment(\.colorProfile) private var colorProfile
     @State private var pulse = false
 
     var color: Color {
         colorProfile.color(for: state)
     }
+    private var shouldPulse: Bool { pulses && state == .pending }
 
     var body: some View {
         Circle()
             .strokeBorder(color, lineWidth: hollow ? 1.5 : 0)
             .background(Circle().fill(hollow ? .clear : color))
             .frame(width: 8, height: 8)
-            .opacity(state == .pending && pulse ? 0.4 : 1)
-            .animation(state == .pending ? .easeInOut(duration: 1).repeatForever() : .default, value: pulse)
-            .onAppear { pulse = state == .pending }
+            .opacity(pulse ? 0.4 : 1)
+            .animation(pulse ? .easeInOut(duration: 1).repeatForever() : .default, value: pulse)
+            .onAppear { pulse = shouldPulse }
+            .onChange(of: shouldPulse) { _, on in pulse = on }
     }
 }
 
