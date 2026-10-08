@@ -102,7 +102,7 @@ struct MenuBarView: View {
                 centered("Loading…")
             } else if model.tab == .queue && model.hasQueues {
                 if model.queueSections.isEmpty {
-                    centered(model.searchText.isEmpty ? "No merge queues yet. One shows up here once a PR of yours waits in it." : "No queued PRs match “\(model.searchText)”")
+                    centered(model.searchText.isEmpty ? "No merge queues. A branch your PRs merge into shows up here when it has one, or pin one in Settings → Sources." : "No queued PRs match “\(model.searchText)”")
                 } else {
                     scrolling(queueList)
                 }

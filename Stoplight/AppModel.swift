@@ -742,15 +742,23 @@ final class AppModel {
         guard prefs.showQueues else { queues = []; return }
         let live = Set(all.filter { $0.mergeQueue != nil && !$0.baseRefName.isEmpty }
             .map { BranchRef(repo: $0.repo, branch: $0.baseRefName) })
-        prefs.rememberQueues(all.filter { $0.mergeQueue != nil && isMine($0) && !$0.baseRefName.isEmpty }
-            .map { BranchRef(repo: $0.repo, branch: $0.baseRefName).spec })
-        let refs = Array(live.union(prefs.queueSpecs().compactMap(BranchRef.init(spec:))))
+        // Where your PRs land (open or just merged): if that branch has a queue, it's yours to watch,
+        // whoever is in it right now. Stacked PRs target other PRs' branches, which never have one.
+        let prBranches = Set(all.map { BranchRef(repo: $0.repo, branch: $0.headRefName) })
+        let landing = Set((mine + merged).filter { !$0.baseRefName.isEmpty }
+            .map { BranchRef(repo: $0.repo, branch: $0.baseRefName) })
+            .subtracting(prBranches)
+        let known = Set(prefs.queueSpecs().compactMap(BranchRef.init(spec:)))
+        let refs = Array(live.union(known).union(landing.prefix(20)))
         guard !refs.isEmpty else { queues = []; return }
         guard let found = try? await provider.fetchMergeQueues(refs, limit: prefs.queueItems) else { return }
         // No entry at all means GitHub has no queue on that branch (or the repo is gone): skip it.
         queues = refs.sorted { $0.spec < $1.spec }.compactMap { ref in
             found[ref.key].map { (ref, $0) }
         }
+        // Remember every queue you're tied to, so it stays when your PRs move on.
+        prefs.rememberQueues(queues.map(\.ref).filter { landing.contains($0) || known.contains($0) }.map(\.spec)
+            + all.filter { $0.mergeQueue != nil && isMine($0) }.map { BranchRef(repo: $0.repo, branch: $0.baseRefName).spec })
     }
 
     func toggleQueuePin(_ ref: BranchRef) { prefs.toggleQueuePin(ref.spec) }

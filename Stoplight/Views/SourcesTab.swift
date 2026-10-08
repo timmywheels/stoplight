@@ -281,7 +281,7 @@ private struct QueuesSection: View {
         } header: {
             Text("Merge queues")
         } footer: {
-            Text("A queue shows up once a PR of yours waits in it, and stays for 30 days after, empty or not. Pin one to keep it for good, or add one by hand.")
+            Text("Any branch your PRs merge into that has a merge queue shows up, with everyone's PRs in it, and stays for 30 days after your last PR there. Pin one to keep it for good, or add one by hand.")
         }
     }
 
