@@ -725,7 +725,9 @@ struct PRRow: View {
             // Hovering swaps status and age for the quick actions, in the same spot: nothing floats
             // over the title, and the expanded row still says what status and age said.
             if showsQuickActions {
-                quickActions
+                // Holds the spot only; the buttons themselves sit on top, after the row's tap gesture,
+                // which would otherwise take their clicks and open the PR.
+                quickActions.hidden()
             } else {
                 trailingStatus.lineLimit(1).fixedSize()
                 if model.prefs.showsDetail(.age) {
@@ -748,6 +750,9 @@ struct PRRow: View {
                     if NSEvent.modifierFlags.contains(.command) { secondaryClick() } else { primaryClick() }
                 })
         )
+        .overlay(alignment: .trailing) {
+            if showsQuickActions { quickActions.padding(.trailing, 12) }
+        }
     }
 
     private var showsQuickActions: Bool { hovering && !expanded && !editingAlias }
