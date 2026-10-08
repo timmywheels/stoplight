@@ -549,6 +549,12 @@ final class AppModel {
 
     /// The panel opened: show fresh data if what's there is over 30 s old.
     func refreshIfStale() {
+        // Opening the panel after a failed sign-in: try again now rather than wait for the timer.
+        if case .failed = auth {
+            signInRetryTask?.cancel()
+            Task { await signIn(); if case .signedIn = auth { await refresh() } }
+            return
+        }
         guard Date.now.timeIntervalSince(lastRefresh ?? .distantPast) > 30 else { return }
         Task { await refresh() }
     }
@@ -597,10 +603,28 @@ final class AppModel {
             provider = p
             self.login = login
             auth = .signedIn(login: login, source: found.kind)
+            signInRetries = 0
         } catch {
             log.error("sign-in failed: \(String(describing: error), privacy: .public)")
             provider = nil
             auth = .failed(error.localizedDescription)
+            // Wi-Fi waking up, a VPN reconnecting: not your token's fault. Try again on our own.
+            if error is URLError { scheduleSignInRetry() }
+        }
+    }
+
+    @ObservationIgnored private var signInRetries = 0
+    @ObservationIgnored private var signInRetryTask: Task<Void, Never>?
+    private func scheduleSignInRetry() {
+        let delays: [Double] = [5, 15, 30, 60]
+        let wait = delays[min(signInRetries, delays.count - 1)]
+        signInRetries += 1
+        signInRetryTask?.cancel()
+        signInRetryTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(wait))
+            guard !Task.isCancelled, let self, case .failed = self.auth else { return }
+            await self.signIn()
+            if case .signedIn = self.auth { await self.refresh() }
         }
     }
 

@@ -40,8 +40,7 @@ struct MenuBarView: View {
                     .help("Drag to move")
 
                 if model.hasQueues {
-                    tabGlyph("checklist", tab: .prs, help: "Your PRs (⌃⇥)")
-                    tabGlyph("line.3.horizontal", tab: .queue, help: "Merge queue (⌃⇥)")
+                    TabToggle(model: model)
                 }
                 Button { model.pinnedPanel.toggle() } label: {
                     Image(systemName: model.pinnedPanel ? "pin.fill" : "pin")
@@ -165,17 +164,6 @@ struct MenuBarView: View {
         }
     }
 
-    /// Two small glyphs rather than a segmented control: the panel is narrow and this is a view
-    /// switch, not a setting. The active one takes the accent colour.
-    private func tabGlyph(_ symbol: String, tab: AppModel.Tab, help: String) -> some View {
-        Button { model.tab = tab } label: {
-            Image(systemName: symbol)
-                .foregroundStyle(model.tab == tab ? Color.accentColor : .secondary)
-                .frame(width: 22, height: 22).contentShape(Rectangle())
-        }
-        .buttonStyle(.plain).help(help)
-    }
-
     private var allSectionsCollapsed: Bool {
         !model.sections.isEmpty && model.sections.allSatisfy { model.prefs.collapsedSections.contains($0.id) }
     }
@@ -219,6 +207,7 @@ struct MenuBarView: View {
                               forgetQueue: { if let q = sec.queue { withAnimation(.snappy(duration: 0.2, extraBounce: 0)) { model.forgetQueue(q) } } },
                               toggle: { model.prefs.toggleCollapsed(sec.id) },
                               toggleAll: { _ = model.handle(.toggleSections) },
+                              reorderable: sec.queue == nil && model.sections.count > 1,
                               drop: { moving in
                                   withAnimation(.snappy(duration: 0.2, extraBounce: 0)) {
                                       model.prefs.moveSection(moving, onto: sec.id, currentOrder: model.sectionIDs)
@@ -428,6 +417,28 @@ struct WatchField: View {
     }
 }
 
+/// Drag a header onto another to reorder (US-023). Off where there's nothing to reorder.
+private struct Reorderable: ViewModifier {
+    let id: String
+    let enabled: Bool
+    let drop: (String) -> Void
+    @Binding var targeted: Bool
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content
+                .draggable(id)
+                .dropDestination(for: String.self) { items, _ in
+                    guard let moving = items.first else { return false }
+                    drop(moving)
+                    return true
+                } isTargeted: { targeted = $0 }
+        } else {
+            content
+        }
+    }
+}
+
 /// Click to collapse. Drag to reorder (US-023). Collapsed: per-state counts so nothing is lost.
 struct SectionHeader: View {
     let id: String
@@ -447,6 +458,8 @@ struct SectionHeader: View {
     var forgetQueue: () -> Void = {}
     let toggle: () -> Void
     var toggleAll: () -> Void = {}
+    /// Dragging only means something with more than one section to put in order.
+    var reorderable = true
     let drop: (String) -> Void
     @State private var targeted = false
 
@@ -491,8 +504,10 @@ struct SectionHeader: View {
                 .buttonStyle(.plain).help("Open on GitHub")
                 .padding(.trailing, 2)
             }
-            Image(systemName: "line.3.horizontal").font(.caption2).foregroundStyle(.quaternary)
-                .help("Drag to reorder")
+            if reorderable {
+                Image(systemName: "line.3.horizontal").font(.caption2).foregroundStyle(.quaternary)
+                    .help("Drag to reorder")
+            }
         }
         .padding(.horizontal, 12).padding(.top, 8).padding(.bottom, collapsed ? 8 : 2)
         .contentShape(Rectangle())
@@ -512,12 +527,7 @@ struct SectionHeader: View {
                 Button("Stop Showing \(queue.spec)", action: forgetQueue)
             }
         }
-        .draggable(id)
-        .dropDestination(for: String.self) { items, _ in
-            guard let moving = items.first else { return false }
-            drop(moving)
-            return true
-        } isTargeted: { targeted = $0 }
+        .modifier(Reorderable(id: id, enabled: reorderable, drop: drop, targeted: $targeted))
         .animation(.easeOut(duration: 0.15), value: collapsed)
     }
 }
@@ -1167,5 +1177,55 @@ struct SkeletonRow: View {
             withAnimation(.easeInOut(duration: 0.9).repeatForever().delay(Double(index) * 0.12)) { dim = true }
         }
         .accessibilityHidden(true)
+    }
+}
+
+/// PRs | Queue: a small segmented toggle in the top bar. The selection slides; the queue side
+/// carries how many are waiting. ⌃⇥ switches too.
+struct TabToggle: View {
+    @Bindable var model: AppModel
+    @Namespace private var ns
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var queued: Int { model.queueSections.reduce(0) { $0 + $1.prs.count } }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            segment("PRs", tab: .prs)
+            segment("Queue", tab: .queue, count: queued)
+        }
+        .padding(2)
+        .background(Capsule().fill(.primary.opacity(0.06)))
+        .overlay(Capsule().strokeBorder(.primary.opacity(0.08), lineWidth: 0.5))
+        .fixedSize()
+        .help("Your PRs or the merge queue (⌃⇥)")
+    }
+
+    private func segment(_ title: String, tab: AppModel.Tab, count: Int = 0) -> some View {
+        let on = model.tab == tab
+        return Button {
+            withAnimation(reduceMotion ? nil : .snappy(duration: 0.22, extraBounce: 0)) { model.tab = tab }
+        } label: {
+            HStack(spacing: 4) {
+                Text(title)
+                if count > 0 {
+                    Text("\(count)").monospacedDigit()
+                        .foregroundStyle(on ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
+                }
+            }
+            .font(.caption.weight(on ? .semibold : .regular))
+            .foregroundStyle(on ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+            .padding(.horizontal, 9).padding(.vertical, 3)
+            .background {
+                if on {
+                    Capsule().fill(.background.opacity(0.9))
+                        .shadow(color: .black.opacity(0.15), radius: 1, y: 0.5)
+                        .matchedGeometryEffect(id: "selection", in: ns)
+                }
+            }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
