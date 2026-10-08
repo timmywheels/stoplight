@@ -781,7 +781,8 @@ final class AppModel {
             found[ref.key].map { (ref, $0) }
         }
         // Remember every queue you're tied to, so it stays when your PRs move on.
-        prefs.rememberQueues(queues.map(\.ref).filter { landing.contains($0) || known.contains($0) }.map(\.spec)
+        // Pinned ones aren't copied in: unpinning has to make them go.
+        prefs.rememberQueues(queues.map(\.ref).filter { landing.contains($0) }.map(\.spec)
             + all.filter { $0.mergeQueue != nil && isMine($0) }.map { BranchRef(repo: $0.repo, branch: $0.baseRefName).spec })
     }
 

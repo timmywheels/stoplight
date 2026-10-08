@@ -562,6 +562,8 @@ struct PRRow: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.colorProfile) private var colorProfile
     @State private var hovering = false
+    /// The title doesn't fit its line; the expanded row then shows all of it.
+    @State private var titleTruncated = false
     @State private var copied: String?  // which button just copied, for the 1s checkmark
     @State private var editingAlias = false
     @State private var aliasDraft = ""
@@ -680,8 +682,8 @@ struct PRRow: View {
                 .onExitCommand { editingAlias = false }
                 .onChange(of: aliasFocused) { _, f in if !f { editingAlias = false } }
         } else {
-            Text(model.displayTitle(pr)).lineLimit(1).truncationMode(.tail)
-                .help(pr.isBranch ? pr.shortRef : "\(pr.shortRef) · @\(pr.author)")
+            MarqueeText(text: model.displayTitle(pr), active: hovering && !expanded, truncated: $titleTruncated)
+                .help(pr.isBranch ? pr.shortRef : "\(model.displayTitle(pr))\n\(pr.shortRef) · @\(pr.author)")
         }
     }
 
@@ -831,8 +833,11 @@ struct PRRow: View {
 
     private var expansion: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if alias != nil {
-                Text(pr.title).font(.caption.weight(.medium)).lineLimit(2)
+            if alias != nil || titleTruncated {
+                // The whole title, since the row cut it off (or shows a nickname instead).
+                Text(pr.title).font(.callout.weight(.medium)).lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
             }
             if !pr.summary.isEmpty {
                 Text(pr.summary).font(.caption).foregroundStyle(.secondary)
