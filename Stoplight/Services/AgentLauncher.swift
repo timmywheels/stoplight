@@ -111,14 +111,38 @@ enum AgentLauncher {
     /// Which agent binaries exist. Deterministic: look for the file in every dir on the login PATH plus the
     /// usual tool folders, instead of trusting an interactive shell to behave in a non-tty.
     static func detectAgents() async -> Set<Agent> {
-        let loginPath = (try? await shell("echo $PATH")) ?? ""
-        let dirs = (extraPath + ":" + loginPath).split(separator: ":").map(String.init)
+        let dirs = await searchPath()
         var found = Set<Agent>([.custom])
         for a in Agent.allCases {
             guard let bin = a.binary else { continue }
             if dirs.contains(where: { FileManager.default.isExecutableFile(atPath: "\($0)/\(bin)") }) { found.insert(a) }
         }
         return found
+    }
+
+    /// The PATH your login shell ends up with after all your rc files, then the usual tool folders.
+    /// Asked once and kept; an empty answer (a config that hangs) is asked again next time.
+    static func searchPath() async -> [String] {
+        if cachedLoginPath == nil, let p = await loginPATH(), !p.isEmpty { cachedLoginPath = p }
+        var seen = Set<String>()
+        return ((cachedLoginPath ?? []) + extraPath.split(separator: ":").map(String.init)).filter { !$0.isEmpty && seen.insert($0).inserted }
+    }
+    private nonisolated(unsafe) static var cachedLoginPath: [String]?
+
+    /// The first `name` on `searchPath()`: a real file, never an alias or a function your config wraps it in.
+    static func which(_ name: String) async -> String? {
+        for dir in await searchPath() where FileManager.default.isExecutableFile(atPath: "\(dir)/\(name)") { return "\(dir)/\(name)" }
+        return nil
+    }
+
+    /// `printenv PATH` after a marker: anything your config prints on startup comes before it and is skipped.
+    /// printenv, not `echo $PATH`, because fish keeps PATH as a list and only the exported form has colons.
+    private static func loginPATH() async -> [String]? {
+        let marker = "__STOPLIGHT_PATH__"
+        guard let out = try? await shell("echo \(marker); printenv PATH") else { return nil }
+        guard let after = out.components(separatedBy: marker).last else { return nil }
+        let line = after.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.first { !$0.isEmpty } ?? ""
+        return line.split(separator: ":").map(String.init)
     }
 
     // MARK: Repos
@@ -443,7 +467,7 @@ enum AgentLauncher {
         echo $$ > \(shq(pidFile))
         trap 'rm -f \(shq(pidFile))' EXIT INT TERM HUP
         clear
-        \(command)
+        \(inLoginShell(command))
         \(shq(loginShell.path)) -l
         """
         try body.write(to: file, atomically: true, encoding: .utf8)
@@ -497,6 +521,13 @@ enum AgentLauncher {
         }
     }
 
+    /// `command` as your login shell runs it in a terminal: rc files read, so PATH, aliases and
+    /// version managers (nvm, mise, asdf) are all there, as they are when you type it yourself.
+    static func inLoginShell(_ command: String) -> String {
+        let sh = loginShell
+        return ([shq(sh.path)] + sh.args.map(shq) + [shq(command)]).joined(separator: " ")
+    }
+
     /// Runs under the user's own login shell so their config applies, whatever shell that is.
     /// Extra tool dirs go in the environment rather than an `export` line, since that syntax isn't
     /// portable (fish would reject it) and every shell inherits and extends PATH from its parent.
@@ -517,9 +548,10 @@ enum AgentLauncher {
             p.standardError = err
             try p.run()
             // A login shell runs the user's whole config, and some of it waits forever without a
-            // terminal. Give up after 8s; killing it closes the pipes, so the reads below return.
+            // terminal. Give up after 15s (a slow one, nvm plus conda on a cold start, still finishes);
+            // killing it closes the pipes, so the reads below return.
             let watchdog = DispatchWorkItem { if p.isRunning { p.terminate() } }
-            DispatchQueue.global().asyncAfter(deadline: .now() + 8, execute: watchdog)
+            DispatchQueue.global().asyncAfter(deadline: .now() + 15, execute: watchdog)
             defer { watchdog.cancel() }
             let data = out.fileHandleForReading.readDataToEndOfFile()
             let errData = err.fileHandleForReading.readDataToEndOfFile()

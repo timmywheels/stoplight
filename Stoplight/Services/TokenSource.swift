@@ -17,10 +17,10 @@ enum TokenSource {
     /// Whatever a login shell resolves `gh` to. Filled once at launch, since the app's own PATH is minimal.
     private(set) nonisolated(unsafe) static var discoveredGHPath: String?
 
+    /// Looks along your login shell's PATH ourselves rather than asking `command -v gh`, which answers
+    /// with the alias when your config wraps gh (1Password's shell plugin does) instead of the file.
     static func discoverGH() async {
-        guard let out = try? await AgentLauncher.shell("command -v gh || true") else { return }
-        let path = out.split(separator: "\n").map(String.init).last?.trimmingCharacters(in: .whitespaces) ?? ""
-        if !path.isEmpty, FileManager.default.isExecutableFile(atPath: path) { discoveredGHPath = path }
+        if let path = await AgentLauncher.which("gh") { discoveredGHPath = path }
     }
 
     static func resolve() -> Found? {
