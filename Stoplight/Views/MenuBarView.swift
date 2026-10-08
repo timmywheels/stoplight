@@ -592,8 +592,11 @@ struct PRRow: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .clipped()
-        .background(selected || model.picked.contains(pr.id) ? AnyShapeStyle(Color.accentColor.opacity(0.18))
-                    : hovering || expanded ? AnyShapeStyle(.quaternary.opacity(0.5)) : AnyShapeStyle(.clear))
+        // Neutral, like the rest of the panel: a little stronger for the keyboard's row, quieter for hover.
+        // A pick (⇧-click, to close several) keeps the accent, so it reads as a selection to act on.
+        .background(model.picked.contains(pr.id) ? AnyShapeStyle(Color.accentColor.opacity(0.18))
+                    : selected ? AnyShapeStyle(.primary.opacity(0.08))
+                    : hovering || expanded ? AnyShapeStyle(.primary.opacity(0.04)) : AnyShapeStyle(.clear))
         .id(pr.id)
         .onHover { hovering = $0 }
         .contextMenu { menu }
@@ -829,7 +832,7 @@ struct PRRow: View {
         VStack(alignment: .leading, spacing: 10) {
             if alias != nil || titleTruncated {
                 // The whole title, since the row cut it off (or shows a nickname instead).
-                Text(pr.title).font(.callout.weight(.medium)).lineLimit(3)
+                Text(pr.title).font(.callout).lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
             }
@@ -861,11 +864,14 @@ struct PRRow: View {
                     .help("Open the checks tab on GitHub")
                 }
             }
-            FlowLayout(spacing: 10, rowSpacing: 8) {
+            // One row of plain icons: a soft plate only under the pointer or the keyboard's focus.
+            HStack(spacing: 2) {
                 ForEach(Array(buttons.enumerated()), id: \.offset) { i, b in
-                    circle(b.symbol, help: b.help, tint: b.tint, focused: selected && model.focusedButton == i, action: b.action)
+                    ExpandedButton(symbol: b.symbol, help: b.help, tint: b.tint,
+                                   focused: selected && model.focusedButton == i, action: b.action)
                 }
             }
+            .padding(.leading, -6)   // the first icon lines up with the text, not its plate
             .frame(maxWidth: .infinity, alignment: .leading)
             .onAppear { if selected { model.expandedButtonCount = buttons.count } }
             .onChange(of: selected) { _, sel in if sel { model.expandedButtonCount = buttons.count } }
@@ -917,20 +923,6 @@ struct PRRow: View {
             }
             }
         }
-    }
-
-    private func circle(_ symbol: String, help: String, tint: Color? = nil, focused: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(tint ?? .secondary)
-                .frame(width: 32, height: 32)
-                .background(.quaternary, in: Circle())
-                .overlay(Circle().strokeBorder(Color.accentColor, lineWidth: focused ? 2 : 0))
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .help(help)
     }
 
     private func flash(_ key: String, _ action: () -> Void) {
@@ -1228,5 +1220,30 @@ struct TabToggle: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(on ? .isSelected : [])
+    }
+}
+
+/// A button in the expanded row: an icon, with a soft plate under the pointer or keyboard focus.
+private struct ExpandedButton: View {
+    let symbol: String
+    let help: String
+    var tint: Color? = nil
+    var focused = false
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(tint ?? (hovering || focused ? .primary : .secondary))
+                .frame(width: 28, height: 26)
+                .background(RoundedRectangle(cornerRadius: 6).fill(.primary.opacity(hovering || focused ? 0.08 : 0)))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.primary.opacity(focused ? 0.35 : 0), lineWidth: 1))
+                .contentShape(RoundedRectangle(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .onHover { hovering = $0 }
     }
 }
