@@ -100,6 +100,7 @@ final class UserPrefs {
         static let rowActionsSeen = "rowActionsSeen"
         static let sectionCounts = "sectionCounts"
         static let statusGlyphs = "statusGlyphs"
+        static let haptics = "haptics"
         static let density = "density"
         static let appearance = "appearance"
         static let hiddenRowDetails = "hiddenRowDetails"
@@ -210,6 +211,8 @@ final class UserPrefs {
 
     /// A row says its status as a few glyphs (hover for the words) instead of a row of tags. Local only.
     var statusGlyphs: Bool { didSet { defaults.set(statusGlyphs, forKey: Key.statusGlyphs) } }
+    /// Trackpad ticks on drag, copy and pick (see `Haptics`).
+    var haptics: Bool { didSet { defaults.set(haptics, forKey: Key.haptics) } }
 
     /// How much room each row gets. Only spacing and layout: what a row says is `hiddenRowDetails`.
     enum Density: String, CaseIterable, Identifiable {
@@ -376,6 +379,7 @@ final class UserPrefs {
         defaults.set(RowAction.allCases.map(\.rawValue), forKey: Key.rowActionsSeen)
         sectionCounts = SectionCounts(rawValue: defaults.string(forKey: Key.sectionCounts) ?? "") ?? .off
         statusGlyphs = defaults.object(forKey: Key.statusGlyphs) as? Bool ?? true
+        haptics = defaults.object(forKey: Key.haptics) as? Bool ?? true
         density = Density(rawValue: defaults.string(forKey: Key.density) ?? "") ?? .standard
         appearance = Appearance(rawValue: defaults.string(forKey: Key.appearance) ?? "") ?? .system
         hiddenRowDetails = Set(defaults.stringArray(forKey: Key.hiddenRowDetails) ?? [])
