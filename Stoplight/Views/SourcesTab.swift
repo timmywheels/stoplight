@@ -74,6 +74,8 @@ struct SourcesTab: View {
                 Text("Gone everywhere: list, dots, widget, notifications. Bots are hidden by default. To hide one PR, right-click it in the panel; it drops off this list once it merges or closes.")
             }
 
+            QueuesSection(model: model)
+
             Section {
                 Picker(selection: $prefs.mergedDays) {
                     Text("Off").tag(0)
@@ -84,20 +86,6 @@ struct SourcesTab: View {
                               "Keeps your merged PRs around a while, so a red merge commit still reaches you.")
                 }
                 .onChange(of: prefs.mergedDays) { _, _ in model.sourcesChanged() }
-
-                Toggle(isOn: $prefs.showQueues) {
-                    InfoLabel("Merge queues",
-                              "When a PR you can see is waiting in a queue, that queue gets its own section: what's ahead of it, and whether the front is failing. Queue rows never light the dots or notify you.")
-                }
-                .onChange(of: prefs.showQueues) { _, _ in model.sourcesChanged() }
-
-                if prefs.showQueues {
-                    Stepper(value: $prefs.queueItems, in: 1...25) {
-                        InfoLabel("Queue entries shown: \(prefs.queueItems)",
-                                  "How far down each queue to list. The queue a PR is in belongs to its base branch, whatever that branch is called.")
-                    }
-                    .onChange(of: prefs.queueItems) { _, _ in model.sourcesChanged() }
-                }
 
                 Stepper(value: $prefs.branchCommits, in: 1...10) {
                     InfoLabel("Commits shown per branch: \(prefs.branchCommits)",
@@ -247,4 +235,72 @@ struct SourcesTab: View {
         }
         model.sourcesChanged()
     }
+}
+
+/// Settings → Sources → Merge queues: the ones a PR of yours used lately, and the ones you pinned.
+/// Each stays on the panel's Queue tab while it's empty.
+private struct QueuesSection: View {
+    @Bindable var model: AppModel
+    @State private var draft = ""
+    @State private var error: String?
+
+    private var specs: [String] { model.prefs.queueSpecs().sorted() }
+
+    var body: some View {
+        @Bindable var prefs = model.prefs
+        Section {
+            Toggle(isOn: $prefs.showQueues) {
+                InfoLabel("Merge queues",
+                          "A Queue tab beside your PRs: what's ahead of yours, and whether the front is failing. Queue rows never light the dots or notify you.")
+            }
+            .onChange(of: prefs.showQueues) { _, _ in model.sourcesChanged() }
+
+            if prefs.showQueues {
+                Stepper(value: $prefs.queueItems, in: 1...25) {
+                    InfoLabel("Queue entries shown: \(prefs.queueItems)",
+                              "How far down each queue to list.")
+                }
+                .onChange(of: prefs.queueItems) { _, _ in model.sourcesChanged() }
+
+                BoxList(items: specs.map(QueueItem.init), visibleRows: 5, draft: { AnyView(addField) }) { item in
+                    HStack(spacing: 8) {
+                        Image(systemName: "line.3.horizontal").foregroundStyle(.secondary).frame(width: 16)
+                        Text(item.id).lineLimit(1).truncationMode(.middle)
+                        Spacer()
+                        Button { prefs.toggleQueuePin(item.id); model.sourcesChanged() } label: {
+                            Image(systemName: prefs.isQueuePinned(item.id) ? "pin.fill" : "pin")
+                                .foregroundStyle(prefs.isQueuePinned(item.id) ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
+                        }
+                        .buttonStyle(.borderless)
+                        .help(prefs.isQueuePinned(item.id) ? "Pinned: always shown. Click to let it expire." : "Remembered for 30 days after a PR of yours waits in it. Click to always show it.")
+                        RowRemoveButton(help: "Stop showing this queue") { prefs.forgetQueue(item.id); model.sourcesChanged() }
+                    }
+                }
+                if let error { Text(error).font(.caption).foregroundStyle(.red) }
+            }
+        } header: {
+            Text("Merge queues")
+        } footer: {
+            Text("A queue shows up once a PR of yours waits in it, and stays for 30 days after, empty or not. Pin one to keep it for good, or add one by hand.")
+        }
+    }
+
+    private var addField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "plus").foregroundStyle(.tertiary).frame(width: 16)
+            TextField("owner/repo@main", text: $draft)
+                .textFieldStyle(.plain)
+                .onSubmit(add)
+        }
+    }
+
+    private func add() {
+        let text = draft.trimmingCharacters(in: .whitespaces)
+        guard let ref = BranchRef(spec: text), !ref.isPattern else { error = "Write it as owner/repo@branch"; return }
+        if !model.prefs.isQueuePinned(ref.spec) { model.prefs.toggleQueuePin(ref.spec) }
+        draft = ""; error = nil
+        model.sourcesChanged()
+    }
+
+    private struct QueueItem: Identifiable { let id: String }
 }

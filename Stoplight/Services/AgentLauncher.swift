@@ -516,6 +516,11 @@ enum AgentLauncher {
             p.standardOutput = out
             p.standardError = err
             try p.run()
+            // A login shell runs the user's whole config, and some of it waits forever without a
+            // terminal. Give up after 8s; killing it closes the pipes, so the reads below return.
+            let watchdog = DispatchWorkItem { if p.isRunning { p.terminate() } }
+            DispatchQueue.global().asyncAfter(deadline: .now() + 8, execute: watchdog)
+            defer { watchdog.cancel() }
             let data = out.fileHandleForReading.readDataToEndOfFile()
             let errData = err.fileHandleForReading.readDataToEndOfFile()
             p.waitUntilExit()

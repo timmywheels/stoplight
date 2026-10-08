@@ -115,6 +115,8 @@ final class UserPrefs {
         static let stackOrder = "stackCopyOrder"
         static let showQueues = "showQueues"
         static let queueItems = "queueItems"
+        static let rememberedQueues = "rememberedQueues"
+        static let pinnedQueues = "pinnedQueues"
         static let refreshSeconds = "refreshSeconds"
         static let notifyReviews = "notifyReviews"
         static let notifyComments = "notifyComments"
@@ -156,6 +158,34 @@ final class UserPrefs {
     var showQueues: Bool { didSet { defaults.set(showQueues, forKey: Key.showQueues) } }
     /// How many entries of each queue to list.
     var queueItems: Int { didSet { defaults.set(queueItems, forKey: Key.queueItems) } }
+    /// Queues a PR of yours has waited in, "owner/repo@branch" → when one last did (seconds since 1970).
+    /// Kept so the queue stays on screen when it's empty. Local only.
+    var rememberedQueues: [String: Double] { didSet { defaults.set(rememberedQueues, forKey: Key.rememberedQueues) } }
+    /// Queues you asked to always show, "owner/repo@branch". They never expire. Local only.
+    var pinnedQueues: [String] { didSet { defaults.set(pinnedQueues, forKey: Key.pinnedQueues) } }
+    /// How long a remembered queue stays without a PR of yours passing through it.
+    static let queueMemory: TimeInterval = 30 * 24 * 3600
+
+    /// Note that a PR of yours is in `spec`'s queue right now. Writes only when the day changes, not every poll.
+    func rememberQueues(_ specs: [String], now: Date = .now) {
+        var next = rememberedQueues
+        for spec in specs where now.timeIntervalSince1970 - (next[spec] ?? 0) > 24 * 3600 { next[spec] = now.timeIntervalSince1970 }
+        if next != rememberedQueues { rememberedQueues = next }
+    }
+    /// Remembered and pinned queues worth asking GitHub about, oldest memories dropped.
+    func queueSpecs(now: Date = .now) -> [String] {
+        let fresh = rememberedQueues.filter { now.timeIntervalSince1970 - $0.value < Self.queueMemory }.map(\.key)
+        return Array(Set(fresh + pinnedQueues))
+    }
+    func isQueuePinned(_ spec: String) -> Bool { pinnedQueues.contains(spec) }
+    func toggleQueuePin(_ spec: String) {
+        if let i = pinnedQueues.firstIndex(of: spec) { pinnedQueues.remove(at: i) } else { pinnedQueues.append(spec) }
+    }
+    /// Stop showing a queue until a PR of yours waits in it again.
+    func forgetQueue(_ spec: String) {
+        pinnedQueues.removeAll { $0 == spec }
+        rememberedQueues[spec] = nil
+    }
 
     /// Which end of a stack "Copy stack as Markdown" starts from.
     enum StackOrder: String, CaseIterable, Identifiable {
@@ -304,6 +334,8 @@ final class UserPrefs {
         stackOrder = StackOrder(rawValue: defaults.string(forKey: Key.stackOrder) ?? "") ?? .bottomFirst
         showQueues = defaults.object(forKey: Key.showQueues) as? Bool ?? true
         queueItems = max(1, defaults.object(forKey: Key.queueItems) as? Int ?? 10)
+        rememberedQueues = defaults.dictionary(forKey: Key.rememberedQueues) as? [String: Double] ?? [:]
+        pinnedQueues = defaults.stringArray(forKey: Key.pinnedQueues) ?? []
         agent = defaults.string(forKey: Key.agent) ?? ""
         agentCustomCommand = defaults.string(forKey: Key.agentCustom) ?? "my-agent {prompt}"
         agentPermissionMode = defaults.string(forKey: Key.agentPermission) ?? "ask"

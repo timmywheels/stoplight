@@ -100,6 +100,12 @@ struct MenuBarView: View {
         case .signedIn:
             if model.lastRefresh == nil && model.lastError == nil {
                 centered("Loading…")
+            } else if model.tab == .queue && model.hasQueues {
+                if model.queueSections.isEmpty {
+                    centered(model.searchText.isEmpty ? "No merge queues yet. One shows up here once a PR of yours waits in it." : "No queued PRs match “\(model.searchText)”")
+                } else {
+                    scrolling(queueList)
+                }
             } else if model.isEmpty {
                 centered("No open PRs")
             } else if rowCount == 0, let ref = model.searchedPullRequest {
@@ -107,18 +113,22 @@ struct MenuBarView: View {
             } else if rowCount == 0 && (!model.statusFilter.isEmpty || !model.searchText.isEmpty) {
                 centered(model.searchText.isEmpty ? "No PRs match the filter" : "No PRs match “\(model.searchText)”")
             } else {
-                // The panel has a user-chosen size; the list fills it and scrolls. Headers carry 8pt of their own; 4 more makes 12, matching the sides.
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        (model.tab == .queue && model.hasQueues ? AnyView(queueList) : AnyView(list))
-                            .background(GeometryReader { g in
-                                Color.clear.onChange(of: g.size.height, initial: true) { _, h in if abs(model.contentHeight - h) > 0.5 { model.contentHeight = h } }
-                            })
-                    }
-                        .onChange(of: model.selectedID) { _, id in
-                            if let id { withAnimation(.snappy(duration: 0.15)) { proxy.scrollTo(id, anchor: .center) } }
-                        }
-                }
+                scrolling(list)
+            }
+        }
+    }
+
+    /// The panel has a user-chosen size; the list fills it and scrolls.
+    private func scrolling(_ inner: some View) -> some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                inner
+                    .background(GeometryReader { g in
+                        Color.clear.onChange(of: g.size.height, initial: true) { _, h in if abs(model.contentHeight - h) > 0.5 { model.contentHeight = h } }
+                    })
+            }
+            .onChange(of: model.selectedID) { _, id in
+                if let id { withAnimation(.snappy(duration: 0.15)) { proxy.scrollTo(id, anchor: .center) } }
             }
         }
     }
@@ -164,12 +174,16 @@ struct MenuBarView: View {
 
     @ViewBuilder
     private func section(_ sec: AppModel.Section, showHeader: Bool, stacked: Bool = true) -> some View {
-        if !sec.prs.isEmpty {
+        if !sec.prs.isEmpty || sec.queue != nil {
             let collapsed = showHeader && model.isCollapsed(sec.id)
             if showHeader {
                 SectionHeader(id: sec.id, title: sec.title, prs: sec.prs, collapsed: collapsed, mode: model.prefs.sectionCounts,
                               allCollapsed: allSectionsCollapsed,
                               url: sec.url,
+                              queue: sec.queue,
+                              queuePinned: sec.queue.map { model.prefs.isQueuePinned($0.spec) } ?? false,
+                              toggleQueuePin: { if let q = sec.queue { model.toggleQueuePin(q) } },
+                              forgetQueue: { if let q = sec.queue { withAnimation(.snappy(duration: 0.2, extraBounce: 0)) { model.forgetQueue(q) } } },
                               toggle: { model.prefs.toggleCollapsed(sec.id) },
                               toggleAll: { _ = model.handle(.toggleSections) },
                               drop: { moving in
@@ -178,6 +192,12 @@ struct MenuBarView: View {
                                   }
                                   model.sourcesChanged()
                               })
+            }
+            if !collapsed && sec.prs.isEmpty {
+                Text("Empty").font(.caption).foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 28).padding(.vertical, 8)
+                Divider()
             }
             if !collapsed {
                 // Queue sections keep GitHub's order: position is the information. Stacks.layout
@@ -206,7 +226,8 @@ struct MenuBarView: View {
     }
 
     private func centered(_ text: String) -> some View {
-        Text(text).foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
+        Text(text).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 24)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onAppear { model.contentHeight = 120 }
     }
 
@@ -386,6 +407,11 @@ struct SectionHeader: View {
     var allCollapsed = false
     /// Where this section lives on GitHub, when it lives anywhere.
     var url: URL? = nil
+    /// Set on a merge queue's header: pin it, or stop showing it.
+    var queue: BranchRef? = nil
+    var queuePinned = false
+    var toggleQueuePin: () -> Void = {}
+    var forgetQueue: () -> Void = {}
     let toggle: () -> Void
     var toggleAll: () -> Void = {}
     let drop: (String) -> Void
@@ -398,6 +424,11 @@ struct SectionHeader: View {
                 .rotationEffect(.degrees(collapsed ? -90 : 0))
                 .frame(width: 10)
             Text(title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+            if let queue {
+                Text(queue.repo.split(separator: "/").last.map(String.init) ?? queue.repo)
+                    .font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
+                if queuePinned { Image(systemName: "pin.fill").font(.system(size: 8)).foregroundStyle(.tertiary) }
+            }
             if collapsed && mode != .off {
                 // Attention: only red and yellow get a dot; everything else folds into a quiet total.
                 // Full: one count per state, worst first, zeros omitted.
@@ -439,6 +470,11 @@ struct SectionHeader: View {
             // No .keyboardShortcut here: the panel's own keyDown already owns ⇧⌘E, and
             // registering it twice risks the two handlers cancelling each other out.
             Button(allCollapsed ? "Expand All Sections (⇧⌘E)" : "Collapse All Sections (⇧⌘E)", action: toggleAll)
+            if let queue {
+                Divider()
+                Button(queuePinned ? "Unpin This Queue" : "Always Show This Queue", action: toggleQueuePin)
+                Button("Stop Showing \(queue.spec)", action: forgetQueue)
+            }
         }
         .draggable(id)
         .dropDestination(for: String.self) { items, _ in

@@ -80,6 +80,8 @@ final class AppModel {
         var query: PRQuery? = nil
         /// Where the section itself lives on GitHub. Queue sections link to their queue.
         var url: URL? = nil
+        /// Set on a merge queue's section.
+        var queue: BranchRef? = nil
 
         /// Rows drop whatever the header already says (US-005: no duplicated data).
         var hidesAuthor: Bool { if case .author = query { return true }; return false }
@@ -511,7 +513,8 @@ final class AppModel {
 
     func signIn() async {
         // The app's own PATH is minimal, so ask a login shell where `gh` is before giving up on it.
-        if TokenSource.discoveredGHPath == nil { await TokenSource.discoverGH() }
+        // Only when the usual places come up empty: a slow or stuck shell config must not hold up sign-in.
+        if TokenSource.ghPath() == nil { await TokenSource.discoverGH() }
         guard let found = TokenSource.resolve() else {
             log.error("sign-in: no token from gh (\(TokenSource.ghPath() ?? "not found", privacy: .public)) or Keychain")
             auth = .signedOut
@@ -644,33 +647,46 @@ final class AppModel {
     /// The Queue tab's sections. Kept out of `sections` so watching a queue doesn't bury your own
     /// PRs under thirty of someone else's. Rows stay in queue order, which is the whole point.
     var queueSections: [Section] {
-        queues.map { q in
+        let searching = !searchText.trimmingCharacters(in: .whitespaces).isEmpty
+        return queues.map { q in
             Section(id: Self.queueSectionID(q.ref), title: q.ref.branch.uppercased(),
                     prs: q.prs.filter(matchesSearch),
-                    url: URL(string: "https://github.com/\(q.ref.repo)/queue/\(q.ref.branch)"))
+                    url: URL(string: "https://github.com/\(q.ref.repo)/queue/\(q.ref.branch)"),
+                    queue: q.ref)
         }
-        .filter { !$0.prs.isEmpty }
+        // An empty queue stays on screen ("Empty"); while searching, only queues with a match.
+        .filter { !searching || !$0.prs.isEmpty }
     }
 
-    var hasQueues: Bool { !queues.isEmpty }
+    /// The queue tab is always there while queues are on, even with nothing in any of them.
+    var hasQueues: Bool { prefs.showQueues }
 
     /// Which half of the panel is showing. Session-only: the panel always opens on your PRs.
     enum Tab: Hashable { case prs, queue }
     var tab: Tab = .prs
 
-    /// Which queues to show is derived, not configured: a queue belongs to a base branch, and orgs
-    /// queue into rc/*, develop, whatever. Any PR you can already see that is waiting in a queue
-    /// names that queue exactly, so there is nothing to type in and nothing to keep in sync.
+    /// Which queues to show: any a visible PR is waiting in right now (a queue belongs to a base
+    /// branch, so the PR names it exactly), plus ones a PR of yours used in the last 30 days, plus
+    /// ones you pinned. The last two keep a queue on screen while it's empty.
     private func refreshQueues(_ provider: GitHubProvider) async {
         guard prefs.showQueues else { queues = []; return }
-        let refs = Array(Set(all.filter { $0.mergeQueue != nil && !$0.baseRefName.isEmpty }
-            .map { BranchRef(repo: $0.repo, branch: $0.baseRefName) }))
+        let live = Set(all.filter { $0.mergeQueue != nil && !$0.baseRefName.isEmpty }
+            .map { BranchRef(repo: $0.repo, branch: $0.baseRefName) })
+        prefs.rememberQueues(all.filter { $0.mergeQueue != nil && isMine($0) && !$0.baseRefName.isEmpty }
+            .map { BranchRef(repo: $0.repo, branch: $0.baseRefName).spec })
+        let refs = Array(live.union(prefs.queueSpecs().compactMap(BranchRef.init(spec:))))
         guard !refs.isEmpty else { queues = []; return }
         guard let found = try? await provider.fetchMergeQueues(refs, limit: prefs.queueItems) else { return }
+        // No entry at all means GitHub has no queue on that branch (or the repo is gone): skip it.
         queues = refs.sorted { $0.spec < $1.spec }.compactMap { ref in
-            guard let prs = found[ref.key], !prs.isEmpty else { return nil }
-            return (ref, prs)
+            found[ref.key].map { (ref, $0) }
         }
+    }
+
+    func toggleQueuePin(_ ref: BranchRef) { prefs.toggleQueuePin(ref.spec) }
+    func forgetQueue(_ ref: BranchRef) {
+        prefs.forgetQueue(ref.spec)
+        queues.removeAll { $0.ref == ref }
     }
 
     // MARK: Search flakiness (US-038)
