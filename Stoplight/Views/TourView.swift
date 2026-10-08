@@ -31,6 +31,9 @@ struct TourView: View {
                           .frame(width: 32, height: 32).background(.quaternary, in: Circle())
                   }
               })),
+        Slide(title: "Your merge queue, without the tab",
+              body: "If your repos use GitHub's merge queue, a Queue tab appears at the top of the list: every PR in line, its position, and the one holding everyone up. It finds the queues your PRs merge into on its own, or add one in Settings → Sources.",
+              art: AnyView(Image(systemName: "line.3.horizontal").font(.system(size: 34)).foregroundStyle(.secondary))),
         Slide(title: "Make it yours",
               body: "Right-click to nickname a PR, hide the ones that just sit there, or copy a whole stack as Markdown to share. Collapse sections, drag them into your order.",
               art: AnyView(Image(systemName: "contextualmenu.and.cursorarrow").font(.system(size: 34)).foregroundStyle(.secondary))),

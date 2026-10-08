@@ -107,6 +107,7 @@ final class AppModel {
         }
         /// What the header adds after the title when the rows dropped it: "servicepro".
         var headerNote: String? {
+            if queue != nil { return nil } // the header names the queue's repo itself
             switch query {
             case .repo, .base: return nil // the title already names it
             default: return mainRepo.flatMap { $0.split(separator: "/").last.map(String.init) }
@@ -751,8 +752,8 @@ final class AppModel {
         .filter { !searching || !$0.prs.isEmpty }
     }
 
-    /// The queue tab is always there while queues are on, even with nothing in any of them.
-    var hasQueues: Bool { prefs.showQueues }
+    /// The queue tab shows once one of your repos has a merge queue, and stays while it's empty.
+    var hasQueues: Bool { prefs.showQueues && !queues.isEmpty }
 
     /// Which half of the panel is showing. Session-only: the panel always opens on your PRs.
     enum Tab: Hashable { case prs, queue }
