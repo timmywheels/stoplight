@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import StoplightCore
@@ -101,6 +102,7 @@ final class UserPrefs {
         static let sectionCounts = "sectionCounts"
         static let statusGlyphs = "statusGlyphs"
         static let density = "density"
+        static let appearance = "appearance"
         static let hiddenRowDetails = "hiddenRowDetails"
         static let agent = "agent"
         static let agentCustom = "agentCustomCommand"
@@ -256,6 +258,35 @@ final class UserPrefs {
             }
         }
     }
+    /// Light or dark for Stoplight's own windows, or whatever macOS is set to.
+    enum Appearance: String, CaseIterable, Identifiable {
+        case system, light, dark
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .system: "System"
+            case .light: "Light"
+            case .dark: "Dark"
+            }
+        }
+        var nsAppearance: NSAppearance? {
+            switch self {
+            case .system: nil
+            case .light: NSAppearance(named: .aqua)
+            case .dark: NSAppearance(named: .darkAqua)
+            }
+        }
+        /// The panel and Settings. Never the menu bar's own windows: the dots sit on the menu bar
+        /// and have to match it, whatever this says.
+        @MainActor func apply() {
+            for w in NSApp.windows where !String(describing: type(of: w)).contains("StatusBar") {
+                w.appearance = nsAppearance
+            }
+        }
+    }
+    /// Local only.
+    var appearance: Appearance { didSet { defaults.set(appearance.rawValue, forKey: Key.appearance); MainActor.assumeIsolated { appearance.apply() } } }
+
     /// Local only.
     var density: Density { didSet { defaults.set(density.rawValue, forKey: Key.density) } }
 
@@ -375,6 +406,7 @@ final class UserPrefs {
         sectionCounts = SectionCounts(rawValue: defaults.string(forKey: Key.sectionCounts) ?? "") ?? .off
         statusGlyphs = defaults.object(forKey: Key.statusGlyphs) as? Bool ?? true
         density = Density(rawValue: defaults.string(forKey: Key.density) ?? "") ?? .standard
+        appearance = Appearance(rawValue: defaults.string(forKey: Key.appearance) ?? "") ?? .system
         hiddenRowDetails = Set(defaults.stringArray(forKey: Key.hiddenRowDetails) ?? [])
         primaryClick = PrimaryClick(rawValue: defaults.string(forKey: Key.primaryClick) ?? "") ?? .open
         refreshRate = RefreshRate(rawValue: defaults.integer(forKey: Key.refreshSeconds)) ?? .automatic

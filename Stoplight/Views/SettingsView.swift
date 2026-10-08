@@ -20,6 +20,8 @@ struct SettingsView: View {
                 .tabItem { Label("Agent", systemImage: "cpu") }
         }
         .frame(minWidth: 520, idealWidth: 560, minHeight: 480, idealHeight: 680)
+        // However this window was opened (panel, right-click menu, ⌘,): take the chosen appearance.
+        .onAppear { DispatchQueue.main.async { model.prefs.appearance.apply() } }
     }
 }
 
@@ -132,6 +134,12 @@ private struct DisplayTab: View {
         @Bindable var prefs = model.prefs
         Form {
             Section {
+                Picker(selection: $prefs.appearance) {
+                    ForEach(UserPrefs.Appearance.allCases) { Text($0.title).tag($0) }
+                } label: {
+                    InfoLabel("Appearance", "The panel and this window. The widget and the menu bar dots follow macOS.")
+                }
+                .pickerStyle(.segmented)
                 Picker(selection: $prefs.colorProfile) {
                     ForEach(ColorProfile.allCases) { Text($0.title).tag($0) }
                 } label: {

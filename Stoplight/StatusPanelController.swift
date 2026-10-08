@@ -301,6 +301,7 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
         let panel = NSPanel(contentRect: NSRect(origin: .zero, size: size),
                             styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView, .resizable],
                             backing: .buffered, defer: false)
+        panel.appearance = model.prefs.appearance.nsAppearance
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
         panel.standardWindowButton(.closeButton)?.isHidden = true
