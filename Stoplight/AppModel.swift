@@ -237,8 +237,6 @@ final class AppModel {
         case .copyBranch: if let pr = selectedPR { PRActions.copyBranch(pr) } else { return false }
         case .copyHash: if let pr = selectedPR { PRActions.copyHash(pr) } else { return false }
         case .pin: if let pr = selectedPR { togglePin(pr) } else { return false }
-        case .fix: if let pr = selectedPR, canRunAgent(pr) { fix(pr, runAgent: true) } else { return false }
-        case .review: if let pr = selectedPR, canRunAgent(pr), !pr.isBranch { review(pr) } else { return false }
         case .hide: if let pr = selectedPR { hide(pr: pr) } else { return false }
         case .checks:
             guard let pr = selectedPR, !pr.checks.isEmpty else { return false }
@@ -497,7 +495,6 @@ final class AppModel {
         guard loop == nil else { return }
         server.statusProvider = { [weak self] in self?.statusReport ?? [:] }
         server.start()
-        Task { await detectAgents() }   // so Settings → Agent is right the first time it opens
         loop = Task { [weak self] in
             await self?.signIn()
             while !Task.isCancelled {
@@ -530,10 +527,6 @@ final class AppModel {
                        "queued": queues.reduce(0) { $0 + $1.prs.count }],
             "queries": ["follow": prefs.followQueries.count, "branches": prefs.sources.followBranches, "mergedDays": prefs.mergedDays,
                         "queues": queues.map(\.ref.spec)],
-            "agent": ["configured": prefs.agent, "installed": installedAgents.map(\.rawValue).sorted(), "repos": prefs.repoPaths.count,
-                      "fixArgs": agentConfig?.args(for: .fix) ?? "", "reviewArgs": agentConfig?.args(for: .review) ?? "",
-                      "needsAttention": agentNeedsAttention,
-                      "sessions": agentStatus.map { "\($0.key.suffix(8))=\($0.value.state)" }.sorted()],
             "rateLimitRemaining": GitHubProvider.lastRateLimit?.remaining ?? -1,
         ]
     }
@@ -732,7 +725,6 @@ final class AppModel {
             publishSnapshot()
             await notify(previous: previous)
             bobIfJustTurnedGreen()
-            reconcileAgentSessions()
             // First run: open the panel so the tour (and the list) is seen without hunting for the dots.
             if !prefs.tourSeen && !firstOpenDone { firstOpenDone = true; openPanel?() }
             await resolveDisplayNames(provider)
@@ -926,91 +918,6 @@ final class AppModel {
         // A hidden PR that merged or closed is gone for good; drop it so the Settings list stays honest.
         let staleHidden = Set(prefs.sources.hiddenPRs.keys).subtracting(live)
         for id in staleHidden { prefs.sources.hiddenPRs[id] = nil }
-    }
-
-    // MARK: Agent (US-025)
-
-    var agentConfig: AgentLauncher.Config? {
-        guard let agent = AgentLauncher.Agent(rawValue: prefs.agent),
-              let terminal = AgentLauncher.Terminal(rawValue: prefs.terminal) else { return nil }
-        func flags(_ id: String) -> String { agent.permissionModes.first { $0.id == id }?.flags ?? "" }
-        return AgentLauncher.Config(agent: agent, customCommand: prefs.agentCustomCommand, terminal: terminal,
-                                    promptTemplate: prefs.promptTemplate, reviewTemplate: prefs.reviewTemplate,
-                                    repoPaths: prefs.repoPaths,
-                                    fixFlags: flags(prefs.agentPermissionMode), reviewFlags: flags(prefs.agentReviewPermissionMode),
-                                    extraArgs: prefs.agentExtraArgs)
-    }
-    var agentTitle: String { AgentLauncher.Agent(rawValue: prefs.agent)?.title ?? "agent" }
-    /// Observable so the Settings picker relabels when detection finishes.
-    private(set) var installedAgents: Set<AgentLauncher.Agent> = []
-    func detectAgents() async { installedAgents = await AgentLauncher.detectAgents() }
-    /// Enough to offer the button. A missing local clone is reported when it runs, so the reason is visible
-    /// instead of the button silently not existing.
-    func canRunAgent(_ pr: PullRequest) -> Bool { agentConfig != nil && !pr.headRefName.isEmpty }
-    func hasClone(_ pr: PullRequest) -> Bool { prefs.repoPaths[pr.repo.lowercased()] != nil }
-    private(set) var agentError: String?
-
-    /// What each launched agent last reported (US-034). Session-only.
-    struct AgentStatus: Equatable { let state: String; let at: Date }   // "working" | "attention" | "done"
-    private(set) var agentStatus: [String: AgentStatus] = [:]
-    func agentReported(_ state: String, prID: String) {
-        agentStatus[prID] = AgentStatus(state: state, at: .now)
-        if state == "attention" || state == "done", let pr = (all + mergedRows).first(where: { $0.id == prID }) {
-            let kind: CIEvent.Kind = state == "attention" ? .agentAttention : .agentDone
-            Task { await notifier.post(CIEvent(pr: pr, kind: kind, detail: agentTitle)) }
-        }
-    }
-    func clearAgentStatus(prID: String) { agentStatus[prID] = nil }
-    /// Is there a terminal open for this PR right now?
-    func hasAgentSession(_ pr: PullRequest) -> Bool {
-        AgentLauncher.session(for: pr.id, job: .fix) != nil || AgentLauncher.session(for: pr.id, job: .review) != nil
-    }
-    /// Jump to the agent's window and stop the badge nagging (US-038).
-    func focusAgent(_ pr: PullRequest) {
-        guard let s = AgentLauncher.session(for: pr.id, job: .fix) ?? AgentLauncher.session(for: pr.id, job: .review)
-        else { clearAgentStatus(prID: pr.id); return }
-        if agentStatus[pr.id]?.state != "working" { agentStatus[pr.id] = AgentStatus(state: "working", at: .now) }
-        Task { await AgentLauncher.focus(s) }
-    }
-
-    /// Badges for windows that are gone shouldn't linger; sessions that outlived a restart should come back.
-    func reconcileAgentSessions() {
-        let live = AgentLauncher.liveSessionKeys()
-        for (id, st) in agentStatus where st.state == "working"
-            && !live.contains(AgentLauncher.sessionKey(id, job: .fix))
-            && !live.contains(AgentLauncher.sessionKey(id, job: .review)) {
-            agentStatus[id] = nil
-        }
-        for pr in all + mergedRows where agentStatus[pr.id] == nil
-            && (live.contains(AgentLauncher.sessionKey(pr.id, job: .fix))
-                || live.contains(AgentLauncher.sessionKey(pr.id, job: .review))) {
-            agentStatus[pr.id] = AgentStatus(state: "working", at: .now)
-        }
-    }
-    /// Any launched agent waiting on the user. Drives the menu bar marker (US-034).
-    var agentNeedsAttention: Bool { agentStatus.values.contains { $0.state == "attention" } }
-    private var lastLaunch: [String: Date] = [:]
-
-    /// One button: worktree + terminal + agent with the failure as the prompt.
-    func fix(_ pr: PullRequest, runAgent: Bool) { launch(pr, runAgent: runAgent, task: .fix) }
-    /// Same plumbing, adversarial-review prompt (US-033).
-    func review(_ pr: PullRequest) { launch(pr, runAgent: true, task: .review) }
-
-    private func launch(_ pr: PullRequest, runAgent: Bool, task: AgentLauncher.Job) {
-        guard let config = agentConfig else { agentError = AgentLauncher.Err.noAgent.localizedDescription; return }
-        // One terminal per PR. A second click focuses the window that's already open (AgentLauncher.fix),
-        // and this covers the gap while the first launch is still starting up.
-        if let last = lastLaunch[pr.id], Date.now.timeIntervalSince(last) < 10 {
-            focusAgent(pr)
-            return
-        }
-        lastLaunch[pr.id] = .now
-        agentError = nil
-        if runAgent { agentStatus[pr.id] = AgentStatus(state: "working", at: .now) }
-        Task {
-            do { try await AgentLauncher.fix(pr, config: config, runAgent: runAgent, task: task) }
-            catch { agentError = error.localizedDescription; agentStatus[pr.id] = nil }
-        }
     }
 
     // MARK: User actions

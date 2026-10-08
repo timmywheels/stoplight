@@ -6,7 +6,7 @@ import StoplightCore
 enum Hotkey: CaseIterable {
     case toggleGlobal
     case moveDown, moveUp, open, expand, collapse, close, nextButton, prevButton
-    case copyURL, share, copyBranch, copyHash, pin, fix, review, hide, checks
+    case copyURL, share, copyBranch, copyHash, pin, hide, checks
     case filterRed, filterYellow, filterGreen, clearFilters
     case toggleSections, refresh, watch, settings, showHotkeys, search, toggleTab
 
@@ -28,8 +28,6 @@ enum Hotkey: CaseIterable {
         case .copyBranch: Combo(key: "b", symbol: "B", mods: [.command])
         case .copyHash: Combo(key: "b", symbol: "B", mods: [.shift, .command])
         case .pin: Combo(key: "p", symbol: "P", mods: [.command])
-        case .fix: Combo(key: "f", symbol: "F", mods: [.option, .command])
-        case .review: Combo(key: "f", symbol: "F", mods: [.shift, .command])
         case .hide: Combo(key: "h", symbol: "H", mods: [.command])
         case .checks: Combo(key: "k", symbol: "K", mods: [.command])
         case .filterRed: Combo(key: "1", symbol: "1", mods: [.command])
@@ -62,8 +60,6 @@ enum Hotkey: CaseIterable {
         case .copyBranch: "Copy branch name"
         case .copyHash: "Copy commit hash"
         case .pin: "Pin or unpin"
-        case .fix: "Fix with your agent"
-        case .review: "Adversarial review with your agent"
         case .hide: "Hide this PR"
         case .checks: "Open the Actions run summary"
         case .filterRed: "Toggle red filter"
@@ -93,7 +89,7 @@ enum Hotkey: CaseIterable {
     static let groups: [(String, [Hotkey])] = [
         ("Anywhere", [.toggleGlobal]),
         ("Navigate", [.moveDown, .moveUp, .expand, .nextButton, .prevButton, .collapse, .close]),
-        ("Selected PR", [.open, .checks, .copyURL, .share, .copyBranch, .copyHash, .pin, .fix, .review, .hide]),
+        ("Selected PR", [.open, .checks, .copyURL, .share, .copyBranch, .copyHash, .pin, .hide]),
         ("Filter", [.filterRed, .filterYellow, .filterGreen, .clearFilters]),
         ("Panel", [.search, .toggleTab, .toggleSections, .refresh, .watch, .settings, .showHotkeys]),
     ]

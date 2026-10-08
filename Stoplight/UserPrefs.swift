@@ -104,17 +104,6 @@ final class UserPrefs {
         static let density = "density"
         static let appearance = "appearance"
         static let hiddenRowDetails = "hiddenRowDetails"
-        static let agent = "agent"
-        static let agentCustom = "agentCustomCommand"
-        static let agentPermission = "agentPermissionMode"
-        static let agentReviewPermission = "agentReviewPermissionMode"
-        static let agentExtraArgs = "agentExtraArgs"
-        static let terminal = "terminal"
-        static let promptTemplate = "agentPrompt"
-        static let reviewTemplate = "agentReviewPrompt"
-        static let scanRoot = "repoScanRoot"        // pre-0.9, a single folder
-        static let scanRoots = "repoScanRoots"
-        static let repoPaths = "repoPaths"
         static let primaryClick = "primaryClick"
         static let stackOrder = "stackCopyOrder"
         static let showQueues = "showQueues"
@@ -143,20 +132,6 @@ final class UserPrefs {
     var colorProfile: ColorProfile { didSet { defaults.set(colorProfile.rawValue, forKey: Key.colorProfile) } }
     /// Recently-merged window in days (US-022). 0 = off. Local only.
     var mergedDays: Int { didSet { defaults.set(mergedDays, forKey: Key.mergedDays) } }
-    // Agent launcher (US-025). Local only.
-    var agent: String { didSet { defaults.set(agent, forKey: Key.agent) } }
-    var agentCustomCommand: String { didSet { defaults.set(agentCustomCommand, forKey: Key.agentCustom) } }
-    /// Ids from the agent's `permissionModes`; an unknown id means no flag. One per job (US-036).
-    var agentPermissionMode: String { didSet { defaults.set(agentPermissionMode, forKey: Key.agentPermission) } }
-    var agentReviewPermissionMode: String { didSet { defaults.set(agentReviewPermissionMode, forKey: Key.agentReviewPermission) } }
-    var agentExtraArgs: String { didSet { defaults.set(agentExtraArgs, forKey: Key.agentExtraArgs) } }
-    var terminal: String { didSet { defaults.set(terminal, forKey: Key.terminal) } }
-    var promptTemplate: String { didSet { defaults.set(promptTemplate, forKey: Key.promptTemplate) } }
-    var reviewTemplate: String { didSet { defaults.set(reviewTemplate, forKey: Key.reviewTemplate) } }
-    /// Folders to look for git clones in. Projects rarely live under one tree, so this is a list.
-    var scanRoots: [String] { didSet { defaults.set(scanRoots, forKey: Key.scanRoots) } }
-    /// "owner/name" (lowercased) → local clone path.
-    var repoPaths: [String: String] { didSet { defaults.set(repoPaths, forKey: Key.repoPaths) } }
 
     /// Show a section for each merge queue any visible PR is waiting in (US-041). Local only.
     var showQueues: Bool { didSet { defaults.set(showQueues, forKey: Key.showQueues) } }
@@ -414,20 +389,9 @@ final class UserPrefs {
         queueItems = max(1, defaults.object(forKey: Key.queueItems) as? Int ?? 10)
         rememberedQueues = defaults.dictionary(forKey: Key.rememberedQueues) as? [String: Double] ?? [:]
         pinnedQueues = defaults.stringArray(forKey: Key.pinnedQueues) ?? []
-        agent = defaults.string(forKey: Key.agent) ?? ""
-        agentCustomCommand = defaults.string(forKey: Key.agentCustom) ?? "my-agent {prompt}"
-        agentPermissionMode = defaults.string(forKey: Key.agentPermission) ?? "ask"
-        // Review defaults to plan: the review prompt asks for findings, not edits.
-        agentReviewPermissionMode = defaults.string(forKey: Key.agentReviewPermission) ?? "plan"
-        agentExtraArgs = defaults.string(forKey: Key.agentExtraArgs) ?? ""
-        terminal = defaults.string(forKey: Key.terminal) ?? "terminal"
-        promptTemplate = defaults.string(forKey: Key.promptTemplate) ?? AgentLauncher.defaultPrompt
-        reviewTemplate = defaults.string(forKey: Key.reviewTemplate) ?? AgentLauncher.defaultReviewPrompt
-        // Carry the old single folder over, then fall back to ~/dev.
-        scanRoots = defaults.stringArray(forKey: Key.scanRoots)
-            ?? defaults.string(forKey: Key.scanRoot).map { [$0] }
-            ?? [NSHomeDirectory() + "/dev"]
-        repoPaths = (defaults.dictionary(forKey: Key.repoPaths) as? [String: String]) ?? [:]
+        // The agent launcher is gone (0.15); drop what it saved.
+        for k in ["agent", "agentCustomCommand", "agentPermissionMode", "agentReviewPermissionMode", "agentExtraArgs", "terminal",
+                  "agentPrompt", "agentReviewPrompt", "repoScanRoot", "repoScanRoots", "repoPaths"] { defaults.removeObject(forKey: k) }
         notifyReviews = defaults.object(forKey: Key.notifyReviews) as? Bool ?? true
         notifyComments = defaults.object(forKey: Key.notifyComments) as? Bool ?? true
         notifyActivityOn = ActivityScope(rawValue: defaults.string(forKey: Key.notifyActivityOn) ?? "") ?? .mine

@@ -20,7 +20,7 @@ enum TokenSource {
     /// Looks along your login shell's PATH ourselves rather than asking `command -v gh`, which answers
     /// with the alias when your config wraps gh (1Password's shell plugin does) instead of the file.
     static func discoverGH() async {
-        if let path = await AgentLauncher.which("gh") { discoveredGHPath = path }
+        if let path = await LoginShell.which("gh") { discoveredGHPath = path }
     }
 
     static func resolve() -> Found? {

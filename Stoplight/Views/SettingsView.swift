@@ -16,8 +16,6 @@ struct SettingsView: View {
                 .tabItem { Label("Sources", systemImage: "person.2") }
             NotificationsTab(model: model)
                 .tabItem { Label("Notifications", systemImage: "bell") }
-            AgentSettingsTab(model: model)
-                .tabItem { Label("Agent", systemImage: "cpu") }
         }
         .frame(minWidth: 520, idealWidth: 560, minHeight: 480, idealHeight: 680)
     }
@@ -208,7 +206,7 @@ private struct DisplayTab: View {
                         .font(.caption).foregroundStyle(.secondary)
                 } label: {
                     InfoLabel("Row buttons",
-                              "The buttons on an expanded PR: open, copy, share, pin, hand it to the agent.")
+                              "The buttons on an expanded PR: open, copy, share, pin.")
                 }
             } header: {
                 Text("Popover")
@@ -238,9 +236,6 @@ private struct DisplayTab: View {
                         }
                         legendRow("Stacked", "Targets the PR above it, not the default branch.") {
                             Image(systemName: "arrow.turn.down.right").font(.caption).foregroundStyle(.tertiary)
-                        }
-                        legendRow("Agent", "An agent you launched is waiting on you.") {
-                            Image(systemName: "cpu").font(.caption).foregroundStyle(.orange)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)

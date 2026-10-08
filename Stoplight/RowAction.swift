@@ -4,10 +4,10 @@ import StoplightCore
 
 /// The circular buttons in an expanded row (US-031). Users pick which appear and in what order.
 enum RowAction: String, CaseIterable, Identifiable, Codable {
-    case open, run, checks, queue, copyURL, share, copyBranch, copyHash, pin, fix, review, onramp
+    case open, run, checks, queue, copyURL, share, copyBranch, copyHash, pin, onramp
     var id: String { rawValue }
 
-    static let defaultOrder: [RowAction] = [.open, .onramp, .run, .queue, .copyURL, .share, .copyHash, .pin, .fix, .review]
+    static let defaultOrder: [RowAction] = [.open, .onramp, .run, .queue, .copyURL, .share, .copyHash, .pin]
 
     var title: String {
         switch self {
@@ -20,8 +20,6 @@ enum RowAction: String, CaseIterable, Identifiable, Codable {
         case .copyBranch: "Copy branch name"
         case .copyHash: "Copy commit hash"
         case .pin: "Pin"
-        case .fix: "Fix with your agent"
-        case .review: "Adversarial review with your agent"
         case .onramp: "Review in Onramp"
         }
     }
@@ -37,8 +35,6 @@ enum RowAction: String, CaseIterable, Identifiable, Codable {
         case .copyBranch: "arrow.triangle.branch"
         case .copyHash: "number"
         case .pin: "pin"
-        case .fix: "wrench.and.screwdriver"
-        case .review: "eye.trianglebadge.exclamationmark"
         case .onramp: Self.onrampSymbol
         }
     }
@@ -53,8 +49,6 @@ enum RowAction: String, CaseIterable, Identifiable, Codable {
         case .queue: pr.queueURL != nil
         case .copyBranch: !pr.headRefName.isEmpty
         case .copyHash: !pr.headSha.isEmpty
-        case .fix: pr.state == .failure && model.canRunAgent(pr)
-        case .review: model.canRunAgent(pr) && !pr.isBranch && pr.status == .open
         case .onramp: !pr.isBranch && PRActions.onrampInstalled
         }
     }

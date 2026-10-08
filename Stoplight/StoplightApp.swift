@@ -42,9 +42,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 model.isSearching = true
                 model.searchText = q.trimmingCharacters(in: .whitespacesAndNewlines)
                 model.openPanel?()
-            } else if url.host == "agent", parts.count >= 2 {
-                // stoplight://agent/<working|attention|done>/<PR id>  (from Claude Code hooks or the agent itself)
-                model.agentReported(parts[parts.startIndex], prID: parts[parts.startIndex + 1])
             } else {
                 model.openPanel?()
             }

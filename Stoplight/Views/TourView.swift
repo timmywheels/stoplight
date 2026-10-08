@@ -31,9 +31,6 @@ struct TourView: View {
                           .frame(width: 32, height: 32).background(.quaternary, in: Circle())
                   }
               })),
-        Slide(title: "Red PR? Send your agent",
-              body: "Pick a coding agent in Settings → Agent. On a failing PR, one click checks out the branch in a separate worktree, opens your terminal there, and starts the agent with the failure already explained.",
-              art: AnyView(Image(systemName: "cpu").font(.system(size: 34)).foregroundStyle(.secondary))),
         Slide(title: "Make it yours",
               body: "Right-click to nickname a PR, hide the ones that just sit there, or copy a whole stack as Markdown to share. Collapse sections, drag them into your order.",
               art: AnyView(Image(systemName: "contextualmenu.and.cursorarrow").font(.system(size: 34)).foregroundStyle(.secondary))),

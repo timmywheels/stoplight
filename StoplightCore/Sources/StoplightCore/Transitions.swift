@@ -8,7 +8,7 @@ public enum NotificationMode: String, Codable, Sendable {
 
 /// Something worth telling the user about (US-006).
 public struct CIEvent: Equatable, Sendable, Identifiable {
-    public enum Kind: String, Sendable { case failed, passed, dequeued, deployFailed, deployed, branchMoved, agentAttention, agentDone, approved, changesRequested, activity }
+    public enum Kind: String, Sendable { case failed, passed, dequeued, deployFailed, deployed, branchMoved, approved, changesRequested, activity }
 
     public let pr: PullRequest
     public let kind: Kind
@@ -31,7 +31,7 @@ public struct CIEvent: Equatable, Sendable, Identifiable {
     /// Changes requested (by decision or in a review) makes a sound; other review news arrives quietly.
     public var urgent: Bool {
         switch kind {
-        case .passed, .branchMoved, .agentDone: false
+        case .passed, .branchMoved: false
         case .activity: activity.contains { $0.kind == .changesRequested }
         default: true
         }
@@ -41,8 +41,6 @@ public struct CIEvent: Equatable, Sendable, Identifiable {
     public var title: String {
         switch kind {
         case .branchMoved: "New release branch in \(pr.repo)"
-        case .agentAttention: "Agent needs you · \(pr.shortRef)"
-        case .agentDone: "Agent done · \(pr.shortRef)"
         case .activity where activity.count == 1: "\(activity[0].author) \(Self.verb(activity[0].kind)) · \(pr.shortRef)"
         default: pr.shortRef
         }
@@ -67,10 +65,6 @@ public struct CIEvent: Equatable, Sendable, Identifiable {
             return "\(pr.title)\nMerged and green"
         case .branchMoved:
             return "Now following \(pr.headRefName)" + (detail.map { " (was \($0))" } ?? "")
-        case .agentAttention:
-            return "\(detail ?? "Your agent") needs your input on \(pr.title)"
-        case .agentDone:
-            return "\(detail ?? "Your agent") finished on \(pr.title)"
         case .activity:
             if activity.count == 1 {
                 let words = Self.excerpt(activity[0].body)

@@ -632,16 +632,6 @@ struct PRRow: View {
                     tag("yours", symbol: "person.fill")
                         .help("Your PR, also listed in its own section above")
                 }
-                if let st = model.agentStatus[pr.id] {
-                    // Agent status from hooks / callbacks (US-034). Click to dismiss.
-                    Button { model.focusAgent(pr) } label: {
-                        tag(st.state == "attention" ? "needs you" : st.state == "done" ? "agent done" : "agent working",
-                            symbol: "cpu",
-                            tint: st.state == "attention" ? .orange : st.state == "done" ? stateColor(.success) : .secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Reported by your agent \(st.at.compactAgo) ago. Click to jump to its terminal window; right-click the row to dismiss.")
-                }
                 if pr.status == .closed { tag("Closed", symbol: "xmark", tint: stateColor(.failure)) }
                 if pr.status == .open, !pr.isDraft, let label = pr.mergeState.label {
                     tag(label, symbol: pr.mergeState.isBlocking ? "exclamationmark.triangle.fill" : nil,
@@ -769,9 +759,9 @@ struct PRRow: View {
 
     /// The row's status as glyphs, most urgent first; hover one for its words.
     @ViewBuilder private var statusLine: some View {
-        let status = RowStatus.of(pr, reported: model.agentStatus[pr.id]?.state, isQueueRow: isQueueRow)
+        let status = RowStatus.of(pr, isQueueRow: isQueueRow)
         if !status.parts.isEmpty {
-            let glyphs = HStack(spacing: 5) {
+            HStack(spacing: 5) {
                 ForEach(status.parts, id: \.symbol) { part in
                     HStack(spacing: 2) {
                         Image(systemName: part.symbol)
@@ -784,13 +774,6 @@ struct PRRow: View {
             }
             .font(.system(size: 10, weight: .semibold))
             .fixedSize()
-            if status.agentLeads {
-                Button { model.focusAgent(pr) } label: { glyphs }
-                    .buttonStyle(.plain)
-                    .help("Jump to your agent's terminal")
-            } else {
-                glyphs
-            }
         }
         if pr.id.hasPrefix("queue:"), model.isMine(pr) {
             Image(systemName: "person.fill").font(.system(size: 9)).foregroundStyle(.secondary)
@@ -801,7 +784,6 @@ struct PRRow: View {
     /// Only what needs someone gets a color; the rest stays quiet so the dot keeps meaning CI.
     private func color(_ level: RowStatus.Level) -> Color {
         switch level {
-        case .needsYou: .orange
         case .blocking: stateColor(.failure)
         case .good: stateColor(.success)
         case .waiting, .info: .secondary
@@ -879,9 +861,6 @@ struct PRRow: View {
                 guard selected, let i = model.focusedButton, i < buttons.count else { return }
                 buttons[i].action()
             }
-            if let err = model.agentError {
-                Text(err).font(.caption2).foregroundStyle(stateColor(.failure)).lineLimit(2)
-            }
         }
         .padding(.leading, 34 + CGFloat(depth) * 14).padding(.trailing, 12).padding(.bottom, 10)
     }
@@ -922,12 +901,6 @@ struct PRRow: View {
             }
             case .pin: RowButton(symbol: pinned ? "pin.fill" : "pin", help: pinned ? "Unpin" : "Pin", tint: pinned ? .primary : nil) {
                 withAnimation(Self.motion) { model.togglePin(pr) }
-            }
-            case .fix: RowButton(symbol: a.symbol, help: pr.isBranch ? "Fix \(pr.headRefName) with \(model.agentTitle) on a new branch off it" : "Fix with \(model.agentTitle): worktree, terminal, agent", tint: nil) {
-                model.fix(pr, runAgent: true)
-            }
-            case .review: RowButton(symbol: a.symbol, help: "Adversarial review with \(model.agentTitle) (⇧⌘F)", tint: nil) {
-                model.review(pr)
             }
             case .onramp: RowButton(symbol: a.symbol, help: a.title, tint: nil) {
                 PRActions.openInOnramp(pr)
@@ -979,19 +952,6 @@ struct PRRow: View {
         if !pr.checks.isEmpty { Button("Open checks tab") { openURL(pr.checksURL) } }
         if pr.mergeQueue != nil, let q = URL(string: "https://github.com/\(pr.repo)/queue/\(pr.baseRefName)") {
             Button("Open merge queue") { openURL(q) }
-        }
-        if model.agentStatus[pr.id] != nil || model.hasAgentSession(pr) {
-            Divider()
-            Button("Show agent terminal") { model.focusAgent(pr) }
-            Button("Dismiss agent status") { model.clearAgentStatus(prID: pr.id) }
-        }
-        if model.canRunAgent(pr) {
-            Divider()
-            Button(pr.isBranch ? "Fix \(pr.headRefName) with \(model.agentTitle) (new branch)" : "Fix with \(model.agentTitle)") { model.fix(pr, runAgent: true) }
-            if !pr.isBranch && pr.status == .open {
-                Button("Adversarial review with \(model.agentTitle)") { model.review(pr) }
-            }
-            Button("Open worktree in terminal") { model.fix(pr, runAgent: false) }
         }
         Divider()
         Button("Share (rich link)") { copyRichLink() }
