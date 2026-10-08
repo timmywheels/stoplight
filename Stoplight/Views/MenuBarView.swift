@@ -112,7 +112,7 @@ struct MenuBarView: View {
                 centered("No open PRs")
             } else if rowCount == 0, let sha = model.searchedCommit {
                 commitResults(sha)
-            } else if rowCount == 0, let ref = model.searchedPullRequest {
+            } else if rowCount == 0, let ref = model.searchedPullRequest ?? model.searchedNumber {
                 UnlistedPullRequest(ref: ref, model: model)
             } else if rowCount == 0 && (!model.statusFilter.isEmpty || !model.searchText.isEmpty) {
                 centered(model.searchText.isEmpty ? "No PRs match the filter" : "No PRs match “\(model.searchText)”")

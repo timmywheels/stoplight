@@ -261,7 +261,7 @@ final class AppModel {
         return true
     }
 
-    /// Text filter (US-032), GitHub-style: bare words, author:, repo:, branch:, is:, #n. Session-only.
+    /// Text filter (US-032), GitHub-style: bare words, author:, repo:, branch:, is:, sha:, #n. Session-only.
     var searchText = "" { didSet { if searchText != oldValue { searchTextChanged() } } }
     var isSearching = false
     /// The "watch a PR by URL" field. Opened by ⌘N or the dots' right-click menu (US-040).
@@ -300,6 +300,19 @@ final class AppModel {
     private(set) var peopleQuery: String?
     private(set) var peopleLoading = false
     @ObservationIgnored private var peopleTask: Task<Void, Never>?
+
+    /// A typed PR number none of your rows has: that number in the repo it most likely means.
+    /// A `repo:` term picks the repo; otherwise it's the one most of your PRs are in.
+    var searchedNumber: PRRef? {
+        let q = searchQuery
+        guard q.pullRequest == nil, q.typedNumbers.count == 1, let n = Int(q.typedNumbers[0]),
+              q.words.isEmpty, q.shas.isEmpty else { return nil }
+        let rows = all + mergedRows
+        let repos = rows.map(\.repo).filter { r in q.repos.allSatisfy { r.lowercased().contains($0) } }
+        let counts = Dictionary(repos.map { ($0, 1) }, uniquingKeysWith: +)
+        guard let repo = counts.max(by: { $0.value < $1.value })?.key else { return nil }
+        return PRRef(key: "\(repo)#\(n)")
+    }
 
     // MARK: Commit hash search
 

@@ -8,7 +8,10 @@ public struct SearchQuery: Equatable, Sendable {
     public var repos: [String] = []
     public var branches: [String] = []
     public var flags: [String] = []
+    /// PR numbers from a link: exact.
     public var numbers: [Int] = []
+    /// PR numbers typed (`851`, `#851`): a prefix, so `85` already finds #851 while you type.
+    public var typedNumbers: [String] = []
     /// A pasted PR link (or owner/repo#123): the PR it names, which may not be in any list.
     public var pullRequest: PRRef?
     /// Commit hashes (7–40 hex characters): a row matches when its head commit starts with one.
@@ -40,14 +43,14 @@ public struct SearchQuery: Equatable, Sendable {
                 if v.count >= 4, v.count <= 40, v.allSatisfy(\.isHexDigit) { shas.append(v) }
             }
             else if t.hasPrefix("is:") { let v = String(t.dropFirst(3)); if !v.isEmpty { flags.append(v) } }
-            else if t.hasPrefix("#"), let n = Int(t.dropFirst()) { numbers.append(n) }
+            else if t.hasPrefix("#"), let n = Int(t.dropFirst()), n > 0 { typedNumbers.append(String(n)) }
             else if Self.isCommitHash(t) { shas.append(t) }
-            else if let n = Int(t) { numbers.append(n) }
+            else if let n = Int(t), n > 0 { typedNumbers.append(String(n)) }
             else { words.append(t) }
         }
     }
 
-    public var isEmpty: Bool { shas.isEmpty && words.isEmpty && authors.isEmpty && repos.isEmpty && branches.isEmpty && flags.isEmpty && numbers.isEmpty }
+    public var isEmpty: Bool { shas.isEmpty && words.isEmpty && authors.isEmpty && repos.isEmpty && branches.isEmpty && flags.isEmpty && numbers.isEmpty && typedNumbers.isEmpty }
 
     /// What the app knows that the PR record doesn't: display names, labels, nicknames, who "mine" is.
     public struct Context: Sendable {
@@ -67,6 +70,7 @@ public struct SearchQuery: Equatable, Sendable {
         // A hash is the head commit's prefix, or (rarely, "defaced") just a word in the title.
         for h in shas where !pr.headSha.lowercased().hasPrefix(h) && !title.contains(h) { return false }
         if !numbers.isEmpty && !numbers.contains(pr.number) { return false }
+        for n in typedNumbers where !String(pr.number).hasPrefix(n) { return false }
         let authorHay = ([pr.author] + ctx.names(pr.author)).joined(separator: " ").lowercased()
         for a in authors where !authorHay.contains(a) { return false }
         for r in repos where !pr.repo.lowercased().contains(r) { return false }

@@ -58,6 +58,11 @@ final class SearchTests: XCTestCase {
         XCTAssertFalse(SearchQuery("is:green").matches(red, ctx))
         XCTAssertTrue(SearchQuery("#439").matches(red, ctx))
         XCTAssertTrue(SearchQuery("439").matches(red, ctx))
+        XCTAssertTrue(SearchQuery("43").matches(red, ctx))      // still typing: a prefix finds it
+        XCTAssertTrue(SearchQuery("#4").matches(red, ctx))
+        XCTAssertFalse(SearchQuery("39").matches(red, ctx))     // the start of the number, not anywhere in it
+        XCTAssertFalse(SearchQuery("4390").matches(red, ctx))
+        XCTAssertFalse(SearchQuery("acme/api#43").matches(red, ctx))   // a link names one PR exactly
         XCTAssertTrue(SearchQuery("is:mine").matches(pr("m", title: "t", author: "tim"), ctx))
         XCTAssertTrue(SearchQuery("is:draft repo:api").matches(pr("x", title: "t", draft: true), ctx))
         XCTAssertTrue(SearchQuery("is:bogus").matches(red, ctx))  // unknown flags are ignored, not fatal
