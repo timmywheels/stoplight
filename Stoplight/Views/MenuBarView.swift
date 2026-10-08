@@ -450,8 +450,12 @@ private struct Reorderable: ViewModifier {
                 .dropDestination(for: String.self) { items, _ in
                     guard let moving = items.first else { return false }
                     drop(moving)
+                    Haptics.tick()
                     return true
-                } isTargeted: { targeted = $0 }
+                } isTargeted: { over in
+                    if over && !targeted { Haptics.snap() }
+                    targeted = over
+                }
         } else {
             content
         }
@@ -925,6 +929,7 @@ struct PRRow: View {
 
     private func flash(_ key: String, _ action: () -> Void) {
         action()
+        Haptics.tick()
         copied = key
         Task { try? await Task.sleep(for: .seconds(1)); if copied == key { copied = nil } }
     }

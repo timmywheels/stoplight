@@ -132,6 +132,7 @@ final class AppModel {
     func togglePicked(_ pr: PullRequest) {
         guard canPick(pr) else { NSSound.beep(); return }
         if picked.contains(pr.id) { picked.remove(pr.id) } else { picked.insert(pr.id) }
+        Haptics.tick()
     }
     /// What closing `pr` from its right-click menu would close: the whole pick when it's part of one.
     func closeTargets(for pr: PullRequest) -> [PullRequest] {
