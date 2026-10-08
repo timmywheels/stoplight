@@ -29,6 +29,7 @@ struct MenuBarView: View {
             HStack(spacing: 4) {
                 Button { model.isSearching.toggle(); if !model.isSearching { model.searchText = "" } } label: {
                     Image(systemName: "magnifyingglass")
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(model.isSearching || !model.searchText.isEmpty ? Color.accentColor : .secondary)
                         .frame(width: 22, height: 22).contentShape(Rectangle())
                 }
@@ -45,13 +46,14 @@ struct MenuBarView: View {
                 }
                 Button { model.pinnedPanel.toggle() } label: {
                     Image(systemName: model.pinnedPanel ? "pin.fill" : "pin")
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(model.pinnedPanel ? Color.accentColor : .secondary)
                         .frame(width: 22, height: 22).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .help(model.pinnedPanel ? "Unpin: close on click outside again" : "Pin: stay open above other windows")
             }
-            .padding(.horizontal, 6).padding(.vertical, 4)
+            .padding(.horizontal, 6).padding(.top, 9).padding(.bottom, 5) // the panel's rounded corner wants a little air above
                 .background(GeometryReader { g in Color.clear.onChange(of: g.size.height, initial: true) { _, h in if abs(topHeight - h) > 0.5 { topHeight = h; report() } } })
             VStack(spacing: 0) {
                 if model.isSearching {
