@@ -24,6 +24,17 @@ final class SearchTests: XCTestCase {
         XCTAssertFalse(SearchQuery("author:tim").matches(dan, ctx))
     }
 
+    func testPastedLinkFindsThatPR() {
+        let target = pr("t", title: "t", repo: "acme/api", number: 439)
+        let link = SearchQuery("https://github.com/acme/api/pull/439/files#diff-1")
+        XCTAssertTrue(link.matches(target, ctx))
+        XCTAssertFalse(link.matches(pr("o", title: "t", repo: "acme/web", number: 439), ctx))
+        XCTAssertFalse(link.matches(pr("n", title: "t", repo: "acme/api", number: 12), ctx))
+        XCTAssertEqual(link.pullRequest?.key, "acme/api#439")
+        XCTAssertTrue(SearchQuery("acme/api#439").matches(target, ctx))
+        XCTAssertNil(SearchQuery("deploy #439").pullRequest)
+    }
+
     func testFlagsAndNumbers() {
         let red = pr("r", title: "t", state: .failure, number: 439)
         XCTAssertTrue(SearchQuery("is:red").matches(red, ctx))

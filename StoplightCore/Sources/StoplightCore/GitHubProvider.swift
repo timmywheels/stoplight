@@ -196,6 +196,15 @@ public struct GitHubProvider: CIProvider {
         return best?.name
     }
 
+    /// GitHub users matching `text` (login or name), for author: suggestions.
+    public func searchUsers(_ text: String, first: Int = 8) async throws -> [(login: String, name: String?)] {
+        let q = "query($q: String!, $n: Int!) { search(query: $q, type: USER, first: $n) { nodes { ... on User { login name } } } }"
+        let data = try await post(["query": q, "variables": ["q": text + " in:login in:name", "n": first]])
+        struct U: Decodable { let login: String?; let name: String? }
+        struct Env: Decodable { struct D: Decodable { struct S: Decodable { let nodes: [U] }; let search: S }; let data: D? }
+        return (try JSONDecoder().decode(Env.self, from: data).data?.search.nodes ?? []).compactMap { u in u.login.map { ($0, u.name) } }
+    }
+
     /// Validate the token and return the login (US-001).
     public func viewerLogin() async throws -> String {
         let data = try await post(["query": "{ viewer { login } }"])
@@ -204,6 +213,20 @@ public struct GitHubProvider: CIProvider {
             throw Error.graphQL("No viewer in response")
         }
         return login
+    }
+
+    /// Close a pull request without merging it (REST: PATCH /repos/{repo}/pulls/{number}).
+    public func closePullRequest(repo: String, number: Int) async throws {
+        var req = URLRequest(url: URL(string: "https://api.github.com/repos/\(repo)/pulls/\(number)")!)
+        req.httpMethod = "PATCH"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        req.setValue("Stoplight/0.1", forHTTPHeaderField: "User-Agent")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["state": "closed"])
+        let (_, resp) = try await session.data(for: req)
+        guard let http = resp as? HTTPURLResponse else { throw Error.http(-1) }
+        if http.statusCode == 401 { throw Error.unauthorized }
+        guard (200..<300).contains(http.statusCode) else { throw Error.http(http.statusCode) }
     }
 
     // MARK: - Transport

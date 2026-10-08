@@ -9,14 +9,21 @@ public struct SearchQuery: Equatable, Sendable {
     public var branches: [String] = []
     public var flags: [String] = []
     public var numbers: [Int] = []
+    /// A pasted PR link (or owner/repo#123): the PR it names, which may not be in any list.
+    public var pullRequest: PRRef?
 
     public static let prefixes = ["author:", "repo:", "branch:", "is:"]
     public static let flagValues = ["red", "yellow", "green", "draft", "merged", "queued", "mine", "branch"]
 
     public init(_ text: String) {
-        for raw in text.split(separator: " ") {
+        for raw in text.split(whereSeparator: \.isWhitespace) {
             let t = String(raw).lowercased()
-            if t.hasPrefix("author:") { let v = String(t.dropFirst(7)).trimmingCharacters(in: CharacterSet(charactersIn: "@")); if !v.isEmpty { authors.append(v) } }
+            // A link someone sent you: narrow to that repo and number.
+            if let ref = URL(string: String(raw)).flatMap(PRRef.init(url:)) ?? (t.contains("/") ? PRRef(key: String(raw)) : nil) {
+                pullRequest = pullRequest ?? ref
+                repos.append(ref.repo.lowercased()); numbers.append(ref.number)
+            }
+            else if t.hasPrefix("author:") { let v = String(t.dropFirst(7)).trimmingCharacters(in: CharacterSet(charactersIn: "@")); if !v.isEmpty { authors.append(v) } }
             else if t.hasPrefix("repo:") { let v = String(t.dropFirst(5)); if !v.isEmpty { repos.append(v) } }
             else if t.hasPrefix("branch:") { let v = String(t.dropFirst(7)); if !v.isEmpty { branches.append(v) } }
             else if t.hasPrefix("is:") { let v = String(t.dropFirst(3)); if !v.isEmpty { flags.append(v) } }
@@ -72,6 +79,7 @@ public struct SearchQuery: Equatable, Sendable {
         public let label: String     // what the chip shows
         public let insert: String    // what replaces the last token
         public var id: String { insert }
+        public init(label: String, insert: String) { self.label = label; self.insert = insert }
     }
 
     /// Chips for the current text. Empty text or a bare word → the prefixes; `author:d` → matching people; etc.
