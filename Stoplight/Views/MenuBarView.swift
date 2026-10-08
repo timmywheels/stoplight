@@ -672,8 +672,8 @@ struct PRRow: View {
                 .onExitCommand { editingAlias = false }
                 .onChange(of: aliasFocused) { _, f in if !f { editingAlias = false } }
         } else {
+            // No tooltip: hovering already slides a cut-off title, and the expanded row shows it whole.
             MarqueeText(text: model.displayTitle(pr), active: hovering && !expanded, truncated: $titleTruncated)
-                .help(pr.isBranch ? pr.shortRef : "\(model.displayTitle(pr))\n\(pr.shortRef) · @\(pr.author)")
         }
     }
 
@@ -719,7 +719,7 @@ struct PRRow: View {
                 .layoutPriority(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
             // Hovering swaps status and age for the quick actions, in the same spot: nothing floats
-            // over the title, and the tooltip and expanded row still say what status and age said.
+            // over the title, and the expanded row still says what status and age said.
             if showsQuickActions {
                 quickActions
             } else {

@@ -2,7 +2,7 @@ import SwiftUI
 
 /// One line of text that, when it doesn't fit and `active` stays on for a moment, slides once to
 /// show its end, rests, and slides back. Never loops; text that fits never moves. With Reduce
-/// Motion it stays put (the caller's tooltip carries the full text). Reports whether it's cut off.
+/// Motion it stays put (the expanded row shows the full text). Reports whether it's cut off.
 struct MarqueeText: View {
     let text: String
     var active: Bool
