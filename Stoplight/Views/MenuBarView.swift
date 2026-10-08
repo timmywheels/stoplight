@@ -1227,14 +1227,15 @@ struct TabToggle: View {
         .background(Capsule().fill(.primary.opacity(0.06)))
         .overlay(Capsule().strokeBorder(.primary.opacity(0.08), lineWidth: 0.5))
         .fixedSize()
+        .animation(reduceMotion ? nil : .snappy(duration: 0.22, extraBounce: 0), value: model.tab)
         .help("Your PRs or the merge queue (⌃⇥)")
     }
 
     private func segment(_ title: String, tab: AppModel.Tab, count: Int = 0) -> some View {
         let on = model.tab == tab
-        return Button {
-            withAnimation(reduceMotion ? nil : .snappy(duration: 0.22, extraBounce: 0)) { model.tab = tab }
-        } label: {
+        // No withAnimation here: it would animate the list swapping in too, and its separators flash
+        // white for a frame while they fade. Only the pill slides (see .animation below).
+        return Button { model.tab = tab } label: {
             HStack(spacing: 4) {
                 Text(title)
                 if count > 0 {
