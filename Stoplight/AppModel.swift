@@ -86,6 +86,7 @@ final class AppModel {
         /// Rows drop whatever the header already says (US-005: no duplicated data).
         var hidesAuthor: Bool { if case .author = query { return true }; return false }
         func refLabel(for pr: PullRequest) -> String {
+            if queue != nil { return "#\(pr.number)" } // one queue is one repo, and the header names it
             switch query {
             case .repo, .base: return "#\(pr.number)"
             default:
