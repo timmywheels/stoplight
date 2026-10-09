@@ -25,6 +25,7 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
     private static let manualHeightKey = "panelHeightIsManual"
     private static let defaultSize = NSSize(width: 380, height: 520)
     private static let minSize = NSSize(width: 320, height: 160)
+    private static let tourHeight: CGFloat = 400
     /// Set once the user drags the panel; we then stop snapping it under the dots until it's closed unpinned.
     private var userMoved = false
     /// Set once the user resizes the panel: from then on the height they chose wins over fitting the content.
@@ -37,6 +38,7 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
 
     init(model: AppModel) {
         self.model = model
+        Self.placeNearClockOnFirstRun()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
         if let button = statusItem.button {
@@ -50,12 +52,28 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
         globalHotkey = GlobalHotkey { [weak self] in self?.toggle() }
     }
 
+    /// macOS adds a new status item at the left end of the extras, which on a notched or crowded menu bar
+    /// is behind the notch: the app runs and nobody can find it. Ask for the right end, next to the clock,
+    /// the first time only. Once the user ⌘-drags it, macOS stores their spot under this key and we never touch it again.
+    private static func placeNearClockOnFirstRun() {
+        let key = "NSStatusItem Preferred Position Item-0"
+        guard UserDefaults.standard.object(forKey: key) == nil else { return }
+        UserDefaults.standard.set(1, forKey: key)
+    }
+
+    /// False when the dots are behind the notch or pushed off by other menu bar items.
+    private var statusItemOnScreen: Bool {
+        guard let window = statusItem.button?.window else { return false }
+        return window.occlusionState.contains(.visible) && NSScreen.screens.contains { $0.frame.intersects(window.frame) }
+    }
+
     /// Shrink to fit when sections collapse; grow back up to the user's chosen height when they expand (US-027).
     private func observeContent() {
         withObservationTracking {
             _ = model.contentHeight
             _ = model.chromeHeight
             _ = model.pinnedPanel
+            _ = model.prefs.tourSeen  // the tour's height floor comes off when it's done
         } onChange: { [weak self] in
             Task { @MainActor in
                 guard let self else { return }
@@ -80,7 +98,9 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
                   let panel = self.panel, panel.isVisible, !panel.inLiveResize, !self.fitting,
                   self.model.contentHeight > 0, self.model.chromeHeight > 0 else { return }
             let maxH = self.savedSize().height
-            let wanted = max(Self.minSize.height, min(maxH, self.model.contentHeight + self.model.chromeHeight))
+            // The tour needs its full height or its Skip/Next row is cut off, whatever the list's size.
+            let floor = self.model.prefs.tourSeen ? Self.minSize.height : Self.tourHeight
+            let wanted = max(floor, min(max(maxH, floor), self.model.contentHeight + self.model.chromeHeight))
             guard abs(wanted - panel.frame.height) > 1 else { return }
             self.fitting = true
             var f = panel.frame
@@ -342,7 +362,15 @@ final class StatusPanelController: NSObject, NSWindowDelegate {
 
     /// Under the status item, right edges aligned, clamped to the screen.
     private func position(_ panel: NSPanel) {
-        guard let button = statusItem.button, let buttonWindow = button.window else { return }
+        guard statusItemOnScreen, let button = statusItem.button, let buttonWindow = button.window else {
+            // No dots to hang from: top right of the main screen, where they'd be.
+            guard let visible = NSScreen.main?.visibleFrame else { return }
+            var size = panel.frame.size
+            size.height = max(size.height, model.prefs.tourSeen ? 0 : Self.tourHeight)
+            panel.setFrame(NSRect(x: visible.maxX - size.width - 8, y: visible.maxY - size.height - 6,
+                                  width: size.width, height: size.height), display: false)
+            return
+        }
         let buttonFrame = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
         let screen = buttonWindow.screen ?? NSScreen.main
         let visible = screen?.visibleFrame ?? .zero

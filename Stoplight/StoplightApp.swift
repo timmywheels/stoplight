@@ -24,6 +24,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.prefs.appearance.apply()
         model.start()  // polling + snapshot server, at launch, not on first click
         statusPanel = StatusPanelController(model: model)
+        // First run: show the panel now, not after the first refresh. If sign-in fails or the dots are
+        // behind the notch, a launch that shows nothing reads as "it didn't open".
+        if !model.prefs.tourSeen {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { model.openPanel?() }
+        }
+    }
+
+    /// Opening the app again (Finder, Spotlight, Launchpad) while it's running: show the panel.
+    /// The only way in when the dots are hidden.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        AppModel.shared.openPanel?()
+        return false
     }
 
     /// stoplight://open            → show the panel (small widget)
