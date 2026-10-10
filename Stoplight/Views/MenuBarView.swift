@@ -701,7 +701,7 @@ struct PRRow: View {
                     .frame(width: 16, alignment: .trailing)
                     .help(q.isBlocked ? "Blocked: everything behind it waits" : "Position \(q.position) in the queue")
             }
-            if pr.status == .merged && !pr.isLanding {
+            if pr.status == .merged && !pr.isTrackedMerge {
                 // Landed. The branch badge says how the base branch is doing now.
                 Image(systemName: "checkmark.circle.fill").font(.caption).foregroundStyle(Color.githubMerged).frame(width: 8)
             } else {

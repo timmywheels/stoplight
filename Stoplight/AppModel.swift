@@ -405,7 +405,7 @@ final class AppModel {
         var seen = Set<String>()
         var out: [PullRequest] = []
         // Merged PRs show up while their merge commit is running, or while it and the base branch are red.
-        let mergedAlerts = merged.filter { $0.isLanding || $0.isUnresolvedMerge || ($0.baseState == nil && !$0.checks.isEmpty) }
+        let mergedAlerts = merged.filter { $0.isTrackedMerge || $0.isUnresolvedMerge || ($0.baseState == nil && !$0.checks.isEmpty) }
         for pr in mine + watched + followed.flatMap(\.prs) + inbound.flatMap(\.prs) + branches + mergedAlerts where seen.insert(pr.id).inserted {
             out.append(pr)
         }
@@ -443,8 +443,8 @@ final class AppModel {
         }
         var out: [Section] = []
         out.append(Section(id: "Pinned", title: "Pinned", prs: take(all, pinnedOnly: true)))
-        // A merge still running CI stays with your PRs (tagged Merged) until it settles.
-        out.append(Section(id: "Mine", title: "My PRs", prs: take(mine + merged.filter(\.isLanding))))
+        // Merges whose CI the dots show sit with your PRs (tagged Merged).
+        out.append(Section(id: "Mine", title: "My PRs", prs: take(mine + merged.filter(\.isTrackedMerge))))
         out.append(Section(id: "Watching", title: "Watching", prs: take(watched)))
         for f in followed {
             var title = f.query.title
@@ -578,7 +578,10 @@ final class AppModel {
             let previous = all
             mine = swap(mine)
             watched = swap(watched)
-            merged = swap(merged)
+            // The single-PR fetch knows nothing about the base branch or which merge is newest: keep those.
+            merged = merged.map { old in
+                byID[old.id].map { $0.withBaseState(old.baseState).withLatestMerge(old.isLatestMerge) } ?? old
+            }
             followed = followed.map { ($0.query, swap($0.prs)) }
             inbound = inbound.map { ($0.query, swap($0.prs)) }
             publishSnapshot()
@@ -704,6 +707,15 @@ final class AppModel {
                 guard let head = statuses[BranchRef(repo: pr.repo, branch: pr.baseRefName).key]?.first, !head.checks.isEmpty else { return pr }
                 return pr.withBaseState(head.state)
             }
+            // My newest merge into each branch that ran CI: what the dots show once it settles.
+            // Merge commits with no checks (a newer push cancelled their run) are skipped.
+            var newest: [String: PullRequest] = [:]
+            for pr in freshMerged where !pr.checks.isEmpty {
+                let key = BranchRef(repo: pr.repo, branch: pr.baseRefName).key
+                if (pr.mergedAt ?? .distantPast) > (newest[key]?.mergedAt ?? .distantPast) { newest[key] = pr }
+            }
+            let latestIDs = Set(newest.values.map(\.id))
+            freshMerged = freshMerged.map { $0.withLatestMerge(latestIDs.contains($0.id)) }
             merged = freshMerged
             watched = freshWatched
             await refreshQueues(provider)

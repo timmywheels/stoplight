@@ -32,4 +32,19 @@ final class PresenceTests: XCTestCase {
         XCTAssertFalse(pr("m", .success, status: .merged).isLanding)
         XCTAssertTrue(StatusPresence([pr("m", .success, status: .merged)]).isDark)
     }
+
+    func testMyNewestMergeKeepsItsOwnColor() {
+        let green = pr("m", .success, status: .merged).withLatestMerge(true)
+        XCTAssertTrue(green.isCounted)
+        XCTAssertEqual(StatusPresence([green]), StatusPresence(failure: false, pending: false, success: true))
+        // Red stays red even while main is running someone else's commit.
+        let red = pr("m", .failure, status: .merged).withLatestMerge(true).withBaseState(.pending)
+        XCTAssertEqual(red.effectiveState, .failure)
+        XCTAssertTrue(StatusPresence([red]).failure)
+        // The flag survives a base-state update, and an older red merge stays history.
+        XCTAssertTrue(red.isLatestMerge)
+        XCTAssertTrue(StatusPresence([pr("o", .failure, status: .merged).withBaseState(.pending)]).isDark)
+        // No checks on the merge commit: nothing to show.
+        XCTAssertFalse(pr("n", nil, status: .merged).withLatestMerge(true).isCounted)
+    }
 }
