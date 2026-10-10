@@ -399,13 +399,13 @@ final class AppModel {
     func displayName(for login: String) -> String? { displayNames[login.lowercased()] }
 
     /// Everything visible, deduped, ignore rules applied. Source of truth for dots, widget, notifications.
-    /// Merged PRs are included only while their merge commit has checks, so a red deploy lights the dots
-    /// and a plain "it landed" row never does.
+    /// Merged PRs are included only while their merge commit is running or red, so a running or red
+    /// deploy lights the dots and a plain "it landed" row never does.
     var all: [PullRequest] {
         var seen = Set<String>()
         var out: [PullRequest] = []
-        // Merged PRs alert only while their own merge is red and the base branch is still red.
-        let mergedAlerts = merged.filter { $0.isUnresolvedMerge || ($0.baseState == nil && !$0.checks.isEmpty) }
+        // Merged PRs show up while their merge commit is running, or while it and the base branch are red.
+        let mergedAlerts = merged.filter { $0.isLanding || $0.isUnresolvedMerge || ($0.baseState == nil && !$0.checks.isEmpty) }
         for pr in mine + watched + followed.flatMap(\.prs) + inbound.flatMap(\.prs) + branches + mergedAlerts where seen.insert(pr.id).inserted {
             out.append(pr)
         }
@@ -443,7 +443,8 @@ final class AppModel {
         }
         var out: [Section] = []
         out.append(Section(id: "Pinned", title: "Pinned", prs: take(all, pinnedOnly: true)))
-        out.append(Section(id: "Mine", title: "My PRs", prs: take(mine)))
+        // A merge still running CI stays with your PRs (tagged Merged) until it settles.
+        out.append(Section(id: "Mine", title: "My PRs", prs: take(mine + merged.filter(\.isLanding))))
         out.append(Section(id: "Watching", title: "Watching", prs: take(watched)))
         for f in followed {
             var title = f.query.title
@@ -854,7 +855,10 @@ final class AppModel {
         let activity = Transitions.activityEvents(previous: previous, current: current, me: login, rules: prefs.activityRules(login: login))
         // A new approval or change request already says what the decision change would: don't say it twice.
         let reviewed = Set(activity.filter { $0.activity.contains { [.approved, .changesRequested].contains($0.kind) } }.map(\.pr.id))
-        let events = (Transitions.events(previous: previous, current: current, mode: NotificationService.mode)
+        // A merge that just went green has left `all`; it still gets its "deployed" notification.
+        var seen = Set(current.map(\.id))
+        let withMerged = current + mergedRows.filter { seen.insert($0.id).inserted }
+        let events = (Transitions.events(previous: previous, current: withMerged, mode: NotificationService.mode)
             .filter { !([.approved, .changesRequested].contains($0.kind) && reviewed.contains($0.pr.id)) } + activity)
             .filter { !sentEvents.contains($0.key) }
         for e in events {

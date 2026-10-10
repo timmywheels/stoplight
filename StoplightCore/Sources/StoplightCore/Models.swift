@@ -270,14 +270,19 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
     /// A merged PR is a live problem only when its own merge commit is red AND the base branch is still red.
     public var isUnresolvedMerge: Bool { status == .merged && state == .failure && baseState == .failure }
 
-    /// Whether the dots count it: open PRs only. Merged PRs and followed branches have rows but no say
-    /// in the tally, so every number matches a dot you can see in the list.
-    public var isCounted: Bool { status == .open && !isBranch }
+    /// A merged PR whose merge commit's checks are still running (CI on the base branch). It reads as
+    /// yellow and sits with your open PRs until the run settles, then drops back to Merged.
+    public var isLanding: Bool { status == .merged && state == .pending }
+
+    /// Whether the dots count it: open PRs, plus merges still running. Other merged PRs and followed
+    /// branches have rows but no say in the tally, so every number matches a dot you can see in the list.
+    public var isCounted: Bool { (status == .open && !isBranch) || isLanding }
 
     /// The color of the row's dot. Open PRs: their checks (a conflict is the row's ▲, not a red dot).
-    /// Merged PRs: red only while unresolved, otherwise "landed" (`.none`).
+    /// Merged PRs: yellow while landing, red only while unresolved, otherwise "landed" (`.none`).
     public var effectiveState: CIState {
         guard status == .merged else { return state }
+        if isLanding { return .pending }
         if baseState == nil { return state }          // no branch info: fall back to the merge commit itself
         return isUnresolvedMerge ? .failure : .none
     }

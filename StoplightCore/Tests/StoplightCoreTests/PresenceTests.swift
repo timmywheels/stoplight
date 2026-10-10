@@ -20,4 +20,16 @@ final class PresenceTests: XCTestCase {
         XCTAssertTrue(StatusPresence([]).isDark)
         XCTAssertTrue(StatusPresence([pr("m", .failure, status: .merged)]).isDark)                           // merged rows have no dot
     }
+
+    func testMergeStillRunningLightsYellow() {
+        let landing = pr("m", .pending, status: .merged)
+        XCTAssertTrue(landing.isLanding)
+        XCTAssertTrue(landing.isCounted)
+        XCTAssertEqual(landing.effectiveState, .pending)
+        XCTAssertEqual(landing.withBaseState(.pending).effectiveState, .pending)
+        XCTAssertEqual(StatusPresence([landing]), StatusPresence(failure: false, pending: true, success: false))
+        // Once it settles green it's just "landed" again: a row, not a dot.
+        XCTAssertFalse(pr("m", .success, status: .merged).isLanding)
+        XCTAssertTrue(StatusPresence([pr("m", .success, status: .merged)]).isDark)
+    }
 }
