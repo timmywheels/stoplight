@@ -37,15 +37,24 @@ public struct GitHubProvider: CIProvider {
 
     // MARK: - Public
 
+    /// One request per search, in parallel. A single request holding every search (each up to 50 PRs
+    /// with all their checks) was big enough for GitHub to time out on (HTTP 504), failing the whole refresh.
     public func fetchPullRequests(queries: [PRQuery]) async throws -> [[PullRequest]] {
         guard !queries.isEmpty else { return [] }
-        let data = try await post(["query": Self.searchQuery(queries)])
-        let env = try Self.decoder.decode(SearchEnvelope.self, from: data)
-        guard let results = env.data else {
-            throw Error.graphQL(env.errors?.first?.message ?? "Empty response")
-        }
-        return queries.indices.map { i in
-            (results["q\(i)"]??.nodes ?? []).compactMap(Self.map)
+        return try await withThrowingTaskGroup(of: (Int, [PullRequest]).self) { group in
+            for (i, q) in queries.enumerated() {
+                group.addTask {
+                    let data = try await self.post(["query": Self.searchQuery([q])])
+                    let env = try Self.decoder.decode(SearchEnvelope.self, from: data)
+                    guard let results = env.data else {
+                        throw Error.graphQL(env.errors?.first?.message ?? "Empty response")
+                    }
+                    return (i, (results["q0"]??.nodes ?? []).compactMap(Self.map))
+                }
+            }
+            var out = Array(repeating: [PullRequest](), count: queries.count)
+            for try await (i, prs) in group { out[i] = prs }
+            return out
         }
     }
 
@@ -262,6 +271,13 @@ public struct GitHubProvider: CIProvider {
         var result: (Data, URLResponse)
         do { result = try await session.data(for: req) }
         catch let e as URLError where e.code == .networkConnectionLost || e.code == .cannotConnectToHost {
+            result = try await session.data(for: req)
+        }
+        // GitHub's gateway gives up on a slow query now and then (502/503/504). It usually goes through
+        // on a second try, so retry twice, briefly, rather than leave the list stale for a minute.
+        for delay in [1.0, 3.0] {
+            guard let code = (result.1 as? HTTPURLResponse)?.statusCode, [502, 503, 504].contains(code) else { break }
+            try await Task.sleep(for: .seconds(delay))
             result = try await session.data(for: req)
         }
         let (data, resp) = result
