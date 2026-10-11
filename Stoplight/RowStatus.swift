@@ -6,7 +6,7 @@ import StoplightCore
 /// Ranked by rules: the facts are structured, so rules are instant and never drop the one that matters.
 struct RowStatus: Equatable {
     enum Level: Int, Comparable {
-        case info, good, waiting, blocking
+        case info, merged, good, waiting, blocking
         static func < (a: Level, b: Level) -> Bool { a.rawValue < b.rawValue }
     }
     /// One fact: an SF Symbol, the words for its tooltip, and how much it matters. `count` sits beside it.
@@ -31,8 +31,16 @@ struct RowStatus: Equatable {
         case .closed:
             return RowStatus(parts: [Part(symbol: "xmark.circle", help: "Closed without merging", level: .info)])
         case .merged:
-            guard pr.baseState == .failure else { return RowStatus(parts: []) }
-            return RowStatus(parts: [Part(symbol: "arrow.triangle.branch", help: "Merged; \(pr.baseRefName) is failing right now", level: .blocking)])
+            // Outside the Merged section (a tracked merge sits in My PRs), say it's merged: its dot is
+            // the merge commit's CI, which otherwise reads like an open PR's.
+            var parts: [Part] = []
+            if pr.baseState == .failure {
+                parts.append(Part(symbol: "arrow.triangle.branch", help: "Merged; \(pr.baseRefName) is failing right now", level: .blocking))
+            }
+            if pr.isTrackedMerge {
+                parts.append(Part(symbol: "arrow.triangle.merge", help: "Merged; the dot is CI on \(pr.baseRefName) after the merge", level: .merged))
+            }
+            return RowStatus(parts: parts)
         case .open:
             break
         }
