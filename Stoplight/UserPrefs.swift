@@ -448,10 +448,7 @@ final class UserPrefs {
     /// Validates, normalizes (strips a leading @), dedupes case-insensitively.
     @discardableResult
     func follow(_ raw: String, kind: SourceKind) -> AddResult {
-        var value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if value.hasPrefix("@") { value.removeFirst() }
-        let valid = kind == .repos ? Filters.isValidRepo(value) : Filters.isValidLogin(value)
-        guard valid else { return .invalid }
+        guard let value = Self.normalize(raw, kind: kind, hideList: false) else { return .invalid }
         if sources[follow: kind].contains(where: { $0.caseInsensitiveCompare(value) == .orderedSame }) { return .duplicate }
         sources[follow: kind].append(value)
         return .added
