@@ -94,7 +94,8 @@ final class UserPrefs {
         static let collapsed = "collapsedSections"
         static let mergedDays = "mergedDays"
         static let branchCommits = "branchCommits"
-        static let repoOnEveryRow = "repoOnEveryRow"
+        static let repoOnEveryRow = "repoOnEveryRow" // before 0.16.5, a Bool: true is now .eachRow
+        static let repoLabels = "repoLabels"
         static let sectionOrder = "sectionOrder"
         static let tourSeen = "tourSeen"
         static let rowActions = "rowActions"
@@ -282,8 +283,19 @@ final class UserPrefs {
     /// Stored as what's hidden, so a detail added later shows up by default. Local only.
     var hiddenRowDetails: Set<String> { didSet { defaults.set(Array(hiddenRowDetails).sorted(), forKey: Key.hiddenRowDetails) } }
     func showsDetail(_ d: RowDetail) -> Bool { !hiddenRowDetails.contains(d.rawValue) }
-    /// Name the repo on every row instead of once in the section header. Off by default. Local only.
-    var repoOnEveryRow: Bool { didSet { defaults.set(repoOnEveryRow, forKey: Key.repoOnEveryRow) } }
+    /// How a section with PRs from several repos says which repo each row is in. Local only.
+    enum RepoLabels: String, CaseIterable, Identifiable {
+        case grouped, eachRow, hidden
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .grouped: "Group by repository"
+            case .eachRow: "Name on each row"
+            case .hidden: "Only on hover"
+            }
+        }
+    }
+    var repoLabels: RepoLabels { didSet { defaults.set(repoLabels.rawValue, forKey: Key.repoLabels) } }
     func setDetail(_ d: RowDetail, shown: Bool) {
         if shown { hiddenRowDetails.remove(d.rawValue) } else { hiddenRowDetails.insert(d.rawValue) }
     }
@@ -369,7 +381,8 @@ final class UserPrefs {
         sectionOrder = defaults.stringArray(forKey: Key.sectionOrder) ?? []
         branchCommits = defaults.object(forKey: Key.branchCommits) == nil ? 1 : max(1, min(10, defaults.integer(forKey: Key.branchCommits)))
         tourSeen = defaults.bool(forKey: Key.tourSeen)
-        repoOnEveryRow = defaults.bool(forKey: Key.repoOnEveryRow)
+        repoLabels = RepoLabels(rawValue: defaults.string(forKey: Key.repoLabels) ?? "")
+            ?? (defaults.bool(forKey: Key.repoOnEveryRow) ? .eachRow : .grouped)
         // Buttons added in a later version join an existing config once, so an upgrade never hides a new
         // action; ones the user actually unchecked stay off because they were already "seen".
         if var saved = defaults.stringArray(forKey: Key.rowActions)?.compactMap(RowAction.init(rawValue:)) {

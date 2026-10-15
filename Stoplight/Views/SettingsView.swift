@@ -165,11 +165,12 @@ private struct DisplayTab: View {
                 ForEach(UserPrefs.RowDetail.allCases) { d in
                     Toggle(d.title, isOn: Binding(get: { prefs.showsDetail(d) }, set: { prefs.setDetail(d, shown: $0) }))
                 }
-                Toggle(isOn: $prefs.repoOnEveryRow) {
-                    InfoLabel("Repository name on every row",
-                              "Off: a section with PRs from several repos splits into one small group per repo, and the group names it.")
+                Picker(selection: $prefs.repoLabels) {
+                    ForEach(UserPrefs.RepoLabels.allCases) { Text($0.title).tag($0) }
+                } label: {
+                    InfoLabel("Repositories",
+                              "For a section with PRs from more than one repo. Group: a small collapsible group per repo. Each row: \"servicepro #1023\". Hover: just \"#1023\".")
                 }
-                .disabled(!prefs.showsDetail(.ref))
             } header: {
                 Text("Rows")
             } footer: {

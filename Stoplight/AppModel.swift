@@ -82,8 +82,8 @@ final class AppModel {
         var url: URL? = nil
         /// Set on a merge queue's section.
         var queue: BranchRef? = nil
-        /// Settings → Rows: every row names its repo, so the section isn't split into repo groups.
-        var repoOnEveryRow = false
+        /// Settings → Rows → Repositories: groups, a name on each row, or only the hover.
+        var repoLabels: UserPrefs.RepoLabels = .grouped
 
         /// Rows drop whatever the header already says (US-005: no duplicated data).
         var hidesAuthor: Bool { if case .author = query { return true }; return false }
@@ -91,14 +91,15 @@ final class AppModel {
         /// A section whose rows can come from several repos shows them under one sub-header per repo,
         /// unless the rows name their repo themselves. A queue or a followed repo is one repo already.
         var groupsByRepo: Bool {
-            if queue != nil || repoOnEveryRow { return false }
+            if queue != nil || repoLabels != .grouped { return false }
             switch query { case .repo, .base: return false; default: return true }
         }
 
         func refLabel(for pr: PullRequest) -> String {
             if pr.isBranch { return pr.shortRef }
             // Grouped, a queue, or a followed repo: the header or the repo sub-header names the repo.
-            if groupsByRepo || queue != nil { return "#\(pr.number)" }
+            // Hover-only: the row's tooltip does.
+            if groupsByRepo || queue != nil || repoLabels == .hidden { return "#\(pr.number)" }
             switch query {
             case .repo, .base: return "#\(pr.number)"
             default: return "\(Self.shortName(pr.repo)) #\(pr.number)" // the owner is on hover
@@ -489,8 +490,8 @@ final class AppModel {
         // Merged rows have no dot, so a color filter hides them along with the other uncounted rows.
         let mergedFiltered = filter.isEmpty ? mergedRows.filter { !claimed.contains($0.id) && matchesSearch($0) } : []
         out.append(Section(id: "Merged", title: "Merged", prs: mergedFiltered))
-        let everyRow = prefs.repoOnEveryRow
-        return applyOrder(out).filter { !$0.prs.isEmpty }.map { var s = $0; s.repoOnEveryRow = everyRow; return s }
+        let labels = prefs.repoLabels
+        return applyOrder(out).filter { !$0.prs.isEmpty }.map { var s = $0; s.repoLabels = labels; return s }
     }
 
     /// All section ids in default order, for drag reordering (includes empty ones so order survives).
