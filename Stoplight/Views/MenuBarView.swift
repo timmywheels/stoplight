@@ -788,6 +788,9 @@ struct PRRow: View {
                 }
             }
         }
+        // As tall as an avatar even without one (a branch row, or avatars off), so the 16pt hover
+        // buttons never make the row grow.
+        .frame(minHeight: avatarSize)
         .padding(.horizontal, 12).padding(.vertical, model.prefs.density.rowPadding)
         .contentShape(Rectangle())
         .gesture(
