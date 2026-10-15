@@ -82,39 +82,65 @@ final class AppModel {
         var url: URL? = nil
         /// Set on a merge queue's section.
         var queue: BranchRef? = nil
-        /// Settings → Rows: every row names its repo, so the header doesn't need to.
+        /// Settings → Rows: every row names its repo, so the section isn't split into repo groups.
         var repoOnEveryRow = false
 
         /// Rows drop whatever the header already says (US-005: no duplicated data).
         var hidesAuthor: Bool { if case .author = query { return true }; return false }
+
+        /// A section whose rows can come from several repos shows them under one sub-header per repo,
+        /// unless the rows name their repo themselves. A queue or a followed repo is one repo already.
+        var groupsByRepo: Bool {
+            if queue != nil || repoOnEveryRow { return false }
+            switch query { case .repo, .base: return false; default: return true }
+        }
+
         func refLabel(for pr: PullRequest) -> String {
-            if queue != nil { return "#\(pr.number)" } // one queue is one repo, and the header names it
+            if pr.isBranch { return pr.shortRef }
+            // Grouped, a queue, or a followed repo: the header or the repo sub-header names the repo.
+            if groupsByRepo || queue != nil { return "#\(pr.number)" }
             switch query {
             case .repo, .base: return "#\(pr.number)"
-            default:
-                // Say only what tells the rows apart: the section's main repo → "#801" (the header
-                // names it once), any other → "stoplight #3". The owner is on hover.
-                if pr.isBranch { return pr.shortRef }
-                if !repoOnEveryRow, let main = mainRepo, pr.repo.lowercased() == main.lowercased() { return "#\(pr.number)" }
-                return "\(pr.repo.split(separator: "/").last.map(String.init) ?? pr.repo) #\(pr.number)"
+            default: return "\(Self.shortName(pr.repo)) #\(pr.number)" // the owner is on hover
             }
         }
 
-        /// The repo at least half the rows are in, when there's more than one row.
-        var mainRepo: String? {
-            let repos = prs.filter { !$0.isBranch }.map(\.repo)
-            guard repos.count > 1 else { return nil }
-            let counts = Dictionary(repos.map { ($0.lowercased(), 1) }, uniquingKeysWith: +)
-            guard let top = counts.max(by: { $0.value < $1.value }), top.value * 2 >= repos.count else { return nil }
-            return repos.first { $0.lowercased() == top.key }
+        static func shortName(_ repo: String) -> String { repo.split(separator: "/").last.map(String.init) ?? repo }
+
+        /// One repo's rows inside a section. `repo` is nil for rows that name their own repo (branches),
+        /// and for the single group of a section that isn't split.
+        struct RepoGroup: Identifiable {
+            let id: String
+            let repo: String?
+            let title: String
+            let rows: [StackRow]
         }
-        /// What the header adds after the title when the rows dropped it: "servicepro".
-        var headerNote: String? {
-            if queue != nil || repoOnEveryRow { return nil } // the header names the queue's repo itself; or the rows do
-            switch query {
-            case .repo, .base: return nil // the title already names it
-            default: return mainRepo.flatMap { $0.split(separator: "/").last.map(String.init) }
+
+        /// Collapse key for a repo group, stored alongside section ids.
+        func groupID(_ repo: String) -> String { "\(id)›\(repo.lowercased())" }
+
+        /// Rows in display order, split by repo when `groupsByRepo`. Groups follow their first row,
+        /// so the group holding the worst PR comes first. Stacks never span repos, so they stay whole.
+        func groups(stacked: Bool = true) -> [RepoGroup] {
+            let rows = stacked ? Stacks.layout(prs) : prs.map { StackRow(pr: $0, depth: 0, stackID: nil) }
+            guard groupsByRepo else { return [RepoGroup(id: id, repo: nil, title: "", rows: rows)] }
+            var order: [String] = [], byRepo: [String: [StackRow]] = [:], names: [String: String] = [:], loose: [StackRow] = []
+            for r in rows {
+                if r.pr.isBranch { loose.append(r); continue }
+                let k = r.pr.repo.lowercased()
+                if byRepo[k] == nil { order.append(k); names[k] = r.pr.repo }
+                byRepo[k, default: []].append(r)
             }
+            // Two owners' "api" would read the same, so those keep their owner.
+            let shortCounts = Dictionary(order.map { (Self.shortName($0), 1) }, uniquingKeysWith: +)
+            var out = loose.isEmpty ? [] : [RepoGroup(id: "\(id)›branches", repo: nil, title: "", rows: loose)]
+            for k in order {
+                let full = names[k] ?? k
+                out.append(RepoGroup(id: groupID(full), repo: full,
+                                     title: shortCounts[Self.shortName(k), default: 0] > 1 ? full : Self.shortName(full),
+                                     rows: byRepo[k] ?? []))
+            }
+            return out
         }
     }
 
@@ -187,7 +213,9 @@ final class AppModel {
 
     /// Row ids in display order, skipping collapsed sections.
     var visibleRowIDs: [String] {
-        sections.flatMap { sec in isCollapsed(sec.id) ? [] : Stacks.layout(sec.prs).map(\.id) }
+        sections.flatMap { sec in
+            isCollapsed(sec.id) ? [] : sec.groups().flatMap { g in g.repo != nil && isCollapsed(g.id) ? [] : g.rows.map(\.id) }
+        }
     }
     /// Collapse is suspended while a search or a status filter is active, so matches are never hidden.
     func isCollapsed(_ sectionID: String) -> Bool {
@@ -202,6 +230,7 @@ final class AppModel {
     func reveal(prID id: String) {
         if let sec = sections.first(where: { $0.prs.contains { $0.id == id } }) {
             prefs.collapsedSections.remove(sec.id)
+            if let pr = sec.prs.first(where: { $0.id == id }) { prefs.collapsedSections.remove(sec.groupID(pr.repo)) }
         }
         statusFilter = []
         selectedID = id

@@ -167,7 +167,7 @@ private struct DisplayTab: View {
                 }
                 Toggle(isOn: $prefs.repoOnEveryRow) {
                     InfoLabel("Repository name on every row",
-                              "Off: a section names its main repo once in the header, and only rows from other repos say theirs.")
+                              "Off: a section with PRs from several repos splits into one small group per repo, and the group names it.")
                 }
                 .disabled(!prefs.showsDetail(.ref))
             } header: {

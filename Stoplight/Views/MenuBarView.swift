@@ -213,7 +213,6 @@ struct MenuBarView: View {
                 SectionHeader(id: sec.id, title: sec.title, prs: sec.prs, collapsed: collapsed, mode: model.prefs.sectionCounts,
                               allCollapsed: allSectionsCollapsed,
                               url: sec.url,
-                              note: sec.headerNote,
                               queue: sec.queue,
                               queuePinned: sec.queue.map { model.prefs.isQueuePinned($0.spec) } ?? false,
                               toggleQueuePin: { if let q = sec.queue { model.toggleQueuePin(q) } },
@@ -237,11 +236,21 @@ struct MenuBarView: View {
             if !collapsed {
                 // Queue sections keep GitHub's order: position is the information. Stacks.layout
                 // regroups by state and recency, which would scramble exactly that.
-                let rows = stacked ? Stacks.layout(sec.prs) : sec.prs.map { StackRow(pr: $0, depth: 0, stackID: nil) }
-                ForEach(rows) { row in
-                    PRRow(pr: row.pr, model: model, section: sec, depth: row.depth,
-                          stack: row.stackID.map { Stacks.members(of: $0, in: rows) })
-                    Divider()
+                ForEach(sec.groups(stacked: stacked)) { group in
+                    let groupCollapsed = group.repo != nil && model.isCollapsed(group.id)
+                    if let repo = group.repo {
+                        RepoGroupHeader(title: group.title, repo: repo, prs: group.rows.map(\.pr),
+                                        collapsed: groupCollapsed, mode: model.prefs.sectionCounts) {
+                            model.prefs.toggleCollapsed(group.id)
+                        }
+                    }
+                    if !groupCollapsed {
+                        ForEach(group.rows) { row in
+                            PRRow(pr: row.pr, model: model, section: sec, depth: row.depth,
+                                  stack: row.stackID.map { Stacks.members(of: $0, in: group.rows) })
+                            Divider()
+                        }
+                    }
                 }
             }
         }
@@ -472,8 +481,6 @@ struct SectionHeader: View {
     var allCollapsed = false
     /// Where this section lives on GitHub, when it lives anywhere.
     var url: URL? = nil
-    /// The repo every row shares, said once here instead of on each row.
-    var note: String? = nil
     /// Set on a merge queue's header: pin it, or stop showing it.
     var queue: BranchRef? = nil
     var queuePinned = false
@@ -493,10 +500,6 @@ struct SectionHeader: View {
                 .rotationEffect(.degrees(collapsed ? -90 : 0))
                 .frame(width: 10)
             Text(title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-            if let note {
-                Text(note).font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
-                    .help("Rows without a repository name are in \(note)")
-            }
             if let queue {
                 Text(queue.repo.split(separator: "/").last.map(String.init) ?? queue.repo)
                     .font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
@@ -552,6 +555,49 @@ struct SectionHeader: View {
             }
         }
         .modifier(Reorderable(id: id, enabled: reorderable, drop: drop, targeted: $targeted))
+        .animation(.easeOut(duration: 0.15), value: collapsed)
+    }
+}
+
+/// One repo inside a section that holds several: its name, and a chevron to fold its rows away.
+struct RepoGroupHeader: View {
+    let title: String
+    let repo: String
+    let prs: [PullRequest]
+    let collapsed: Bool
+    var mode: UserPrefs.SectionCounts = .off
+    let toggle: () -> Void
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "chevron.down")
+                .font(.system(size: 8, weight: .semibold)).foregroundStyle(.tertiary)
+                .rotationEffect(.degrees(collapsed ? -90 : 0))
+                .frame(width: 10)
+            Text(title).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+            if collapsed && mode != .off {
+                let states: [CIState] = mode == .full ? CIState.allCases : [.failure, .pending]
+                ForEach(states, id: \.self) { state in
+                    let n = prs.filter { $0.isCounted && $0.effectiveState == state }.count
+                    if n > 0 {
+                        HStack(spacing: 3) {
+                            StatusDot(state: state)
+                            Text("\(n)").font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                        }
+                        .padding(.leading, 4)
+                    }
+                }
+                if mode == .attention {
+                    Text("· \(prs.count)").font(.caption2).foregroundStyle(.tertiary).monospacedDigit().padding(.leading, 2)
+                }
+            }
+            Spacer()
+        }
+        .padding(.leading, 22).padding(.trailing, 12).padding(.top, 5).padding(.bottom, collapsed ? 5 : 1)
+        .contentShape(Rectangle())
+        .help(repo)
+        .onTapGesture(perform: toggle)
+        .contextMenu { Button(collapsed ? "Expand \(title)" : "Collapse \(title)", action: toggle) }
         .animation(.easeOut(duration: 0.15), value: collapsed)
     }
 }
