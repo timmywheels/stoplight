@@ -236,9 +236,12 @@ struct MenuBarView: View {
             if !collapsed {
                 // Queue sections keep GitHub's order: position is the information. Stacks.layout
                 // regroups by state and recency, which would scramble exactly that.
-                ForEach(sec.groups(stacked: stacked)) { group in
-                    let groupCollapsed = group.repo != nil && model.isCollapsed(group.id)
-                    if let repo = group.repo {
+                let groups = sec.groups(stacked: stacked)
+                // One repo has nothing to tell apart, so it gets no sub-header.
+                let showGroups = groups.filter { $0.repo != nil }.count > 1
+                ForEach(groups) { group in
+                    let groupCollapsed = showGroups && group.repo != nil && model.isCollapsed(group.id)
+                    if showGroups, let repo = group.repo {
                         RepoGroupHeader(title: group.title, repo: repo, prs: group.rows.map(\.pr),
                                         collapsed: groupCollapsed, mode: model.prefs.sectionCounts) {
                             model.prefs.toggleCollapsed(group.id)
@@ -593,7 +596,7 @@ struct RepoGroupHeader: View {
             }
             Spacer()
         }
-        .padding(.leading, 22).padding(.trailing, 12).padding(.top, 5).padding(.bottom, collapsed ? 5 : 1)
+        .padding(.horizontal, 12).padding(.top, 5).padding(.bottom, collapsed ? 5 : 1)
         .contentShape(Rectangle())
         .help(repo)
         .onTapGesture(perform: toggle)

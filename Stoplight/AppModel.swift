@@ -214,7 +214,9 @@ final class AppModel {
     /// Row ids in display order, skipping collapsed sections.
     var visibleRowIDs: [String] {
         sections.flatMap { sec in
-            isCollapsed(sec.id) ? [] : sec.groups().flatMap { g in g.repo != nil && isCollapsed(g.id) ? [] : g.rows.map(\.id) }
+            guard !isCollapsed(sec.id) else { return [String]() }
+            let groups = sec.groups(), split = groups.filter { $0.repo != nil }.count > 1
+            return groups.flatMap { g in split && g.repo != nil && isCollapsed(g.id) ? [] : g.rows.map(\.id) }
         }
     }
     /// Collapse is suspended while a search or a status filter is active, so matches are never hidden.
