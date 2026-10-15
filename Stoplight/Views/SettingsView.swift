@@ -165,6 +165,11 @@ private struct DisplayTab: View {
                 ForEach(UserPrefs.RowDetail.allCases) { d in
                     Toggle(d.title, isOn: Binding(get: { prefs.showsDetail(d) }, set: { prefs.setDetail(d, shown: $0) }))
                 }
+                Toggle(isOn: $prefs.repoOnEveryRow) {
+                    InfoLabel("Repository name on every row",
+                              "Off: a section names its main repo once in the header, and only rows from other repos say theirs.")
+                }
+                .disabled(!prefs.showsDetail(.ref))
             } header: {
                 Text("Rows")
             } footer: {

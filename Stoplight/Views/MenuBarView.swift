@@ -495,6 +495,7 @@ struct SectionHeader: View {
             Text(title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
             if let note {
                 Text(note).font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
+                    .help("Rows without a repository name are in \(note)")
             }
             if let queue {
                 Text(queue.repo.split(separator: "/").last.map(String.init) ?? queue.repo)

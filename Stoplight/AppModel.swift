@@ -82,6 +82,8 @@ final class AppModel {
         var url: URL? = nil
         /// Set on a merge queue's section.
         var queue: BranchRef? = nil
+        /// Settings → Rows: every row names its repo, so the header doesn't need to.
+        var repoOnEveryRow = false
 
         /// Rows drop whatever the header already says (US-005: no duplicated data).
         var hidesAuthor: Bool { if case .author = query { return true }; return false }
@@ -93,7 +95,7 @@ final class AppModel {
                 // Say only what tells the rows apart: the section's main repo → "#801" (the header
                 // names it once), any other → "stoplight #3". The owner is on hover.
                 if pr.isBranch { return pr.shortRef }
-                if let main = mainRepo, pr.repo.lowercased() == main.lowercased() { return "#\(pr.number)" }
+                if !repoOnEveryRow, let main = mainRepo, pr.repo.lowercased() == main.lowercased() { return "#\(pr.number)" }
                 return "\(pr.repo.split(separator: "/").last.map(String.init) ?? pr.repo) #\(pr.number)"
             }
         }
@@ -108,7 +110,7 @@ final class AppModel {
         }
         /// What the header adds after the title when the rows dropped it: "servicepro".
         var headerNote: String? {
-            if queue != nil { return nil } // the header names the queue's repo itself
+            if queue != nil || repoOnEveryRow { return nil } // the header names the queue's repo itself; or the rows do
             switch query {
             case .repo, .base: return nil // the title already names it
             default: return mainRepo.flatMap { $0.split(separator: "/").last.map(String.init) }
@@ -456,7 +458,8 @@ final class AppModel {
         // Merged rows have no dot, so a color filter hides them along with the other uncounted rows.
         let mergedFiltered = filter.isEmpty ? mergedRows.filter { !claimed.contains($0.id) && matchesSearch($0) } : []
         out.append(Section(id: "Merged", title: "Merged", prs: mergedFiltered))
-        return applyOrder(out).filter { !$0.prs.isEmpty }
+        let everyRow = prefs.repoOnEveryRow
+        return applyOrder(out).filter { !$0.prs.isEmpty }.map { var s = $0; s.repoOnEveryRow = everyRow; return s }
     }
 
     /// All section ids in default order, for drag reordering (includes empty ones so order survives).
