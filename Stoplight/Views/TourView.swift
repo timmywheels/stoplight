@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import StoplightCore
 
 /// First-run tour (US-024). Four slides inside the panel; Skip or Done marks it seen. Replay from Settings.
@@ -8,14 +9,25 @@ struct TourView: View {
     @State private var index = 0
     private static let motion = Animation.snappy(duration: 0.2, extraBounce: 0)
 
+    /// Whether Raycast is installed. A LaunchServices lookup — no entitlement, no prompt. Checked once per tour.
+    private let hasRaycast = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.raycast.macos") != nil
+
     private struct Slide {
         let title: String
         let body: String
         let art: AnyView
+        /// An optional call to action shown under the body, e.g. "Get the Raycast extension".
+        var cta: CTA? = nil
+    }
+
+    private struct CTA {
+        let label: String
+        let url: URL
     }
 
     // Computed, not stored: the art has to read the color profile from the environment.
-    private var slides: [Slide] { [
+    private var slides: [Slide] {
+        var slides: [Slide] = [
         Slide(title: "Stop refreshing GitHub",
               body: "Stoplight watches every open PR you have. Red means go fix something. Yellow means keep working, it's still running. Green means ship it. One glance at the menu bar is the whole check. ⌥⌘S opens the list from anywhere.",
               art: AnyView(HStack(spacing: 10) {
@@ -40,7 +52,17 @@ struct TourView: View {
         Slide(title: "Watch your team, not just yourself",
               body: "Follow people, repos, or orgs in Settings → Sources and each gets its own section. You get a notification the moment CI fails, or goes green. The desktop widget shows the same list.",
               art: AnyView(Image(systemName: "person.2").font(.system(size: 34)).foregroundStyle(.secondary))),
-    ] }
+        ]
+        // Only shown to people who already run Raycast: the same PR lights, a hotkey away in Raycast.
+        if hasRaycast, let url = URL(string: "https://github.com/timmywheels/stoplight/tree/main/raycast") {
+            slides.append(Slide(
+                title: "You use Raycast too",
+                body: "There's a Stoplight extension for Raycast: the same PR lights, searchable from your launcher, with live CI and the conversation one keypress away. Enter reviews a PR right here in Stoplight.",
+                art: AnyView(Image(systemName: "wand.and.stars").font(.system(size: 34)).foregroundStyle(.secondary)),
+                cta: CTA(label: "Get the Raycast extension", url: url)))
+        }
+        return slides
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -50,6 +72,10 @@ struct TourView: View {
                 Text(slides[index].title).font(.headline)
                 Text(slides[index].body).font(.callout).foregroundStyle(.secondary)
                     .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+                if let cta = slides[index].cta {
+                    Button(cta.label) { NSWorkspace.shared.open(cta.url) }
+                        .buttonStyle(.borderedProminent).controlSize(.small)
+                }
             }
             .id(index)
             .transition(.opacity)
