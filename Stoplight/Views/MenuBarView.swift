@@ -920,6 +920,10 @@ struct PRRow: View {
             }
             // One row of plain icons: a soft plate only under the pointer or the keyboard's focus.
             HStack(spacing: 2) {
+                // Only yours, only when GitHub would take it: a quiet green ring that says "ready to merge".
+                if model.canMerge(pr) {
+                    MergeButton(pr: pr, model: model)
+                }
                 ForEach(Array(buttons.enumerated()), id: \.offset) { i, b in
                     ExpandedButton(symbol: b.symbol, help: b.help, tint: b.tint,
                                    focused: selected && model.focusedButton == i, action: b.action)
@@ -1278,6 +1282,75 @@ struct TabToggle: View {
 }
 
 /// A button in the expanded row: an icon, with a soft plate under the pointer or keyboard focus.
+/// The merge affordance (US-040). Idle it's a small green merge glyph ringed in green — minimal, but
+/// unmistakably "this one's ready". On confirm the ring travels once around the circle like AirDrop,
+/// then pops: a quick spring and a check. The sweep and the API call run together, so the pop lands the
+/// moment GitHub says yes, never before.
+private struct MergeButton: View {
+    let pr: PullRequest
+    @Bindable var model: AppModel
+    @Environment(\.colorProfile) private var colorProfile
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private enum Phase { case idle, merging, done }
+    @State private var phase: Phase = .idle
+    @State private var sweep: CGFloat = 0     // 0…1 around the ring (the "travel")
+    @State private var pop = false            // the little scale kick at the end
+    @State private var hovering = false
+
+    private var green: Color { colorProfile.color(for: .success) }
+
+    var body: some View {
+        Button(action: start) {
+            ZStack {
+                // The ring: a full, faint hoop at rest; the bright arc rides over it as it fills.
+                Circle().strokeBorder(green.opacity(phase == .idle ? (hovering ? 0.55 : 0.4) : 0.18), lineWidth: 1.5)
+                Circle()
+                    .trim(from: 0, to: phase == .idle ? 0 : sweep)
+                    .stroke(green, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                    .rotationEffect(.degrees(-90))   // start the sweep at 12 o'clock
+                Image(systemName: phase == .done ? "checkmark" : "arrow.triangle.merge")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(green)
+                    .opacity(phase == .merging ? 0 : 1)   // step aside while the ring travels
+            }
+            .frame(width: 18, height: 18)
+            .scaleEffect(pop ? 1.18 : 1)
+            .frame(width: 28, height: 26)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(phase != .idle)
+        .help("Merge \(pr.shortRef)")
+        .onHover { hovering = $0 }
+    }
+
+    private func start() {
+        guard phase == .idle, model.confirmMerge(pr) else { return }
+        phase = .merging
+        let travel = reduceMotion ? 0.0 : 0.9
+        withAnimation(.easeInOut(duration: travel)) { sweep = 1 }
+        Task {
+            // Let the ring finish its lap even if GitHub answers first — the pop should feel earned.
+            async let lap: Void = Task.sleep(for: .seconds(travel))
+            let failure = await model.merge(pr)
+            try? await lap
+            if let failure {
+                withAnimation(.easeOut(duration: 0.25)) { sweep = 0 }
+                phase = .idle
+                model.reportMergeFailure(pr, failure)
+                return
+            }
+            Haptics.drop()
+            phase = .done
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) { pop = true }
+            withAnimation(.easeOut(duration: 0.2).delay(0.18)) { pop = false }
+            try? await Task.sleep(for: .seconds(0.65))
+            await model.refresh()   // the PR slides to Merged; this row goes with it.
+        }
+    }
+}
+
 private struct ExpandedButton: View {
     let symbol: String
     let help: String

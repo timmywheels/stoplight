@@ -192,6 +192,39 @@ final class AppModel {
         }
     }
 
+    /// Only your own open PRs that GitHub would merge right now: the only ones worth offering a merge button on.
+    func canMerge(_ pr: PullRequest) -> Bool {
+        isMine(pr) && pr.status == .open && !pr.isBranch && !pr.id.hasPrefix("queue:")
+            && (pr.mergeState == .clean || pr.mergeState == .unstable)
+    }
+
+    /// Ask before merging. Returns true when the user confirmed — the row then plays its merge animation and calls `merge`.
+    func confirmMerge(_ pr: PullRequest) -> Bool {
+        guard canMerge(pr) else { return false }
+        let alert = NSAlert()
+        alert.messageText = "Merge \(pr.shortRef)?"
+        alert.informativeText = pr.title + "\n\nThis merges it on GitHub using the repository's default method."
+        alert.addButton(withTitle: "Merge")
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate()
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    /// Merge `pr` on GitHub. Returns nil on success, or a short reason to show the user. The caller refreshes.
+    func merge(_ pr: PullRequest) async -> String? {
+        guard let provider else { return "Not signed in to GitHub" }
+        do { try await provider.mergePullRequest(repo: pr.repo, number: pr.number); return nil }
+        catch { return error.localizedDescription }
+    }
+
+    /// GitHub refused the merge: say so, once the row's animation has wound back.
+    func reportMergeFailure(_ pr: PullRequest, _ reason: String) {
+        let alert = NSAlert()
+        alert.messageText = "\(pr.shortRef) didn't merge"
+        alert.informativeText = reason
+        alert.runModal()
+    }
+
     /// Close `prs` on GitHub, then refresh. Returns what failed, as "repo#n: reason".
     func close(_ prs: [PullRequest]) async -> [String] {
         guard let provider else { return ["Not signed in to GitHub"] }

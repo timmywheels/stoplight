@@ -256,6 +256,38 @@ public struct GitHubProvider: CIProvider {
         guard (200..<300).contains(http.statusCode) else { throw Error.http(http.statusCode) }
     }
 
+    /// Merge a pull request the way the repo would (REST: PUT /repos/{repo}/pulls/{number}/merge).
+    /// GitHub's REST merge defaults to a merge commit, so we first ask the repo for the viewer's default
+    /// method and pass it explicitly — the button matches whatever the repo is set up to do.
+    public func mergePullRequest(repo: String, number: Int) async throws {
+        let method = try await defaultMergeMethod(repo: repo)
+        var req = URLRequest(url: URL(string: "https://api.github.com/repos/\(repo)/pulls/\(number)/merge")!)
+        req.httpMethod = "PUT"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        req.setValue("Stoplight/0.1", forHTTPHeaderField: "User-Agent")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["merge_method": method])
+        let (_, resp) = try await session.data(for: req)
+        guard let http = resp as? HTTPURLResponse else { throw Error.http(-1) }
+        if http.statusCode == 401 { throw Error.unauthorized }
+        guard (200..<300).contains(http.statusCode) else { throw Error.http(http.statusCode) }
+    }
+
+    /// The repo's default merge method for this viewer, as the REST merge body spells it: "merge", "squash", "rebase".
+    private func defaultMergeMethod(repo: String) async throws -> String {
+        let parts = repo.split(separator: "/", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else { return "merge" }
+        let query = "query($owner:String!,$name:String!){repository(owner:$owner,name:$name){viewerDefaultMergeMethod}}"
+        let data = try await post(["query": query, "variables": ["owner": parts[0], "name": parts[1]]])
+        struct R: Decodable { struct D: Decodable { struct Repo: Decodable { let viewerDefaultMergeMethod: String? }; let repository: Repo? }; let data: D? }
+        let method = try JSONDecoder().decode(R.self, from: data).data?.repository?.viewerDefaultMergeMethod
+        switch method {
+        case "SQUASH": return "squash"
+        case "REBASE": return "rebase"
+        default: return "merge"   // MERGE, or a repo that didn't say: a plain merge commit.
+        }
+    }
+
     // MARK: - Transport
 
     private func post(_ body: [String: Any]) async throws -> Data {
