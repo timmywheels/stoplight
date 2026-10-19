@@ -228,3 +228,56 @@ export async function fetchViaGh(gh: string): Promise<Snapshot> {
   }
   return snapshotFromResponse(JSON.parse(stdout) as SearchResponse);
 }
+
+const REPO = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+
+const MERGE_METHOD_QUERY = `query($owner: String!, $name: String!) {
+  repository(owner: $owner, name: $name) { viewerDefaultMergeMethod }
+}`;
+
+const MERGE_MUTATION = `mutation($id: ID!, $method: PullRequestMergeMethod!) {
+  mergePullRequest(input: { pullRequestId: $id, mergeMethod: $method }) { pullRequest { merged } }
+}`;
+
+/** gh exits non-zero on a GraphQL error but still prints the error JSON; keep that so the caller can read it. */
+async function runGh(gh: string, args: string[]): Promise<string> {
+  try {
+    const { stdout } = await run(gh, args, { maxBuffer: 8 * 1024 * 1024, timeout: 20_000 });
+    return stdout;
+  } catch (error) {
+    const e = error as { stdout?: string; stderr?: string };
+    if (e.stdout?.includes('"data"') || e.stdout?.includes('"errors"')) return e.stdout;
+    throw new Error(e.stderr?.trim() || (error as Error).message);
+  }
+}
+
+/** The merge method GitHub's own green button would use for this viewer on this repo (MERGE / SQUASH / REBASE). */
+async function viewerDefaultMergeMethod(gh: string, owner: string, name: string): Promise<string> {
+  const response = JSON.parse(
+    await runGh(gh, [
+      "api",
+      "graphql",
+      "-f",
+      `query=${MERGE_METHOD_QUERY}`,
+      "-f",
+      `owner=${owner}`,
+      "-f",
+      `name=${name}`,
+    ]),
+  ) as { data?: { repository?: { viewerDefaultMergeMethod?: string } }; errors?: { message: string }[] };
+  const method = response.data?.repository?.viewerDefaultMergeMethod;
+  if (!method) throw new Error(response.errors?.[0]?.message ?? "Couldn't read the repository's merge settings");
+  return method;
+}
+
+/** Merge a PR with its repository's default merge method, matching GitHub's green button. Throws a readable error. */
+export async function mergePullRequest(gh: string, pr: PullRequest): Promise<void> {
+  if (!REPO.test(pr.repo)) throw new Error(`Not a repository: ${pr.repo}`);
+  const [owner, name] = pr.repo.split("/");
+  const method = await viewerDefaultMergeMethod(gh, owner, name);
+  const response = JSON.parse(
+    await runGh(gh, ["api", "graphql", "-f", `query=${MERGE_MUTATION}`, "-f", `id=${pr.id}`, "-f", `method=${method}`]),
+  ) as { data?: { mergePullRequest?: { pullRequest?: { merged?: boolean } } }; errors?: { message: string }[] };
+  if (response.errors?.length) throw new Error(response.errors[0].message);
+  if (!response.data?.mergePullRequest?.pullRequest?.merged) throw new Error("GitHub didn't merge the pull request");
+}

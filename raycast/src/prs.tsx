@@ -170,6 +170,7 @@ export default function Command(props: LaunchProps<{ launchContext?: LaunchConte
       ghPath={ghPath}
       demo={demo}
       showAuthor={showsAuthor(row.pr, row.section, viewer)}
+      viewer={viewer}
       profile={profile}
     />
   );
@@ -236,7 +237,16 @@ export default function Command(props: LaunchProps<{ launchContext?: LaunchConte
                 subtitle={showsAuthor(pr, section, viewer) ? `${ref} · @${pr.author}` : ref}
                 keywords={[pr.repo, String(pr.number), pr.headRefName, pr.author].filter(Boolean)}
                 accessories={accessories(row, pinned.has(pr.id), profile)}
-                actions={<PRActions pr={pr} stoplight={stoplight} refresh={refresh} details={detailView(row)} />}
+                actions={
+                  <PRActions
+                    pr={pr}
+                    stoplight={stoplight}
+                    refresh={refresh}
+                    details={detailView(row)}
+                    viewer={viewer}
+                    gh={ghFound}
+                  />
+                }
               />
             );
           })}

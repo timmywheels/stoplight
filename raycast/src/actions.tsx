@@ -1,12 +1,34 @@
-import { Action, ActionPanel, Application, Icon, Keyboard } from "@raycast/api";
+import { Action, ActionPanel, Alert, Application, confirmAlert, Icon, Keyboard, showToast, Toast } from "@raycast/api";
 import { ReactNode } from "react";
-import { actionsRunURL, checksURL, isBranch, PullRequest, queueURL, reviewURL, shareLink, shortRef } from "./lib/model";
+import { actionsRunURL, checksURL, isBranch, PullRequest, queueURL, shareLink, shortRef } from "./lib/model";
+import { mergePullRequest } from "./lib/github";
 import { STOPLIGHT_RELEASES } from "./lib/install";
-import { glyph } from "./style";
+import { glyph, stateColor } from "./style";
+
+/** Ask, then merge the PR with its repo's default method, narrating the one step through a toast. */
+async function merge(pr: PullRequest, gh: string, refresh: () => void) {
+  const confirmed = await confirmAlert({
+    title: `Merge ${shortRef(pr)}?`,
+    message: pr.title,
+    icon: glyph("merge", stateColor("success")),
+    primaryAction: { title: "Merge", style: Alert.ActionStyle.Default },
+  });
+  if (!confirmed) return;
+  const toast = await showToast({ style: Toast.Style.Animated, title: "Merging…" });
+  try {
+    await mergePullRequest(gh, pr);
+    toast.style = Toast.Style.Success;
+    toast.title = "Merged";
+    refresh();
+  } catch (error) {
+    toast.style = Toast.Style.Failure;
+    toast.title = "Couldn't merge";
+    toast.message = error instanceof Error ? error.message : String(error);
+  }
+}
 
 /**
- * ↵ is the first action, ⌘↵ the second. In the list, ↵ opens the details page and ⌘↵ reviews in Stoplight;
- * on the details page, ↵ reviews in Stoplight and ⌘↵ copies the link to share.
+ * ↵ opens the PR on GitHub (also ⌘O). In the list ⌘↵ shows the details page; on the details page it copies the link.
  */
 export function PRActions(props: {
   pr: PullRequest;
@@ -15,11 +37,20 @@ export function PRActions(props: {
   details?: ReactNode;
   view?: ReactNode;
   jobs?: ReactNode;
+  viewer?: string;
+  gh?: string;
 }) {
-  const { pr, stoplight } = props;
+  const { pr, stoplight, viewer, gh } = props;
   const run = actionsRunURL(pr);
   const queue = queueURL(pr);
   const onDetails = !props.details;
+  // Your own open PR, and in a state GitHub would merge: the only time the button appears.
+  const canMerge =
+    gh &&
+    viewer &&
+    pr.author.toLowerCase() === viewer.toLowerCase() &&
+    pr.status === "open" &&
+    ["clean", "unstable"].includes(pr.mergeState);
 
   const copyURL = (
     <Action.CopyToClipboard
@@ -33,23 +64,24 @@ export function PRActions(props: {
   return (
     <ActionPanel title={shortRef(pr)}>
       <ActionPanel.Section>
-        {props.details && <Action.Push title="Show Details" icon={Icon.Sidebar} target={props.details} />}
-        {stoplight && !isBranch(pr) && (
-          <Action.Open
-            title="Review in Stoplight"
-            icon={{ fileIcon: stoplight.path }}
-            target={reviewURL(pr)}
-            application={stoplight}
-          />
-        )}
-        {onDetails && copyURL}
         <Action.OpenInBrowser
           title={isBranch(pr) ? "Open Commit on GitHub" : "Open on GitHub"}
           icon={Icon.ArrowNe}
           url={pr.url}
           shortcut={Keyboard.Shortcut.Common.Open}
         />
+        {props.details && <Action.Push title="Show Details" icon={Icon.Sidebar} target={props.details} />}
+        {onDetails && copyURL}
       </ActionPanel.Section>
+      {canMerge && (
+        <ActionPanel.Section>
+          <Action
+            title="Merge Pull Request"
+            icon={glyph("merge", stateColor("success"))}
+            onAction={() => merge(pr, gh!, props.refresh)}
+          />
+        </ActionPanel.Section>
+      )}
       {props.view && <ActionPanel.Section title="View">{props.view}</ActionPanel.Section>}
       <ActionPanel.Section title="Dig Deeper">
         {props.jobs}

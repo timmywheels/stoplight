@@ -58,6 +58,7 @@ export function PRDetailView(props: {
   ghPath?: string;
   demo: boolean;
   showAuthor: boolean;
+  viewer?: string;
   profile: ColorProfile;
 }) {
   const { pr, activity } = props.row;
@@ -129,6 +130,8 @@ export function PRDetailView(props: {
           pr={pr}
           stoplight={props.stoplight}
           refresh={refresh}
+          viewer={props.viewer}
+          gh={gh}
           jobs={jobs(detail)
             .filter((job) => job.url && (job.state === "failure" || job.running))
             .slice(0, 5)
