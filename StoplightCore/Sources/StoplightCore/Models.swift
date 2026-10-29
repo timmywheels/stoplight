@@ -193,6 +193,8 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
     public let activity: [Activity]
     /// For merged PRs: this is my newest merge into its base branch, so its own CI is what the dots show.
     public let isLatestMerge: Bool
+    /// The repo's default branch ("" when unknown, e.g. an older cache).
+    public let defaultBranch: String
 
     public init(id: String, repo: String, number: Int, title: String, url: URL,
                 isDraft: Bool, updatedAt: Date, headSha: String, checks: [CheckResult],
@@ -200,7 +202,8 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
                 headRefName: String = "", baseRefName: String = "", mergeQueue: MergeQueueInfo? = nil,
                 mergeState: MergeState = .unknown,
                 mergedAt: Date? = nil, note: String? = nil, baseState: CIState? = nil,
-                review: ReviewDecision = .none, activity: [Activity] = [], isLatestMerge: Bool = false) {
+                review: ReviewDecision = .none, activity: [Activity] = [], isLatestMerge: Bool = false,
+                defaultBranch: String = "") {
         self.id = id
         self.repo = repo
         self.number = number
@@ -223,6 +226,7 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
         self.review = review
         self.activity = activity
         self.isLatestMerge = isLatestMerge
+        self.defaultBranch = defaultBranch
     }
 
     // Tolerant decoding so an older prs.json still loads (author/status added in US-011).
@@ -250,6 +254,7 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
         baseState = try c.decodeIfPresent(CIState.self, forKey: .baseState)
         activity = try c.decodeIfPresent([Activity].self, forKey: .activity) ?? []
         isLatestMerge = try c.decodeIfPresent(Bool.self, forKey: .isLatestMerge) ?? false
+        defaultBranch = try c.decodeIfPresent(String.self, forKey: .defaultBranch) ?? ""
     }
 
     /// Same PR, annotated with how its base branch is doing right now (US-028).
@@ -267,7 +272,7 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
                     headSha: headSha, checks: checks, author: author, status: status, summary: summary,
                     headRefName: headRefName, baseRefName: baseRefName, mergeQueue: mergeQueue, mergeState: mergeState,
                     mergedAt: mergedAt, note: note, baseState: baseState, review: review, activity: activity,
-                    isLatestMerge: isLatestMerge)
+                    isLatestMerge: isLatestMerge, defaultBranch: defaultBranch)
     }
 
     /// The same PR as a queue row (US-041). A distinct id keeps selection, expansion, pins and
@@ -278,19 +283,25 @@ public struct PullRequest: Codable, Sendable, Hashable, Identifiable {
                            updatedAt: updatedAt, headSha: headSha, checks: checks ?? self.checks, author: author, status: status,
                            summary: summary, headRefName: headRefName, baseRefName: baseRefName, mergeQueue: entry,
                            mergeState: mergeState, mergedAt: mergedAt, note: note, baseState: baseState,
-                           review: review)
+                           review: review, defaultBranch: defaultBranch)
     }
 
+    /// Merged into the repo's default branch. A merge into another branch (a stacked PR into its
+    /// parent) is history the moment it lands: it never lights the dots.
+    public var isIntoDefaultBranch: Bool { defaultBranch.isEmpty || baseRefName == defaultBranch }
+
     /// A merged PR is a live problem only when its own merge commit is red AND the base branch is still red.
-    public var isUnresolvedMerge: Bool { status == .merged && state == .failure && baseState == .failure }
+    public var isUnresolvedMerge: Bool { status == .merged && isIntoDefaultBranch && state == .failure && baseState == .failure }
 
     /// A merged PR whose merge commit's checks are still running (CI on the base branch).
     public var isLanding: Bool { status == .merged && state == .pending }
 
-    /// A merged PR whose own CI the dots show: any merge still running, and my newest merge into
-    /// each branch once it settles (green or red). For repos where CI only runs after merge, this is
-    /// the PR's real result. Older settled merges are history: a later merge has superseded them.
-    public var isTrackedMerge: Bool { isLanding || (status == .merged && isLatestMerge && !checks.isEmpty) }
+    /// A merged PR whose own CI the dots show: any merge into the default branch still running, and
+    /// my newest merge into it once it settles (green or red). For repos where CI only runs after
+    /// merge, this is the PR's real result. Older settled merges are history: a later merge has superseded them.
+    public var isTrackedMerge: Bool {
+        isIntoDefaultBranch && (isLanding || (status == .merged && isLatestMerge && !checks.isEmpty))
+    }
 
     /// Whether the dots count it: open PRs, plus tracked merges. Other merged PRs and followed
     /// branches have rows but no say in the tally, so every number matches a dot you can see in the list.

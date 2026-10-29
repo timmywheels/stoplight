@@ -350,7 +350,7 @@ public struct GitHubProvider: CIProvider {
       mergeQueueEntry { position state }
       mergeStateStatus
       reviewDecision
-      repository { nameWithOwner }
+      repository { nameWithOwner defaultBranchRef { name } }
       mergeCommit { ...CommitChecks }
       commits(last: 1) { nodes { commit { ...CommitChecks } } }
       reviews(last: 10) { nodes { databaseId state bodyText submittedAt url author { __typename login } } }
@@ -411,7 +411,8 @@ public struct GitHubProvider: CIProvider {
 
     private struct Node: Decodable {
         struct Author: Decodable { let login: String; let __typename: String? }
-        struct Repo: Decodable { let nameWithOwner: String }
+        struct Repo: Decodable { let nameWithOwner: String; let defaultBranchRef: Ref? }
+        struct Ref: Decodable { let name: String }
         /// A review or a comment (reviews have `state` and `submittedAt`, comments `createdAt`).
         struct Talk: Decodable {
             let databaseId: Int?
@@ -494,7 +495,8 @@ public struct GitHubProvider: CIProvider {
             mergeState: MergeState(github: n.mergeStateStatus),
             mergedAt: n.mergedAt,
             review: ReviewDecision(github: n.reviewDecision),
-            activity: activity(of: n)
+            activity: activity(of: n),
+            defaultBranch: n.repository?.defaultBranchRef?.name ?? ""
         )
     }
 

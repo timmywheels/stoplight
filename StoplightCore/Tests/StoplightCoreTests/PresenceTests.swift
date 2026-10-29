@@ -2,10 +2,12 @@ import XCTest
 @testable import StoplightCore
 
 final class PresenceTests: XCTestCase {
-    private func pr(_ id: String, _ s: CheckState?, draft: Bool = false, status: PRStatus = .open) -> PullRequest {
+    private func pr(_ id: String, _ s: CheckState?, draft: Bool = false, status: PRStatus = .open,
+                    base: String = "main", defaultBranch: String = "main") -> PullRequest {
         PullRequest(id: id, repo: "o/r", number: 1, title: "t", url: URL(string: "https://github.com/o/r/pull/1")!,
                     isDraft: draft, updatedAt: .now, headSha: "s",
-                    checks: s.map { [CheckResult(name: "ci", state: $0, url: nil)] } ?? [], status: status)
+                    checks: s.map { [CheckResult(name: "ci", state: $0, url: nil)] } ?? [], status: status,
+                    baseRefName: base, defaultBranch: defaultBranch)
     }
 
     func testLightsReflectEachStateIndependently() {
@@ -46,5 +48,17 @@ final class PresenceTests: XCTestCase {
         XCTAssertTrue(StatusPresence([pr("o", .failure, status: .merged).withBaseState(.pending)]).isDark)
         // No checks on the merge commit: nothing to show.
         XCTAssertFalse(pr("n", nil, status: .merged).withLatestMerge(true).isCounted)
+    }
+
+    func testMergeIntoAnotherBranchNeverLightsTheDots() {
+        // A stacked PR merged into its parent's branch: history, whatever its CI says.
+        let stacked = pr("s", .failure, status: .merged, base: "feature/pay-1").withLatestMerge(true).withBaseState(.failure)
+        XCTAssertFalse(stacked.isTrackedMerge)
+        XCTAssertFalse(stacked.isUnresolvedMerge)
+        XCTAssertFalse(stacked.isCounted)
+        XCTAssertFalse(pr("s", .pending, status: .merged, base: "feature/pay-1").isCounted)
+        XCTAssertTrue(StatusPresence([stacked]).isDark)
+        // An older cache without the default branch keeps counting as before.
+        XCTAssertTrue(pr("s", .pending, status: .merged, base: "feature/pay-1", defaultBranch: "").isCounted)
     }
 }

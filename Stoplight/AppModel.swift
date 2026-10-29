@@ -471,8 +471,8 @@ final class AppModel {
     var all: [PullRequest] {
         var seen = Set<String>()
         var out: [PullRequest] = []
-        // Merged PRs show up while their merge commit is running, or while it and the base branch are red.
-        let mergedAlerts = merged.filter { $0.isTrackedMerge || $0.isUnresolvedMerge || ($0.baseState == nil && !$0.checks.isEmpty) }
+        // Merges into the default branch show up while their merge commit is running, or while it and the base branch are red.
+        let mergedAlerts = merged.filter { $0.isTrackedMerge || $0.isUnresolvedMerge || ($0.isIntoDefaultBranch && $0.baseState == nil && !$0.checks.isEmpty) }
         for pr in mine + watched + followed.flatMap(\.prs) + inbound.flatMap(\.prs) + branches + mergedAlerts where seen.insert(pr.id).inserted {
             out.append(pr)
         }
