@@ -854,7 +854,6 @@ struct PRRow: View {
         switch level {
         case .blocking: stateColor(.failure)
         case .good: stateColor(.success)
-        case .merged: .githubMerged
         case .waiting, .info: .secondary
         }
     }

@@ -510,8 +510,8 @@ final class AppModel {
         }
         var out: [Section] = []
         out.append(Section(id: "Pinned", title: "Pinned", prs: take(all, pinnedOnly: true)))
-        // Merges whose CI the dots show sit with your PRs (tagged Merged).
-        out.append(Section(id: "Mine", title: "My PRs", prs: take(mine + merged.filter(\.isTrackedMerge))))
+        // Only open PRs: every merge, tracked or not, lives in the Merged section.
+        out.append(Section(id: "Mine", title: "My PRs", prs: take(mine)))
         out.append(Section(id: "Watching", title: "Watching", prs: take(watched)))
         for f in followed {
             var title = f.query.title
