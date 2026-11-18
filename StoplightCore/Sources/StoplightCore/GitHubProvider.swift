@@ -438,14 +438,14 @@ public struct GitHubProvider: CIProvider {
             let name: String?
             let status: String?
             let conclusion: String?
-            let detailsUrl: URL?
+            let detailsUrl: String?
             let startedAt: Date?
             let completedAt: Date?
             let checkSuite: CheckSuite?
             // StatusContext
             let context: String?
             let state: String?
-            let targetUrl: URL?
+            let targetUrl: String?
             let createdAt: Date?
         }
 
@@ -550,13 +550,20 @@ public struct GitHubProvider: CIProvider {
         switch c.__typename {
         case "CheckRun":
             guard let name = c.name else { return nil }
-            return CheckResult(name: name, state: checkRunState(status: c.status, conclusion: c.conclusion), url: c.detailsUrl)
+            return CheckResult(name: name, state: checkRunState(status: c.status, conclusion: c.conclusion), url: checkURL(c.detailsUrl))
         case "StatusContext":
             guard let name = c.context else { return nil }
-            return CheckResult(name: name, state: statusContextState(c.state), url: c.targetUrl)
+            return CheckResult(name: name, state: statusContextState(c.state), url: checkURL(c.targetUrl))
         default:
             return nil
         }
+    }
+
+    private static func checkURL(_ value: String?) -> URL? {
+        guard let value, !value.isEmpty, let url = URL(string: value),
+              let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
+              let host = url.host, !host.isEmpty else { return nil }
+        return url
     }
 
     /// GitHub CheckRun → CheckState. Exposed for tests.
