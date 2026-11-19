@@ -52,6 +52,14 @@ final class AppModel {
     private var lastSearch: (queries: [PRQuery], mine: [PullRequest], followed: [[PullRequest]], inbound: [[PullRequest]])?
     private(set) var lastRefresh: Date?
     private(set) var lastError: String?
+    /// When the last full refresh started, and how many in a row have failed. A failure retries
+    /// from the failed attempt, not from the last success: counting from the success made a long
+    /// outage retry every 5 seconds, which tripped GitHub's secondary rate limit on top of it.
+    @ObservationIgnored private var lastAttempt: Date?
+    @ObservationIgnored private var failures = 0
+    /// GitHub rate-limited us (HTTP 403/429): nothing is sent before this.
+    @ObservationIgnored private var holdUntil: Date?
+    private var isHeld: Bool { (holdUntil ?? .distantPast) > .now }
     private(set) var auth: AuthState = .unknown
     private(set) var isRefreshing = false
     private(set) var login: String?
@@ -604,19 +612,30 @@ final class AppModel {
     private var fullInterval: TimeInterval {
         let chosen = TimeInterval(prefs.refreshRate.rawValue)   // 0 = automatic
         if let rl = GitHubProvider.lastRateLimit, rl.remaining < 1000 { return max(chosen, 900) } // running low: back off
-        if lastError != nil { return 60 }   // a failed fetch retries soon, never "5 minutes because the list looks empty"
         return chosen > 0 ? chosen : 300
     }
 
-    private var fullRefreshDue: Bool {
-        guard let last = lastRefresh else { return true }
-        return Date.now.timeIntervalSince(last) >= fullInterval - 1
+    /// When the next full refresh is due. After a failure, retry soon (never "5 minutes because the
+    /// list looks empty") but back off while it keeps failing: 1, 2, 4 minutes after the failed
+    /// attempt, capped at the normal interval, and never before GitHub's own retry time.
+    private var nextFullRefresh: Date {
+        guard lastError != nil else { return (lastRefresh ?? .distantPast) + fullInterval }
+        let backoff = min(max(60, fullInterval), 60 * pow(2, Double(max(0, failures - 1))))
+        return max((lastAttempt ?? .distantPast) + backoff, holdUntil ?? .distantPast)
     }
 
+    private var fullRefreshDue: Bool { Date.now >= nextFullRefresh - 1 }
+
     private var nextInterval: TimeInterval {
-        let untilFull = max(5, fullInterval - Date.now.timeIntervalSince(lastRefresh ?? .distantPast))
+        let untilFull = max(5, nextFullRefresh.timeIntervalSinceNow)
         let ciRunning = all.contains { $0.state == .pending && $0.ref != nil }
-        return ciRunning ? min(60, untilFull) : untilFull
+        return ciRunning && !isHeld ? min(60, untilFull) : untilFull
+    }
+
+    /// GitHub said to slow down: hold every request until it said, or a minute if it didn't.
+    private func noteRateLimit(_ error: Swift.Error) {
+        guard case GitHubProvider.Error.rateLimited(let until) = error else { return }
+        holdUntil = max(until ?? .distantPast, .now + 60)
     }
 
     /// The panel opened: show fresh data if what's there is over 30 s old.
@@ -627,14 +646,16 @@ final class AppModel {
             Task { await signIn(); if case .signedIn = auth { await refresh() } }
             return
         }
-        guard Date.now.timeIntervalSince(lastRefresh ?? .distantPast) > 30 else { return }
+        // Measured from the last attempt too, so reopening the panel during an outage doesn't hammer GitHub.
+        let last = max(lastRefresh ?? .distantPast, lastAttempt ?? .distantPast)
+        guard Date.now.timeIntervalSince(last) > 30 else { return }
         Task { await refresh() }
     }
 
     /// Between full refreshes: re-fetch only PRs whose CI is still running (one small request),
     /// so a check going green or red still shows up within a minute.
     func refreshPending() async {
-        guard let provider, !isRefreshing else { return }
+        guard let provider, !isRefreshing, !isHeld else { return }
         let refs = all.filter { $0.state == .pending }.compactMap(\.ref)
         guard !refs.isEmpty else { return }
         isRefreshing = true
@@ -657,6 +678,7 @@ final class AppModel {
             bobIfJustTurnedGreen()
         } catch {
             log.error("pending refresh failed: \(String(describing: error), privacy: .public)")
+            noteRateLimit(error)
         }
     }
 
@@ -726,8 +748,9 @@ final class AppModel {
     // MARK: Fetch (US-002, US-011)
 
     func refresh() async {
-        guard let provider, !isRefreshing else { return }
+        guard let provider, !isRefreshing, !isHeld else { return }
         isRefreshing = true
+        lastAttempt = .now
         defer { isRefreshing = false }
         do {
             let refs = prefs.watched
@@ -798,6 +821,7 @@ final class AppModel {
             }
             lastRefresh = .now
             lastError = nil
+            failures = 0
             pruneClosedWatches()
             prunePins()
             publishSnapshot()
@@ -810,6 +834,8 @@ final class AppModel {
             // Keep last good data on screen; surface the error as "stale" (US-002).
             log.error("refresh failed: \(String(describing: error), privacy: .public)")
             lastError = error.localizedDescription
+            failures += 1
+            noteRateLimit(error)
             if case GitHubProvider.Error.unauthorized = error {
                 auth = .failed("Token rejected")
                 self.provider = nil

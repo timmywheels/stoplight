@@ -8,12 +8,16 @@ public struct GitHubProvider: CIProvider {
         case http(Int)
         case graphQL(String)
         case unauthorized
+        /// HTTP 403/429 from the GraphQL endpoint: a rate limit, usually the secondary one that
+        /// trips on bursts. `until` is when GitHub said to try again, when it said.
+        case rateLimited(until: Date?)
 
         public var errorDescription: String? {
             switch self {
             case .http(let code): "GitHub returned HTTP \(code)"
             case .graphQL(let msg): msg
             case .unauthorized: "GitHub rejected the token"
+            case .rateLimited: "GitHub asked Stoplight to slow down"
             }
         }
     }
@@ -37,36 +41,83 @@ public struct GitHubProvider: CIProvider {
 
     // MARK: - Public
 
-    /// One request per search, in parallel. A single request holding every search (each up to 50 PRs
-    /// with all their checks) was big enough for GitHub to time out on (HTTP 504), failing the whole refresh.
+    /// PRs per detail request. A search asking for up to 50 PRs with all their checks ran past
+    /// GitHub's 10-second query limit on busy afternoons (HTTP 504 on every refresh, for hours).
+    /// Fetched by ID in small batches, each request stays well under it, and one that does time
+    /// out is cheap to retry.
+    static let detailBatch = 10
+    /// Detail requests in flight at once: GitHub's secondary rate limit punishes bursts.
+    static let maxInFlight = 4
+
+    /// Two steps: every search in one request asking only for IDs (fast however many PRs match),
+    /// then each PR's detail once, in small batches. A PR found by several searches is fetched once.
     public func fetchPullRequests(queries: [PRQuery]) async throws -> [[PullRequest]] {
         guard !queries.isEmpty else { return [] }
-        return try await withThrowingTaskGroup(of: (Int, [PullRequest]).self) { group in
-            for (i, q) in queries.enumerated() {
-                group.addTask {
-                    let data = try await self.post(["query": Self.searchQuery([q])])
-                    let env = try Self.decoder.decode(SearchEnvelope.self, from: data)
-                    guard let results = env.data else {
-                        throw Error.graphQL(env.errors?.first?.message ?? "Empty response")
-                    }
-                    return (i, (results["q0"]??.nodes ?? []).compactMap(Self.map))
-                }
-            }
-            var out = Array(repeating: [PullRequest](), count: queries.count)
-            for try await (i, prs) in group { out[i] = prs }
-            return out
+        let data = try await post(["query": Self.searchIDsQuery(queries)])
+        let env = try Self.decoder.decode(IDSearchEnvelope.self, from: data)
+        // A search that errors (an SSO-protected org) comes back null beside the others: it finds nothing.
+        guard let results = env.data else {
+            throw Error.graphQL(env.errors?.first?.message ?? "Empty response")
         }
+        let idLists = queries.indices.map { i in (results["q\(i)"]??.nodes ?? []).compactMap { $0?.id } }
+        var seen = Set<String>()
+        let unique = idLists.joined().filter { seen.insert($0).inserted }
+        let details = try await pullRequests(ids: unique)
+        return idLists.map { $0.compactMap { details[$0] } }
+    }
+
+    /// Full detail for PRs by node ID, keyed by ID. IDs GitHub can't resolve are left out.
+    private func pullRequests(ids: [String]) async throws -> [String: PullRequest] {
+        let batches = try await Self.inBatches(ids, size: Self.detailBatch) { batch in
+            let data = try await self.post(["query": Self.nodesQuery, "variables": ["ids": batch]])
+            let env = try Self.decoder.decode(NodesEnvelope.self, from: data)
+            guard let nodes = env.data?.nodes else {
+                throw Error.graphQL(env.errors?.first?.message ?? "Empty response")
+            }
+            return nodes.compactMap { $0.flatMap(Self.map) }
+        }
+        return Dictionary(batches.joined().map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
     }
 
     public func fetchPullRequests(refs: [PRRef]) async throws -> [PullRequest] {
         guard !refs.isEmpty else { return [] }
-        let data = try await post(["query": Self.refsQuery(refs)])
-        let env = try Self.decoder.decode(RefsEnvelope.self, from: data)
-        // Partial results are normal here (a private repo you lost access to, a deleted PR). Only throw when nothing came back.
-        guard let repos = env.data else {
-            throw Error.graphQL(env.errors?.first?.message ?? "Empty response")
+        return try await Self.inBatches(refs, size: Self.detailBatch) { batch in
+            let data = try await self.post(["query": Self.refsQuery(batch)])
+            let env = try Self.decoder.decode(RefsEnvelope.self, from: data)
+            // Partial results are normal here (a private repo you lost access to, a deleted PR). Only throw when nothing came back.
+            guard let repos = env.data else {
+                throw Error.graphQL(env.errors?.first?.message ?? "Empty response")
+            }
+            return repos.values.compactMap { $0?.pullRequest }.compactMap(Self.map)
+        }.flatMap { $0 }
+    }
+
+    /// Run `work` on `items` in batches of `size`, at most `maxInFlight` at once. Results keep batch order.
+    static func inBatches<T: Sendable, R: Sendable>(
+        _ items: [T], size: Int, maxInFlight: Int = GitHubProvider.maxInFlight,
+        _ work: @escaping @Sendable ([T]) async throws -> R
+    ) async throws -> [R] {
+        let batches = stride(from: 0, to: items.count, by: max(1, size)).map {
+            Array(items[$0..<min($0 + max(1, size), items.count)])
         }
-        return repos.values.compactMap { $0?.pullRequest }.compactMap(Self.map)
+        return try await withThrowingTaskGroup(of: (Int, R).self) { group in
+            var out = [R?](repeating: nil, count: batches.count)
+            var next = 0
+            while next < min(max(1, maxInFlight), batches.count) {
+                let i = next
+                group.addTask { (i, try await work(batches[i])) }
+                next += 1
+            }
+            while let (i, r) = try await group.next() {
+                out[i] = r
+                if next < batches.count {
+                    let j = next
+                    group.addTask { (j, try await work(batches[j])) }
+                    next += 1
+                }
+            }
+            return out.compactMap { $0 }
+        }
     }
 
     /// Pull requests with `sha` among their commits (or as their merge commit), in repos owned by
@@ -320,8 +371,20 @@ public struct GitHubProvider: CIProvider {
             Self.lastRateLimit = RateLimit(remaining: rem, resetAt: reset)
         }
         if http.statusCode == 401 { throw Error.unauthorized }
+        if [403, 429].contains(http.statusCode) { throw Error.rateLimited(until: Self.retryTime(http)) }
         guard (200..<300).contains(http.statusCode) else { throw Error.http(http.statusCode) }
         return data
+    }
+
+    /// When a rate-limited response says to try again: `Retry-After` seconds, or the hourly reset
+    /// when the hourly budget is spent. Nil when GitHub didn't say. Exposed for tests.
+    static func retryTime(_ http: HTTPURLResponse, now: Date = .now) -> Date? {
+        if let s = http.value(forHTTPHeaderField: "retry-after").flatMap(TimeInterval.init) { return now + s }
+        if http.value(forHTTPHeaderField: "x-ratelimit-remaining") == "0",
+           let reset = http.value(forHTTPHeaderField: "x-ratelimit-reset").flatMap(TimeInterval.init) {
+            return Date(timeIntervalSince1970: reset)
+        }
+        return nil
     }
 
     private static let decoder: JSONDecoder = {
@@ -377,13 +440,16 @@ public struct GitHubProvider: CIProvider {
     }
     """
 
-    /// All searches in one request via aliases q0…qN. Query strings only contain validated identifiers.
-    static func searchQuery(_ queries: [PRQuery]) -> String {
+    /// All searches in one request via aliases q0…qN, IDs only. Query strings only contain validated identifiers.
+    static func searchIDsQuery(_ queries: [PRQuery]) -> String {
         let fields = queries.enumerated().map { i, q in
-            "q\(i): search(query: \"\(q.githubSearch)\", type: ISSUE, first: 50) { nodes { ... on PullRequest { ...PRFields } } }"
+            "q\(i): search(query: \"\(q.githubSearch)\", type: ISSUE, first: 50) { nodes { ... on PullRequest { id } } }"
         }
-        return "query {\n" + fields.joined(separator: "\n") + "\n}\n" + prFields
+        return "query {\n" + fields.joined(separator: "\n") + "\n}"
     }
+
+    /// Full detail for a batch of PRs by node ID; the IDs go in as a variable.
+    static let nodesQuery = "query($ids: [ID!]!) { nodes(ids: $ids) { ... on PullRequest { ...PRFields } } }\n" + prFields
 
     /// One request for all watched refs via aliases. PRRef validates owner/name/number, so interpolation is safe.
     static func refsQuery(_ refs: [PRRef]) -> String {
@@ -400,6 +466,19 @@ public struct GitHubProvider: CIProvider {
     private struct SearchEnvelope: Decodable {
         struct Search: Decodable { let nodes: [Node]? }
         let data: [String: Search?]?
+        let errors: [GQLError]?
+    }
+
+    private struct IDSearchEnvelope: Decodable {
+        struct ID: Decodable { let id: String? }
+        struct Search: Decodable { let nodes: [ID?]? }
+        let data: [String: Search?]?
+        let errors: [GQLError]?
+    }
+
+    private struct NodesEnvelope: Decodable {
+        struct Nodes: Decodable { let nodes: [Node?]? }
+        let data: Nodes?
         let errors: [GQLError]?
     }
 

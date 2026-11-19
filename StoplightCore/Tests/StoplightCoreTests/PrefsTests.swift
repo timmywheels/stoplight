@@ -29,9 +29,11 @@ final class PrefsTests: XCTestCase {
         XCTAssertEqual(PRQuery.author("bob").githubSearch, "is:pr is:open archived:false author:bob")
         XCTAssertEqual(PRQuery.repo("acme/api").githubSearch, "is:pr is:open archived:false repo:acme/api")
         XCTAssertEqual(PRQuery.org("acme").githubSearch, "is:pr is:open archived:false org:acme")
-        let q = GitHubProvider.searchQuery([.authored, .author("bob")])
+        let q = GitHubProvider.searchIDsQuery([.authored, .author("bob")])
         XCTAssertTrue(q.contains("q0: search(query: \"is:pr is:open archived:false author:@me\""))
         XCTAssertTrue(q.contains("q1: search(query: \"is:pr is:open archived:false author:bob\""))
+        // The search asks for IDs only; detail comes in small batches afterwards.
+        XCTAssertFalse(q.contains("PRFields"))
     }
 
     func testBranchRefSpec() {
